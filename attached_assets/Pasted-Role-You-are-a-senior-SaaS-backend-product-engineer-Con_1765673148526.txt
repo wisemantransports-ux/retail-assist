@@ -1,0 +1,192 @@
+Role:
+You are a senior SaaS backend & product engineer.
+
+Context:
+This is a production-ready SaaS app called Retail Assist.
+The app already has:
+
+User signup & login
+
+Admin dashboard
+
+Client dashboard (partially gated)
+
+PayPal subscription plans already created externally ($22 / $45 / $75)
+
+Manual admin approval system
+
+
+Goal:
+Users MUST pay first before their account can be approved and fully activated.
+Admin still has final control to approve or suspend accounts.
+
+
+---
+
+🎯 REQUIRED FLOW (DO NOT CHANGE ARCHITECTURE)
+
+1️⃣ Signup Flow (Client)
+
+When a user signs up:
+
+Create the user with status:
+
+
+status: "unpaid"
+subscription_status: "pending"
+
+User can log in
+
+User CANNOT access dashboard features
+
+Redirect user to Payment Required page
+
+
+
+---
+
+2️⃣ Payment Page (Critical)
+
+Create or complete: /dashboard/billing/payment-required
+
+This page must:
+
+Show selected plan
+
+Show PayPal subscription payment link
+
+Explain clearly:
+
+> “Your account will be activated after payment and admin approval.”
+
+
+
+
+Plans:
+
+Starter → $22/month
+
+Pro → $45/month
+
+Enterprise → $75/month
+
+
+⚠ DO NOT auto-activate after payment.
+
+
+---
+
+3️⃣ Payment Confirmation (Manual but Structured)
+
+Since PayPal is manual for now:
+
+After payment:
+
+User clicks "I Have Paid"
+
+This updates user record to:
+
+
+payment_status: "paid"
+subscription_status: "awaiting_approval"
+
+Log this event in admin logs
+
+
+
+---
+
+4️⃣ Admin Approval Flow (Core Requirement)
+
+In Admin Dashboard:
+
+Admin must see:
+
+User plan
+
+Payment status
+
+Signup date
+
+Buttons:
+
+✅ Approve Account
+
+❌ Reject / Suspend
+
+
+
+When Admin clicks Approve:
+
+status: "active"
+subscription_status: "active"
+activated_at: timestamp
+
+Only after this:
+
+Client dashboard unlocks
+
+Meta integrations work
+
+AI automation runs
+
+
+
+---
+
+5️⃣ Route Protection (Enforced)
+
+Update route guards so that:
+
+User Status	Access
+
+unpaid	❌ dashboard
+paid + pending	❌ dashboard
+active	✅ full access
+suspended	❌ access
+
+
+
+---
+
+6️⃣ Client Messaging (UX)
+
+Every blocked page should clearly say:
+
+If unpaid → “Please complete payment”
+
+If paid but not approved → “Awaiting admin approval”
+
+
+
+---
+
+7️⃣ Non-NegOTIABLE RULES
+
+❌ Do NOT auto-approve users
+
+❌ Do NOT change pricing
+
+❌ Do NOT add Stripe or new gateways
+
+❌ Do NOT refactor database structure
+
+✅ Build on existing admin + auth logic
+
+✅ Production-ready code only
+
+
+
+---
+
+✅ Final Deliverables
+
+Working pay-before-approval flow
+
+Admin-controlled activation
+
+Clear client UX
+
+Secure gating
+
+No breaking changes

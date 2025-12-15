@@ -1,0 +1,93 @@
+25-12-14T09:17:57Z info: Running Security Scan
+2025-12-14T09:18:09Z info: Security Scan Complete
+2025-12-14T09:18:09Z info: Connecting to builder
+2025-12-14T09:18:10Z info: Builder connected
+2025-12-14T09:18:10Z info: Installing packages
+--> npm install
+
+
+up to date, audited 401 packages in 3s
+
+2025-12-14T09:18:13Z info: Starting Build
+
+> retail-assist-app@0.1.0 build
+> next build
+
+
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+
+   Creating an optimized production build ...
+
+
+> Build error occurred
+
+Error: Turbopack build failed with 78 errors:
+./app/lib/supabase/server.ts:2:1
+Ecmascript file had an error
+  1 | // FIXED: ensure createServerSupabaseClient export matches server-only pattern required by server components
+> 2 | import { cookies } from 'next/headers';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  3 | import { createClient as supabaseCreateClient } from '@supabase/supabase-js';
+  4 |
+  5 | /**
+
+You're importing a component that needs "next/headers". That only works in a Server Component but one of its parents is marked with "use client", so it's a Client Component.
+Learn more: https://nextjs.org/docs/app/building-your-application/rendering
+
+
+
+Import traces:
+  #1 [App Route]:
+    ./app/lib/supabase/server.ts
+    ./app/api/agent/[agentId]/route.ts
+
+  #2 [App Route]:
+    ./app/lib/supabase/server.ts
+    ./app/lib/replit-db/session.ts
+    ./app/api/admin/settings/route.ts
+
+  #3 [Client Component Browser]:
+    ./app/lib/supabase/server.ts [Client Component Browser]
+    ./app/lib/supabase/queries.ts [Client Component Browser]
+    ./app/dashboard/[workspaceId]/billing/page.tsx [Client Component Browser]
+    ./app/dashboard/[workspaceId]/billing/page.tsx [Server Component]
+
+  #4 [Client Component SSR]:
+    ./app/lib/supabase/server.ts [Client Component SSR]
+    ./app/lib/supabase/queries.ts [Client Component SSR]
+    ./app/dashboard/[workspaceId]/billing/page.tsx [Client Component SSR]
+    ./app/dashboard/[workspaceId]/billing/page.tsx [Server Component]
+
+
+./app/api/workspace/invite/accept/route.ts:2:1
+Export acceptInvite doesn't exist in target module
+  1 | import { createServerClient } from '@/lib/supabase/server';
+> 2 | import { acceptInvite } from '@/lib/supabase/queries';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  3 | import { NextRequest, NextResponse } from 'next/server';
+  4 |
+  5 | /**
+
+The export acceptInvite was 
+omment/runCommentAutomation.ts:7:1)
+    at <unknown> (./app/api/billing/checkout/momo/route.ts:5:1)
+    at <unknown> (./app/api/billing/momo/confirm/route.ts:3:1)
+    at <unknown> (./app/api/billing/paypal/capture/route.ts:3:1)
+    at <unknown> (./app/api/billing/paypal/webhook/route.ts:4:1)
+    at <unknown> (./app/api/billing/stripe/webhook/route.ts:3:1)
+    at <unknown> (./app/api/billing/paypal/capture/route.ts:3:1)
+    at <unknown> (./app/api/billing/stripe/webhook/route.ts:3:1)
+    at <unknown> (./app/api/payments/mobile-money/admin/reject/route.ts:3:1)
+    at <unknown> (./app/api/workspace/member/remove/route.ts:2:1)
+    at <unknown> (./app/api/agent/[agentId]/comments/route.ts:4:1)
+    at <unknown> (./app/lib/automation/comment/runCommentAutomation.ts:7:1)
+    at <unknown> (./app/api/billing/mobile-money/submit/route.ts:3:1)
+    at <unknown> (./app/api/payments/mobile-money/initiate/route.ts:3:1)
+    at <unknown> (./app/api/automation/rule/[ruleId]/route.ts:1:1)
+    at <unknown> (./app/api/workspace/member/role/route.ts:2:1)
+    at <unknown> (./app/api/payments/paypal/capture/route.ts:4:1)
+    at <unknown> (./app/api/billing/momo/confirm/route.ts:3:1)
+    at <unknown> (./app/api/billing/paypal/capture/route.ts:3:1)
+    at <unknown> (./app/api/billing/paypal/webhook/route.ts:4:1)
+    at <unknown> (./app/api/webhooks/paypal/route.ts:4:1)
+

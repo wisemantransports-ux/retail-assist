@@ -1,0 +1,51 @@
+{
+  "id": "WH-ABC123FAKE456789",
+  "event_version": "1.0",
+  "create_time": "2025-12-10T12:00:00Z",
+  "event_type": "PAYMENT.CAPTURE.COMPLETED",
+  "summary": "Payment completed for Order-123",
+  "resource_type": "capture",
+  "resource": {
+    "status": "COMPLETED",
+    "links": [
+      {
+        "rel": "up",
+        "href": "https://api.sandbox.paypal.com/v2/checkout/orders/6KH60ZW27LS62"
+      }
+    ],
+    "id": "5SY405966H123456S",
+    "final_capture": true,
+    "seller_protection": {
+      "status": "ELIGIBLE",
+      "dispute_categories": [
+        "ITEM_NOT_RECEIVED",
+        "UNAUTHORIZED_TRANSACTION"
+      ]
+    },
+    "supplementary_data": {
+      "related_ids": {
+        "order_id": "6KH60ZW27LS62"
+      }
+    },
+    "create_time": "2025-12-10T12:00:00Z",
+    "update_time": "2025-12-10T12:00:00Z",
+    "amount": {
+      "value": "29.00",
+      "currency_code": "USD"
+    },
+    "custom_id": "workspace-uuid-123",
+    "invoice_id": "INV-2025-12-001"
+  },
+  "links": [
+    {
+      "href": "https://api.sandbox.paypal.com/v2/notifications/webhooks-events/WH-ABC123FAKE456789",
+      "rel": "self",
+      "method": "GET"
+    },
+    {
+      "href": "https://api.sandbox.paypal.com/v2/notifications/webhooks/WH-ABC123FAKE456789/resend",
+      "rel": "resend",
+      "method": "POST"
+    }
+  ]
+}

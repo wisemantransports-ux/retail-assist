@@ -1,0 +1,261 @@
+Role:
+You are a senior SaaS engineer working on an existing Next.js Retail Assist App already uploaded in this Replit workspace.
+Do NOT rebuild the app, do NOT change architecture unnecessarily.
+Your task is to implement pricing plans, subscription logic, and feature limits based on the instructions below.
+
+
+---
+
+🎯 GOAL
+
+Make the app commercially usable by enforcing subscription plans, controlling feature access, and supporting manual + automated activation by the admin.
+
+This app is hosted on Replit, uses Replit database / APIs, and is intended for African SMBs using Facebook & Instagram automation.
+
+
+---
+
+💳 PRODUCT NAME (already created in PayPal)
+
+Product Name: Retail Assist
+Product Description:
+AI-powered social media automation tool for businesses to auto-reply to Facebook & Instagram comments and messages, manage conversations, and increase sales.
+
+
+---
+
+💰 SUBSCRIPTION PLANS (IMPLEMENT EXACTLY)
+
+1️⃣ STARTER PLAN
+
+Price: $22 / month
+
+Features:
+
+Facebook Messenger auto-reply
+
+Comment-to-DM automation (limited)
+
+1 Facebook Page / Account
+
+Basic AI responses
+
+
+Limits:
+
+Max 1 page
+
+Comment automation capped (set reasonable internal limit)
+
+
+
+
+---
+
+2️⃣ PRO PLAN
+
+Price: $44 / month
+
+Features:
+
+Facebook + Instagram automation
+
+Comment-to-DM automation (higher limit)
+
+AI-powered responses
+
+3 Pages / Accounts
+
+
+Limits:
+
+Max 3 pages
+
+Higher automation volume than Starter
+
+
+
+
+---
+
+3️⃣ ENTERPRISE PLAN
+
+Price: $74 / month
+
+Features:
+
+All features unlocked
+
+Unlimited pages/accounts
+
+Priority support
+
+Custom automation rules
+
+
+Limits:
+
+No enforced limits
+
+
+
+
+---
+
+🧠 BILLING & ACCESS LOGIC
+
+Subscription Status
+
+Each business account must have:
+
+plan_type (starter | pro | enterprise)
+
+subscription_status (pending | active | suspended)
+
+billing_start_date
+
+billing_end_date
+
+
+
+---
+
+Admin Controls (VERY IMPORTANT)
+
+Admin must be able to:
+
+Manually approve or reject new business signups
+
+Manually activate / suspend subscriptions
+
+Change a client’s plan manually
+
+
+Automation should NOT override admin decisions
+
+
+
+---
+
+Client Access Rules
+
+If subscription_status !== active
+
+Client cannot access dashboard features
+
+Show message: “Your subscription is inactive. Please contact support.”
+
+
+
+
+---
+
+🔌 PAYMENT INTEGRATION (CURRENT PHASE)
+
+Assume PayPal subscription links are used
+
+Do NOT overbuild webhooks now
+
+Store:
+
+PayPal subscription ID
+
+Plan selected
+
+
+Admin will manually verify payment initially
+
+
+(Leave hooks/placeholders for future automated verification)
+
+
+---
+
+🧩 WHAT TO IMPLEMENT (STEP BY STEP)
+
+1. Pricing Page
+
+Display all 3 plans clearly
+
+Monthly pricing only
+
+CTA: “Subscribe”
+
+
+
+2. Signup Flow
+
+Business signs up
+
+Chooses a plan
+
+Status = pending
+
+Admin reviews and activates
+
+
+
+3. Dashboard Access Control
+
+Enforce feature limits based on plan
+
+Hide unavailable features per plan
+
+
+
+4. Admin Dashboard Enhancements
+
+View all businesses
+
+View selected plan
+
+Activate / Suspend
+
+Change plan
+
+
+
+
+
+---
+
+🚫 IMPORTANT CONSTRAINTS
+
+Do NOT:
+
+Remove Facebook / Instagram features
+
+Add Supabase, Netlify, Stripe, or external services
+
+Redesign UI unless necessary
+
+
+Do:
+
+Build on existing code
+
+Use Replit DB or existing storage
+
+Keep changes minimal and efficient
+
+
+
+
+---
+
+✅ FINAL OUTPUT EXPECTED
+
+Fully working pricing + subscription logic
+
+Admin-controlled activation
+
+Clients only access features they paid for
+
+App ready for real paying customers
+
+
+
+---
+
+If anything is unclear, ask before making assumptions.
+Otherwise, proceed with implementation.

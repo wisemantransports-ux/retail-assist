@@ -1,0 +1,27 @@
+[build]
+  command = "npm ci && npm run build"
+  publish = ".next"  # Set the publish directory to ".next" (default Next.js build folder)
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[build.environment]
+  SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,SUPABASE_SERVICE_ROLE_KEY,META_PAGE_ACCESS_TOKEN,NEXT_PUBLIC_USE_MOCK_SUPABASE"
+
+[context.production.environment]
+  # In production, set NEXT_PUBLIC_USE_MOCK_SUPABASE = "false" if using real Supabase
+  # For now, keep mock mode enabled
+  NEXT_PUBLIC_USE_MOCK_SUPABASE = "true"
+  # Add other production variables in Netlify UI
+  # OPENAI_API_KEY = "sk-..."
+  # META_PAGE_ACCESS_TOKEN = "..."
+
+[context.deploy-preview.environment]
+  # Deploy previews use mock mode by default
+  NEXT_PUBLIC_USE_MOCK_SUPABASE = "true"
+  NEXT_PUBLIC_TEST_MODE = "false"
+
+[context.branch-deploy.environment]
+  # Branch deploys use mock mode by default
+  NEXT_PUBLIC_USE_MOCK_SUPABASE = "true"
+  NEXT_PUBLIC_TEST_MODE = "false"

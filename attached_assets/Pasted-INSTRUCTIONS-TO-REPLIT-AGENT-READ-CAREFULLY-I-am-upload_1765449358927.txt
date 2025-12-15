@@ -1,0 +1,191 @@
+INSTRUCTIONS TO REPLIT AGENT (READ CAREFULLY):
+
+I am uploading an existing Next.js bot project.
+Do NOT rebuild from scratch.
+First scan the current codebase, understand the folder structure, and then modify + extend it with the features below.
+
+The goal is to make this a production-ready automation bot hosted entirely on Replit, using Replit Database ONLY (no Supabase, no Netlify, no external DB).
+
+
+---
+
+✅ CORE FEATURES TO ADD OR IMPROVE
+
+1. Facebook Messenger + Instagram + Comment-to-Inbox
+
+The bot must support:
+
+Facebook Messenger automation
+
+Instagram DM automation
+
+Comment-to-Inbox automation
+
+Webhook endpoints for all above
+
+Auto-reply, structured messaging, quick replies
+
+Ability to handle multiple businesses (multi-tenant)
+
+
+NOTE:
+We are in Africa → businesses rely heavily on Facebook/Instagram.
+These features are core, not optional.
+
+
+---
+
+2. Client Signup + Package Selection
+
+When a business signs up:
+
+They choose a monthly package
+
+The system must auto-create an account in Replit DB
+
+Store:
+
+business name
+
+email
+
+phone
+
+package selected
+
+page tokens/Instagram tokens
+
+account status (active/inactive)
+
+date created
+
+
+
+
+---
+
+✅ 3. Activation System (VERY IMPORTANT)
+
+A. Automatic Activation
+
+When a business completes signup:
+
+Mark their status as "pending" first
+
+After verifying via webhook or manual admin check, you can set it to active
+
+
+B. Manual Admin Activation (Must Be Included)
+
+Add an /admin page where I (the owner) can:
+
+See all signups
+
+Activate / deactivate any business manually
+
+Change package
+
+Update tokens
+
+Reset account
+
+
+This is important because I’m a startup, and manual activation helps prevent misuse.
+
+
+---
+
+✅ 4. Replit DB Structure
+
+Use only:
+
+users:{}
+tokens:{}
+business_settings:{}
+logs:{}
+
+No external DBs.
+
+
+---
+
+✅ 5. Multi-Tenant Bot Logic
+
+Every message that enters the bot must:
+
+1. Detect which business the message belongs to
+
+
+2. Load their settings
+
+
+3. Trigger their automation flow
+
+
+
+
+---
+
+✅ 6. Admin Dashboard
+
+Create simple pages (Next.js):
+
+/admin/login
+
+/admin/users
+
+/admin/settings
+
+
+User access controlled with Replit’s Auth or password-based login.
+
+
+---
+
+✅ 7. Migration of Existing Code
+
+VERY IMPORTANT:
+Do NOT remove existing functionality unless required.
+Enhance the code but keep the project structure.
+
+
+---
+
+✅ 8. Production-Ready Deployment on Replit
+
+Run on Replit’s free tier
+
+Use Replit web server
+
+Background tasks handled with scheduled endpoints
+
+No Netlify, no Supabase
+
+All environment variables stored in .env
+
+
+
+---
+
+PURPOSE OF THIS BOT
+
+This bot is meant to:
+
+Help businesses in Botswana automate Facebook/Instagram inbox
+
+Convert comments to inbox
+
+Reply to DMs
+
+Manage customer enquiries
+
+Allow me (business owner) to onboard clients easily
+
+Scale later to WhatsApp
+
+
+
+---
+
+IMPORTANT:
+After scanning the code, list all required changes and begin implementing them step by step.

@@ -1,0 +1,60 @@
+{
+  "id": "WH-ABC456FAKE789012",
+  "event_version": "1.0",
+  "create_time": "2025-12-10T12:00:00Z",
+  "event_type": "BILLING.SUBSCRIPTION.ACTIVATED",
+  "summary": "Subscription activated",
+  "resource_type": "subscription",
+  "resource": {
+    "status": "ACTIVE",
+    "id": "I-ABC123FAKE456789",
+    "links": [
+      {
+        "rel": "self",
+        "href": "https://api.sandbox.paypal.com/v1/billing/subscriptions/I-ABC123FAKE456789"
+      }
+    ],
+    "plan_id": "P-ABC123FAKE",
+    "custom_id": "workspace-uuid-123",
+    "start_time": "2025-12-10T12:00:00Z",
+    "quantity": "1",
+    "shipping_amount": {
+      "currency_code": "USD",
+      "value": "0.00"
+    },
+    "subscriber": {
+      "name": {
+        "given_name": "John",
+        "surname": "Doe"
+      },
+      "email_address": "user@example.com",
+      "payer_id": "ABC123"
+    },
+    "billing_info": {
+      "outstanding_balance": {
+        "currency_code": "USD",
+        "value": "0.00"
+      },
+      "cycle_executions": [
+        {
+          "tenure_type": "REGULAR",
+          "sequence": 1,
+          "cycles_completed": 0,
+          "cycles_remaining": null,
+          "total_cycles": null
+        }
+      ],
+      "last_payment": {
+        "amount": {
+          "currency_code": "USD",
+          "value": "29.00"
+        },
+        "time": "2025-12-10T12:00:00Z"
+      },
+      "next_billing_time": "2025-01-10T12:00:00Z",
+      "failed_payments_count": 0
+    },
+    "create_time": "2025-12-10T12:00:00Z",
+    "update_time": "2025-12-10T12:00:00Z"
+  }
+}

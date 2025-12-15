@@ -1,0 +1,321 @@
+ROLE You are a senior full-stack SaaS engineer with deep experience in:
+
+Meta (Facebook & Instagram) Graph API
+
+OAuth flows
+
+Multi-tenant SaaS onboarding
+
+Production-ready automation platforms
+
+
+You MUST NOT redesign the app, change pricing, or rebuild existing features.
+
+
+---
+
+🎯 GOAL (VERY IMPORTANT)
+
+We already have a Retail Assist App built on Next.js and Replit Database.
+
+Your task is to finish the missing Meta integration so that:
+
+1. ONLY ONE Meta App (owned by admin) is verified
+
+
+2. Clients DO NOT need Meta verification
+
+
+3. Clients simply:
+
+Sign up
+
+Login
+
+Click “Connect Facebook Page”
+
+Select their page
+
+Bot starts working
+
+
+
+
+This is the exact model used by tools like ManyChat, Chatfuel, etc.
+
+
+---
+
+🚫 WHAT YOU MUST NOT DO
+
+❌ Do NOT remove WhatsApp / Facebook / Instagram features
+
+❌ Do NOT rebuild dashboards or UI already done
+
+❌ Do NOT introduce Supabase, Netlify, or new databases
+
+❌ Do NOT change pricing ($22 / $45 / $75)
+
+❌ Do NOT replace Replit DB
+
+❌ Do NOT change authentication logic
+
+
+You must extend, not replace.
+
+
+---
+
+✅ WHAT YOU MUST IMPLEMENT (STEP BY STEP)
+
+1️⃣ Single Meta App Architecture (Admin-Owned)
+
+Use ONE Meta App:
+
+App is verified ONCE by admin
+
+App ID & Secret stored in environment variables
+
+
+All client pages connect through this app
+
+
+Env vars required:
+
+META_APP_ID
+META_APP_SECRET
+META_VERIFY_TOKEN
+
+
+---
+
+2️⃣ Client Facebook Page Connection Flow (CRITICAL)
+
+Implement OAuth flow:
+
+Client Flow
+
+1. Client logs into dashboard
+
+
+2. Clicks Connect Facebook Page
+
+
+3. Redirect to Meta OAuth:
+
+scopes:
+
+pages_manage_metadata
+
+pages_read_engagement
+
+pages_messaging
+
+instagram_manage_messages
+
+instagram_basic
+
+
+
+
+4. After auth:
+
+Fetch list of pages client manages
+
+Let client select page(s)
+
+
+
+5. Store:
+
+page_id
+
+page_name
+
+page_access_token
+
+connected_at
+
+user_id
+
+
+
+
+📌 Store all data in Replit Database (JSON or structured)
+
+
+---
+
+3️⃣ NO Client Verification Required
+
+Clients should NOT:
+
+Create Meta apps
+
+Submit Meta verification
+
+Touch Meta Developer Console
+
+
+
+All requests go through admin-verified Meta App
+
+
+---
+
+4️⃣ Webhook Activation (Already Exists – Finish It)
+
+Use existing endpoints:
+
+/api/webhooks/facebook
+
+/api/webhooks/instagram
+
+
+
+You must:
+
+Complete webhook verification handshake
+
+Ensure events are processed:
+
+Comments
+
+Messages
+
+
+Map incoming events → correct client → correct page
+
+
+
+---
+
+5️⃣ Comment-to-DM Automation (CORE FEATURE)
+
+When:
+
+Someone comments on a connected page post
+
+
+Then:
+
+Detect comment
+
+Generate AI response using client’s AI agent prompt
+
+Send private DM via Messenger API
+
+Respect plan limits:
+
+Starter: limited pages & messages
+
+Pro: more pages
+
+Enterprise: unlimited
+
+
+
+
+---
+
+6️⃣ AI Agent Usage
+
+Use existing OpenAI integration
+
+Each business uses its own:
+
+system prompt
+
+greeting
+
+fallback
+
+
+Do NOT change AI logic, only connect it properly
+
+
+
+---
+
+7️⃣ Admin Control (Already Exists – Wire It)
+
+Ensure:
+
+Admin can:
+
+Activate / suspend users
+
+Override subscriptions manually
+
+
+Suspended users:
+
+Cannot connect pages
+
+Cannot send messages
+
+
+
+
+---
+
+8️⃣ Fix Remaining Supabase References
+
+Remove or safely disable unused Supabase imports
+
+Do NOT refactor entire app
+
+Only fix breaking imports
+
+
+
+---
+
+🧪 DELIVERABLES
+
+By the end:
+
+A client can:
+
+Signup
+
+Login
+
+Connect Facebook Page
+
+Receive & auto-reply to comments via DM
+
+
+Admin:
+
+Uses ONE Meta App
+
+Controls all clients from dashboard
+
+
+App runs fully on Replit
+
+Production-ready
+
+
+
+---
+
+⚠ FINAL INSTRUCTION
+
+Before coding:
+
+1. Scan the project
+
+
+2. Identify exact files to modify
+
+
+3. Implement only missing pieces
+
+
+4. Do NOT start from scratch
+
+
+
+If anything is unclear, ASK before coding.
