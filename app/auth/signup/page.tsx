@@ -95,12 +95,12 @@ function SignupForm() {
         <div className="w-full max-w-md text-center">
           <div className="bg-gray-800 border border-gray-700 rounded-xl p-8">
             <div className="text-6xl mb-4 text-green-400">&#10003;</div>
-            <h1 className="text-2xl font-bold text-white mb-4">Account Created!</h1>
+            <h1 className="text-2xl font-bold text-white mb-4">Thanks — We received your info</h1>
             <p className="text-gray-400 mb-4">
-              Your account has been created. You can access the dashboard now — some premium features are locked until you upgrade.
+              This signup is a lead capture. Products are locked until you subscribe — our team will follow up via email or phone to help you get started.
             </p>
             <div className="space-y-3">
-              <Link href="/dashboard" className="block w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg">Go to Dashboard</Link>
+              <Link href="/dashboard" className="block w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg">Go to Dashboard (View only)</Link>
               <Link href="/pricing" className="block w-full text-gray-400 hover:text-white text-sm">View Plans & Upgrade</Link>
             </div>
           </div>
@@ -113,8 +113,8 @@ function SignupForm() {
     <div className="min-h-screen flex items-center justify-center px-4 py-8 bg-gradient-to-br from-gray-900 to-gray-800">
       <div className="w-full max-w-2xl">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-extrabold text-white mb-2">Get Started — It’s Free</h1>
-          <p className="text-gray-400">Sign up to access your dashboard. Upgrade anytime to unlock premium features.</p>
+          <h1 className="text-4xl font-extrabold text-white mb-2">Create your account — View dashboard</h1>
+          <p className="text-gray-400">Sign up to view and navigate the dashboard. Products and actions require a paid plan — we’ll follow up by email or phone.</p>
         </div>
 
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-6 space-y-6">

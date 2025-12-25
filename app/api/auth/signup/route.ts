@@ -39,6 +39,15 @@ export async function POST(request: Request) {
       );
     }
     
+    // record signup as a lead for follow-up (business + phone + email)
+    await db.logs.add({
+      user_id: user.id,
+      level: 'lead',
+      message: `Lead captured: ${business_name} (${email})`,
+      meta: { plan_type: selectedPlan, phone, business_name }
+    });
+
+    // keep an info log as well
     await db.logs.add({
       user_id: user.id,
       level: 'info',

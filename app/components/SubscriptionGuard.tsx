@@ -123,16 +123,16 @@ export default function SubscriptionGuard({ children, requiredFeature }: Subscri
         <div className="w-full bg-yellow-900/90 text-yellow-200 py-3">
           <div className="max-w-7xl mx-auto px-4 flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="text-2xl">💳</div>
+              <div className="text-2xl">�</div>
               <div>
-                <div className="font-semibold">Limited Access</div>
-                <div className="text-sm text-yellow-200/90">You're on the free plan — some premium features are locked. Upgrade anytime.</div>
+                <div className="font-semibold">View-only Dashboard</div>
+                <div className="text-sm text-yellow-200/90">Products are locked until you subscribe — you can browse and inspect the dashboard, but creation/actions are disabled. We'll follow up by email or phone to help you subscribe.</div>
               </div>
             </div>
 
             <div className="flex items-center gap-3">
               <Link href="/pricing" className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md font-semibold">View Plans</Link>
-              <button onClick={() => router.push('/dashboard/billing/payment-required')} className="text-sm text-white/90 underline">Complete Payment</button>
+              <a href="mailto:sales@retailassist.com" className="text-sm text-white/90 underline">Contact Sales</a>
             </div>
           </div>
         </div>
@@ -230,5 +230,7 @@ export function useSubscription() {
     return true;
   };
 
-  return { user, loading, canUseFeature };
+  const readOnly = !!user && user.role !== "admin" && user.subscription_status !== "active";
+
+  return { user, loading, canUseFeature, readOnly };
 }
