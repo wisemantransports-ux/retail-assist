@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { sessionManager } from '@/lib/replit-db/session';
+import { sessionManager } from '@/lib/session';
 
 export async function POST(request: Request) {
   try {

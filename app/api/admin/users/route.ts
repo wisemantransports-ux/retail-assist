@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { replitDb, PLAN_LIMITS } from '@/lib/replit-db';
-import { sessionManager } from '@/lib/replit-db/session';
+import { db, PLAN_LIMITS } from '@/lib/db';
+import { sessionManager } from '@/lib/session';
 
 async function verifyAdmin(request: Request) {
   const sessionId = request.headers.get('cookie')?.split(';')
@@ -9,10 +9,10 @@ async function verifyAdmin(request: Request) {
   
   if (!sessionId) return null;
   
-  const session = sessionManager.validate(sessionId);
+  const session = await sessionManager.validate(sessionId);
   if (!session) return null;
   
-  const user = await replitDb.users.findById(session.user_id);
+  const user = await db.users.findById(session.user_id);
   if (!user || user.role !== 'admin') return null;
   
   return user;
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const users = await replitDb.users.getAll();
+    const users = await db.users.getAll();
     
     const filteredUsers = users
       .filter(u => u.role !== 'admin')
@@ -104,13 +104,13 @@ export async function PATCH(request: Request) {
       updateData.billing_end_date = billing_end_date;
     }
 
-    const updated = await replitDb.users.update(userId, updateData);
+    const updated = await db.users.update(userId, updateData);
     
     if (!updated) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    await replitDb.logs.add({
+    await db.logs.add({
       user_id: admin.id,
       level: 'info',
       message: `Admin updated user ${userId}`,
@@ -138,13 +138,13 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'User ID required' }, { status: 400 });
     }
 
-    const deleted = await replitDb.users.delete(userId);
+    const deleted = await db.users.delete(userId);
     
     if (!deleted) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    await replitDb.logs.add({
+    await db.logs.add({
       user_id: admin.id,
       level: 'warn',
       message: `Admin deleted user ${userId}`

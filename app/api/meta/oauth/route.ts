@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { env } from '@/lib/env';
-import { sessionManager } from '@/lib/replit-db/session';
-import { replitDb } from '@/lib/replit-db';
+import { sessionManager } from '@/lib/session';
+import { db } from '@/lib/db';
 
 export async function GET(request: Request) {
   try {
@@ -13,17 +13,17 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
     
-    const session = sessionManager.validate(sessionId);
+    const session = await sessionManager.validate(sessionId);
     if (!session) {
       return NextResponse.json({ error: 'Session expired' }, { status: 401 });
     }
 
-    const user = await replitDb.users.findById(session.user_id);
+    const user = await db.users.findById(session.user_id);
     if (!user || user.subscription_status !== 'active') {
       return NextResponse.json({ error: 'Subscription not active' }, { status: 403 });
     }
 
-    const canAdd = await replitDb.users.canAddPage(user.id);
+    const canAdd = await db.users.canAddPage(user.id);
     if (!canAdd.allowed) {
       return NextResponse.json({ error: canAdd.reason }, { status: 403 });
     }
@@ -45,7 +45,7 @@ export async function GET(request: Request) {
       'pages_read_user_content',
     ];
 
-    if (await replitDb.users.canUseInstagram(user.id)) {
+    if (await db.users.canUseInstagram(user.id)) {
       scopes.push('instagram_basic', 'instagram_manage_messages', 'instagram_manage_comments');
     }
 

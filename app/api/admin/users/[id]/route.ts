@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { replitDb, PLAN_LIMITS } from '@/lib/replit-db';
-import { sessionManager } from '@/lib/replit-db/session';
+import { db, PLAN_LIMITS } from '@/lib/db';
+import { sessionManager } from '@/lib/session';
 
 async function verifyAdmin(request: Request) {
   const sessionId = request.headers.get('cookie')?.split(';')
@@ -9,10 +9,10 @@ async function verifyAdmin(request: Request) {
   
   if (!sessionId) return null;
   
-  const session = sessionManager.validate(sessionId);
+  const session = await sessionManager.validate(sessionId);
   if (!session) return null;
   
-  const user = await replitDb.users.findById(session.user_id);
+  const user = await db.users.findById(session.user_id);
   if (!user || user.role !== 'admin') return null;
   
   return user;
@@ -29,13 +29,13 @@ export async function GET(
     }
 
     const { id } = await params;
-    const user = await replitDb.users.findById(id);
+    const user = await db.users.findById(id);
     
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const tokens = await replitDb.tokens.findByUserId(id);
+    const tokens = await db.tokens.findByUserId(id);
     const planLimits = PLAN_LIMITS[user.plan_type];
 
     return NextResponse.json({

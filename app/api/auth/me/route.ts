@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { replitDb, PLAN_LIMITS } from '@/lib/replit-db';
-import { sessionManager } from '@/lib/replit-db/session';
+import { db, PLAN_LIMITS } from '@/lib/db';
+import { sessionManager } from '@/lib/session';
 
 export async function GET(request: Request) {
   try {
@@ -15,7 +15,7 @@ export async function GET(request: Request) {
       );
     }
     
-    const session = sessionManager.validate(sessionId);
+    const session = await sessionManager.validate(sessionId);
     if (!session) {
       const response = NextResponse.json(
         { error: 'Session expired' },
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
       return response;
     }
     
-    const user = await replitDb.users.findById(session.user_id);
+    const user = await db.users.findById(session.user_id);
     if (!user) {
       return NextResponse.json(
         { error: 'User not found' },

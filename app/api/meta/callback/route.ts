@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { env } from '@/lib/env';
-import { replitDb } from '@/lib/replit-db';
+import { db } from '@/lib/db';
 
 export async function GET(request: Request) {
   try {
@@ -30,7 +30,7 @@ export async function GET(request: Request) {
       return NextResponse.redirect(new URL('/dashboard/integrations?error=invalid_state', url.origin));
     }
 
-    const user = await replitDb.users.findById(userId);
+    const user = await db.users.findById(userId);
     if (!user) {
       return NextResponse.redirect(new URL('/dashboard/integrations?error=user_not_found', url.origin));
     }

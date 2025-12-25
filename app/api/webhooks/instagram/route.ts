@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { env } from '@/lib/env';
-import { replitDb } from '@/lib/replit-db';
+import { db } from '@/lib/db';
 import { verifyWebhookSignature, fbSendDM } from '@/lib/facebook';
 
 const WEBHOOK_LOG_PREFIX = '[Instagram Webhook]';
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
         processedCount++;
       } catch (error: any) {
         console.error(`${WEBHOOK_LOG_PREFIX} Error processing entry:`, error.message);
-        await replitDb.logs.add({
+        await db.logs.add({
           level: 'error',
           message: `Instagram webhook error: ${error.message}`,
           meta: { entryId: entry.id }
@@ -104,21 +104,21 @@ async function processInstagramEntry(entry: any) {
   const igUserId = entry.id;
   console.log(`${WEBHOOK_LOG_PREFIX} Processing entry for IG user:`, igUserId);
 
-  const token = await replitDb.tokens.findByPageId(igUserId);
+  const token = await db.tokens.findByPageId(igUserId);
   
   if (!token) {
     console.warn(`${WEBHOOK_LOG_PREFIX} No token found for IG user:`, igUserId);
     return;
   }
 
-  const user = await replitDb.users.findById(token.user_id);
+  const user = await db.users.findById(token.user_id);
   
   if (!user || user.subscription_status !== 'active') {
     console.warn(`${WEBHOOK_LOG_PREFIX} User not active:`, igUserId);
     return;
   }
 
-  const settings = await replitDb.settings.findByUserId(user.id);
+  const settings = await db.settings.findByUserId(user.id);
   
   if (!settings || !settings.auto_reply_enabled) {
     console.log(`${WEBHOOK_LOG_PREFIX} Auto-reply not enabled`);
@@ -152,7 +152,7 @@ async function handleInstagramMessage(user: any, settings: any, token: any, msg:
 
     if (result.success) {
       console.log(`${WEBHOOK_LOG_PREFIX} IG DM reply sent:`, result.messageId);
-      await replitDb.logs.add({
+      await db.logs.add({
         user_id: user.id,
         level: 'info',
         message: 'Instagram DM replied',
@@ -175,7 +175,7 @@ async function handleInstagramComment(user: any, settings: any, token: any, comm
 
       if (result.success) {
         console.log(`${WEBHOOK_LOG_PREFIX} IG comment-to-DM sent:`, result.messageId);
-        await replitDb.logs.add({
+        await db.logs.add({
           user_id: user.id,
           level: 'info',
           message: 'Instagram comment-to-DM sent',

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { replitDb } from '@/lib/replit-db';
-import { sessionManager } from '@/lib/replit-db/session';
+import { db } from '@/lib/db';
+import { sessionManager } from '@/lib/session';
 
 function generateSalt(): string {
   const array = new Uint8Array(16);
@@ -24,10 +24,10 @@ async function verifyAdmin(request: Request) {
   
   if (!sessionId) return null;
   
-  const session = sessionManager.validate(sessionId);
+  const session = await sessionManager.validate(sessionId);
   if (!session) return null;
   
-  const user = await replitDb.users.findById(session.user_id);
+  const user = await db.users.findById(session.user_id);
   if (!user || user.role !== 'admin') return null;
   
   return user;
@@ -46,9 +46,9 @@ export async function PATCH(request: Request) {
     if (password && password.length >= 6) {
       const salt = generateSalt();
       const password_hash = await hashPasswordWithSalt(password, salt);
-      await replitDb.users.update(admin.id, { password_hash } as any);
+      await db.users.update(admin.id, { password_hash } as any);
 
-      await replitDb.logs.add({
+      await db.logs.add({
         user_id: admin.id,
         level: 'info',
         message: 'Admin password updated'

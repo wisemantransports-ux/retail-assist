@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { sessionManager } from '@/lib/replit-db/session';
-import { replitDb } from '@/lib/replit-db';
+import { sessionManager } from '@/lib/session';
+import { db } from '@/lib/db';
 
 export async function POST(request: Request) {
   try {
@@ -12,7 +12,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
     
-    const session = sessionManager.validate(sessionId);
+    const session = await sessionManager.validate(sessionId);
     if (!session) {
       return NextResponse.json({ error: 'Session expired' }, { status: 401 });
     }
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing pageId' }, { status: 400 });
     }
 
-    const token = await replitDb.tokens.findByPageId(pageId);
+    const token = await db.tokens.findByPageId(pageId);
     
     if (!token) {
       return NextResponse.json({ error: 'Page not found' }, { status: 404 });
@@ -34,9 +34,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    await replitDb.tokens.delete(token.id);
+    await db.tokens.delete(token.id);
 
-    await replitDb.logs.add({
+    await db.logs.add({
       user_id: session.user_id,
       level: 'info',
       message: `Disconnected page: ${token.page_name}`,

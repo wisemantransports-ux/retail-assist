@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { sessionManager } from "@/lib/replit-db/session";
+import { sessionManager } from "@/lib/session";
 import { getBrand } from "@/config/branding";
 
 const PAYPAL_API_BASE = "https://api-m.paypal.com";
@@ -47,87 +47,5 @@ async function getPayPalAccessToken(): Promise<string> {
 }
 
 export async function POST(request: NextRequest) {
-  try {
-    const cookieStore = await cookies();
-    const sessionId = cookieStore.get("session_id")?.value;
-    const session = sessionManager.validate(sessionId || "");
-
-    if (!session?.user_id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const body = await request.json();
-    const { plan } = body;
-
-    if (!plan || !PLAN_IDS[plan]) {
-      return NextResponse.json({ error: "Invalid plan. Use: starter, pro, or enterprise" }, { status: 400 });
-    }
-
-    const paypalPlanId = PLAN_IDS[plan];
-    const accessToken = await getPayPalAccessToken();
-
-    const baseUrl = request.nextUrl.origin;
-
-    const brandConfig = getBrand();
-    const subscriptionPayload = {
-      plan_id: paypalPlanId,
-      custom_id: `${session.user_id}:${plan}`,
-      application_context: {
-        brand_name: brandConfig.name,
-        locale: "en-US",
-        shipping_preference: "NO_SHIPPING",
-        user_action: "SUBSCRIBE_NOW",
-        return_url: `${baseUrl}/api/billing/paypal/success`,
-        cancel_url: `${baseUrl}/checkout?plan=${plan}&cancelled=true`
-      }
-    };
-
-    const response = await fetch(`${PAYPAL_API_BASE}/v1/billing/subscriptions`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-        "Prefer": "return=representation"
-      },
-      body: JSON.stringify(subscriptionPayload)
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error("PayPal subscription error:", errorData);
-      return NextResponse.json(
-        { error: "Failed to create subscription", details: errorData },
-        { status: 500 }
-      );
-    }
-
-    const subscription = await response.json();
-
-    const approvalLink = subscription.links?.find(
-      (link: { rel: string; href: string }) => link.rel === "approve"
-    );
-
-    if (!approvalLink) {
-      return NextResponse.json(
-        { error: "No approval URL returned from PayPal" },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({
-      subscription_id: subscription.id,
-      approval_url: approvalLink.href,
-      plan: plan,
-      price: PLAN_PRICES[plan],
-      status: subscription.status
-    });
-
-  } catch (error) {
-    console.error("Create subscription error:", error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Internal server error" },
-      { status: 500 }
-    );
-  }
+  return NextResponse.json({ error: 'Payment gateway disabled. Payments are currently disconnected.' }, { status: 503 });
 }

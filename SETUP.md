@@ -51,6 +51,23 @@ Visit `http://localhost:5000` - App works fully in mock mode!
 ### Step 2: Apply Database Schema
 Choose your preferred method:
 
+> Development tip: to run the app locally without a Supabase project, enable **Dev Auth** and seed a local dev database:
+>
+> 1. Run:
+> ```bash
+> # create a local dev seed (admin + sample client)
+> node scripts/create-dev-seed.js
+> ```
+> 2. Enable dev auth in your `.env.local`:
+> ```bash
+> NEXT_PUBLIC_USE_DEV_AUTH=true
+> ```
+> 3. Start dev server and sign in using the dev credentials:
+> - Admin: `admin@example.com` / `admin123`
+> - Client: `client@example.com` / `client123`
+>
+> This uses a local JSON fallback (no Supabase) and is intended only for local testing. Do NOT enable in production.
+
 #### Option A: Using Supabase CLI
 ```bash
 # Install Supabase CLI
@@ -68,8 +85,10 @@ supabase db push
 
 #### Option B: Manual SQL in Supabase UI
 1. Open Supabase dashboard > SQL Editor
-2. Copy entire content from `supabase/migrations/001_initial_schema.sql`
+2. Copy entire content from `supabase/migrations/002_complete_schema.sql` (production-ready)
 3. Paste into SQL editor and execute
+
+> **Note:** `002_complete_schema.sql` contains the full production-ready schema (plans, billing, mobile-money support, RLS policies, and helper triggers). Use it in production; `001_initial_schema.sql` is an earlier, smaller scaffold.
 
 #### Option C: Using psql directly
 ```bash

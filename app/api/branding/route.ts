@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { getBrand, saveBrand } from '@/config/branding';
-import { replitDb } from '@/lib/replit-db';
+import { db } from '@/lib/db';
 
 export async function GET() {
   try {
@@ -23,7 +23,7 @@ export async function PUT(request: Request) {
     }
 
     const userId = sessionCookie.value;
-    const user = await replitDb.users.findById(userId);
+    const user = await db.users.findById(userId);
     
     if (!user || user.role !== 'admin') {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });

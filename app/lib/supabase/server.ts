@@ -1,53 +1,53 @@
-/**
- * Stub Supabase server client - This app uses file-based JSON storage, not Supabase.
- * These exports exist to satisfy imports without breaking the build.
- */
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-const createChainableMock = () => {
-  const chain: any = {
-    select: () => chain,
-    insert: () => chain,
-    update: () => chain,
-    delete: () => chain,
-    upsert: () => chain,
-    eq: () => chain,
-    neq: () => chain,
-    gt: () => chain,
-    lt: () => chain,
-    gte: () => chain,
-    lte: () => chain,
-    like: () => chain,
-    ilike: () => chain,
-    is: () => chain,
-    in: () => chain,
-    contains: () => chain,
-    order: () => chain,
-    limit: () => chain,
-    range: () => chain,
-    single: () => Promise.resolve({ data: null, error: null }),
-    maybeSingle: () => Promise.resolve({ data: null, error: null }),
-    then: (resolve: any) => resolve({ data: [], error: null }),
-  };
-  return chain;
-};
+// IMPORTANT: Do not use Supabase server clients while mock mode is enabled.
+// The factory functions below will throw if `env.useMockMode` is true to prevent accidental live DB calls.
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
 
-const stubClient = {
-  from: (table: string) => createChainableMock(),
-  auth: {
-    getUser: () => Promise.resolve({ data: { user: null }, error: null }),
-    getSession: () => Promise.resolve({ data: { session: null }, error: null }),
-    signInWithPassword: (...args: any[]) => Promise.resolve({ data: null, error: null }),
-    signUp: (...args: any[]) => Promise.resolve({ data: null, error: null }),
-    signOut: () => Promise.resolve({ error: null }),
-    resetPasswordForEmail: (...args: any[]) => Promise.resolve({ data: null, error: null }),
-    updateUser: (...args: any[]) => Promise.resolve({ data: null, error: null }),
-    onAuthStateChange: (...args: any[]) => ({ data: { subscription: { unsubscribe: () => {} } } }),
-  },
-  rpc: () => Promise.resolve({ data: null, error: null }),
-};
+import { env } from '@/lib/env'
 
-export const createServerSupabaseClient = () => stubClient;
-export const createServerClient = () => stubClient;
-export const createAdminSupabaseClient = () => stubClient;
-export const createMockAdminSupabaseClient = () => stubClient;
-export default stubClient;
+function requireConfig() {
+  // Respect mock mode: prevent accidental use of Supabase clients when mock mode is enabled
+  if (env.useMockMode) {
+    throw new Error('Supabase client disabled: mock mode is enabled (NEXT_PUBLIC_USE_MOCK_SUPABASE=true). Set NEXT_PUBLIC_USE_MOCK_SUPABASE=false and provide SUPABASE_* env vars to enable Supabase.')
+  }
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('Missing Supabase configuration. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in environment.')
+  }
+}
+
+let adminClient: SupabaseClient | null = null
+let anonClient: SupabaseClient | null = null
+
+export function createServerSupabaseClient(): SupabaseClient {
+  requireConfig()
+  if (!adminClient) {
+    adminClient = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!, {
+      auth: { persistSession: false }
+    })
+  }
+  return adminClient
+}
+
+export function createAdminSupabaseClient(): SupabaseClient {
+  return createServerSupabaseClient()
+}
+
+export function createServerClient(): SupabaseClient {
+  if (env.useMockMode) {
+    throw new Error('Supabase client disabled: mock mode is enabled (NEXT_PUBLIC_USE_MOCK_SUPABASE=true). Set NEXT_PUBLIC_USE_MOCK_SUPABASE=false and provide NEXT_PUBLIC_SUPABASE_* env vars to enable the client.')
+  }
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    throw new Error('Missing Supabase configuration. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY for server client.')
+  }
+  if (!anonClient) {
+    anonClient = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
+      auth: { persistSession: false }
+    })
+  }
+  return anonClient
+}
+
+export default createServerSupabaseClient

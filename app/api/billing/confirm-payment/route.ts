@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { replitDb } from "@/lib/replit-db";
-import { sessionManager } from "@/lib/replit-db/session";
+import { db } from "@/lib/db";
+import { sessionManager } from "@/lib/session";
 
 export async function POST(request: Request) {
   try {
@@ -14,12 +14,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const session = sessionManager.validate(sessionId);
+    const session = await sessionManager.validate(sessionId);
     if (!session) {
       return NextResponse.json({ error: "Session expired" }, { status: 401 });
     }
 
-    const user = await replitDb.users.findById(session.user_id);
+    const user = await db.users.findById(session.user_id);
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
@@ -32,12 +32,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Payment already confirmed" }, { status: 400 });
     }
 
-    await replitDb.users.update(user.id, {
+    await db.users.update(user.id, {
       payment_status: "paid",
       subscription_status: "awaiting_approval"
     });
 
-    await replitDb.logs.add({
+    await db.logs.add({
       user_id: user.id,
       level: "info",
       message: `Payment confirmed by user. Plan: ${user.plan_type}. Awaiting admin approval.`,

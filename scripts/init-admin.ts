@@ -1,89 +1,50 @@
-import * as fs from 'fs';
-import * as path from 'path';
-
-const DATA_DIR = process.env.DATA_DIR || './.data';
-const DB_PATH = path.join(DATA_DIR, 'database.json');
-
-function generateSalt(): string {
-  const array = new Uint8Array(16);
-  crypto.getRandomValues(array);
-  return Array.from(array).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-async function hashPasswordWithSalt(password: string, salt: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password + salt);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  return `${salt}:${hash}`;
-}
+import { createAdminSupabaseClient } from '@/lib/supabase/server'
 
 async function initAdmin() {
-  const adminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
-  const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+  const adminEmail = process.env.ADMIN_EMAIL || 'admin@example.com'
+  const adminPassword = process.env.ADMIN_PASSWORD || 'admin123'
 
-  console.log('Initializing admin user...');
+  console.log('Initializing admin user in Supabase...')
 
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+  const supabase = createAdminSupabaseClient()
+
+  // Look for existing admin by email or role
+  const { data: existingUsers, error: fetchErr } = await supabase.from('users').select('*').eq('email', adminEmail)
+  if (fetchErr) {
+    console.error('Failed to query users:', fetchErr.message)
+    throw fetchErr
   }
 
-  let db: any = {
-    users: {},
-    tokens: {},
-    business_settings: {},
-    logs: []
-  };
-
-  if (fs.existsSync(DB_PATH)) {
-    try {
-      db = JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'));
-    } catch {
-      console.log('Creating fresh database...');
-    }
+  if (existingUsers && existingUsers.length > 0) {
+    console.log('Admin user already exists:', adminEmail)
+    console.log('NOTE: Passwords are managed by Supabase Auth. To change password, use the Supabase dashboard or CLI.')
+    return
   }
 
-  const existingAdmin = Object.values(db.users as any[]).find(
-    (u: any) => u.email === adminEmail || u.role === 'admin'
-  );
+  // Insert minimal admin record into users table. Note: create a Supabase auth user separately if required.
+  const now = new Date().toISOString()
+  const id = crypto.randomUUID()
 
-  if (existingAdmin) {
-    console.log('Admin user already exists:', (existingAdmin as any).email);
-    console.log('Updating admin password...');
-    const salt = generateSalt();
-    const password_hash = await hashPasswordWithSalt(adminPassword, salt);
-    (existingAdmin as any).password_hash = password_hash;
-    fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
-    console.log('Admin password updated!');
-    return;
-  }
-
-  const id = crypto.randomUUID();
-  const now = new Date().toISOString();
-  const salt = generateSalt();
-  const password_hash = await hashPasswordWithSalt(adminPassword, salt);
-
-  db.users[id] = {
+  const payload = {
     id,
     email: adminEmail,
-    password_hash,
     business_name: 'Admin',
     phone: '',
-    package: 'enterprise',
-    status: 'active',
+    plan_id: 'enterprise',
+    subscription_tier: 'enterprise',
     role: 'admin',
     created_at: now,
     updated_at: now
-  };
+  }
 
-  fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
+  const { error } = await supabase.from('users').insert(payload)
+  if (error) {
+    console.error('Failed to create admin user in Supabase:', error.message)
+    throw error
+  }
 
-  console.log('Admin user created successfully!');
-  console.log('Email:', adminEmail);
-  console.log('Password:', adminPassword);
-  console.log('');
-  console.log('IMPORTANT: Change the password after first login!');
+  console.log('Admin user record created in Supabase users table: ', adminEmail)
+  console.log('IMPORTANT: Create a Supabase Auth user for this email (via Dashboard or CLI) and set its password.')
 }
 
-initAdmin().catch(console.error);
+initAdmin().catch(console.error)

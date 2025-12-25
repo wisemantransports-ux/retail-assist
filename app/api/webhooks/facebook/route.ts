@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { env } from '@/lib/env';
-import { replitDb } from '@/lib/replit-db';
+import { db } from '@/lib/db';
 import {
   parseFacebookWebhook,
   verifyWebhookSignature,
@@ -96,7 +96,7 @@ export async function POST(request: Request) {
         processedCount++;
       } catch (entryError: any) {
         console.error(`${WEBHOOK_LOG_PREFIX} Error processing entry:`, entryError.message);
-        await replitDb.logs.add({
+        await db.logs.add({
           level: 'error',
           message: `Webhook entry error: ${entryError.message}`,
           meta: { entryId: entry.id }
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error(`${WEBHOOK_LOG_PREFIX} Unexpected error:`, error.message);
-    await replitDb.logs.add({
+    await db.logs.add({
       level: 'error',
       message: `Webhook error: ${error.message}`
     });
@@ -126,21 +126,21 @@ async function processEntry(entry: any, fullPayload: any) {
     const pageId = entry.id;
     console.log(`${WEBHOOK_LOG_PREFIX} Processing entry for page:`, pageId);
 
-    const token = await replitDb.tokens.findByPageId(pageId);
+    const token = await db.tokens.findByPageId(pageId);
     
     if (!token) {
       console.warn(`${WEBHOOK_LOG_PREFIX} No token found for page:`, pageId);
       return;
     }
 
-    const user = await replitDb.users.findById(token.user_id);
+    const user = await db.users.findById(token.user_id);
     
     if (!user || user.subscription_status !== 'active') {
       console.warn(`${WEBHOOK_LOG_PREFIX} User not active for page:`, pageId);
       return;
     }
 
-    const settings = await replitDb.settings.findByUserId(user.id);
+    const settings = await db.settings.findByUserId(user.id);
     
     if (!settings) {
       console.warn(`${WEBHOOK_LOG_PREFIX} No settings found for user:`, user.id);
@@ -157,7 +157,7 @@ async function processEntry(entry: any, fullPayload: any) {
 
     console.log(`${WEBHOOK_LOG_PREFIX} Detected event:`, event.eventType);
 
-    await replitDb.logs.add({
+    await db.logs.add({
       user_id: user.id,
       level: 'info',
       message: `Received ${event.eventType} event`,
@@ -218,14 +218,14 @@ async function handleCommentEvent(user: any, settings: any, token: any, comment:
         }
       }
 
-      await replitDb.logs.add({
+      await db.logs.add({
         user_id: user.id,
         level: 'info',
         message: 'Comment replied successfully',
         meta: { commentId: comment.id, replyId: replyResult.replyId, aiGenerated: settings.ai_enabled }
       });
     } else {
-      await replitDb.logs.add({
+      await db.logs.add({
         user_id: user.id,
         level: 'error',
         message: `Comment reply failed: ${replyResult.error}`,
@@ -234,7 +234,7 @@ async function handleCommentEvent(user: any, settings: any, token: any, comment:
     }
   } catch (error: any) {
     console.error(`${WEBHOOK_LOG_PREFIX} Error handling comment:`, error.message);
-    await replitDb.logs.add({
+    await db.logs.add({
       user_id: user.id,
       level: 'error',
       message: `Comment handling error: ${error.message}`,
@@ -267,14 +267,14 @@ async function handleMessageEvent(user: any, settings: any, token: any, message:
     if (dmResult.success) {
       console.log(`${WEBHOOK_LOG_PREFIX} DM reply sent:`, dmResult.messageId);
 
-      await replitDb.logs.add({
+      await db.logs.add({
         user_id: user.id,
         level: 'info',
         message: 'Message replied successfully',
         meta: { messageId: message.id, replyId: dmResult.messageId, aiGenerated: settings.ai_enabled }
       });
     } else {
-      await replitDb.logs.add({
+      await db.logs.add({
         user_id: user.id,
         level: 'error',
         message: `Message reply failed: ${dmResult.error}`,
@@ -283,7 +283,7 @@ async function handleMessageEvent(user: any, settings: any, token: any, message:
     }
   } catch (error: any) {
     console.error(`${WEBHOOK_LOG_PREFIX} Error handling message:`, error.message);
-    await replitDb.logs.add({
+    await db.logs.add({
       user_id: user.id,
       level: 'error',
       message: `Message handling error: ${error.message}`,

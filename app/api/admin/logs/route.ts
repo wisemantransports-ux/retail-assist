@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { replitDb } from '@/lib/replit-db';
-import { sessionManager } from '@/lib/replit-db/session';
+import { db } from '@/lib/db';
+import { sessionManager } from '@/lib/session';
 
 async function verifyAdmin(request: Request) {
   const sessionId = request.headers.get('cookie')?.split(';')
@@ -9,10 +9,10 @@ async function verifyAdmin(request: Request) {
   
   if (!sessionId) return null;
   
-  const session = sessionManager.validate(sessionId);
+  const session = await sessionManager.validate(sessionId);
   if (!session) return null;
   
-  const user = await replitDb.users.findById(session.user_id);
+  const user = await db.users.findById(session.user_id);
   if (!user || user.role !== 'admin') return null;
   
   return user;
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const logs = await replitDb.logs.getRecent(200);
+    const logs = await db.logs.getRecent(200);
     
     return NextResponse.json({ logs });
   } catch (error: any) {

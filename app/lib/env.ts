@@ -12,13 +12,17 @@ export const env = {
     serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '', // Server-only, never expose to client
   },
 
-  // Mock mode flag (true for local dev, false for production)
-  useMockMode: process.env.NEXT_PUBLIC_USE_MOCK_SUPABASE === 'true',
+  // Mock mode flag — keep enabled by default until you explicitly go-live with Supabase.
+  // Set NEXT_PUBLIC_USE_MOCK_SUPABASE = "false" in your environment to disable mock mode.
+  useMockMode: (typeof process.env.NEXT_PUBLIC_USE_MOCK_SUPABASE !== 'undefined') ? process.env.NEXT_PUBLIC_USE_MOCK_SUPABASE === 'true' : true,
 
   // OpenAI (server-side only)
   openai: {
     apiKey: process.env.OPENAI_API_KEY || '',
   },
+
+  // Mock payments flag — enabled by default while in mock mode. Set NEXT_PUBLIC_USE_MOCK_PAYMENTS=false to enable live payments.
+  useMockPayments: (typeof process.env.NEXT_PUBLIC_USE_MOCK_PAYMENTS !== 'undefined') ? process.env.NEXT_PUBLIC_USE_MOCK_PAYMENTS === 'true' : true,
 
   // Meta/Facebook (server-side only)
   meta: {
@@ -64,8 +68,8 @@ export const env = {
 
   // Test/Debug mode
   isTestMode: process.env.NEXT_PUBLIC_TEST_MODE === 'true',
-  // Mock payments flag (client+server toggle)
-  useMockPayments: process.env.NEXT_PUBLIC_USE_MOCK_PAYMENTS === 'true',
+  // Mock payments are disabled in production
+  useMockPayments: false,
 
   // App environment
   isDevelopment: process.env.NODE_ENV === 'development',

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { replitDb } from '@/lib/replit-db';
+import { db } from '@/lib/db';
 
 export async function POST(request: Request) {
   try {
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     const validPlans = ['starter', 'pro', 'enterprise'];
     const selectedPlan = validPlans.includes(plan_type) ? plan_type : 'starter';
     
-    const user = await replitDb.users.create({
+    const user = await db.users.create({
       email,
       password,
       business_name,
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
       );
     }
     
-    await replitDb.logs.add({
+    await db.logs.add({
       user_id: user.id,
       level: 'info',
       message: `New user signup: ${business_name} (${email})`,

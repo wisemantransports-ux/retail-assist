@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { sessionManager } from '@/lib/replit-db/session';
-import { replitDb } from '@/lib/replit-db';
+import { sessionManager } from '@/lib/session';
+import { db } from '@/lib/db';
 
 export async function GET(request: Request) {
   try {
@@ -12,12 +12,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
     
-    const session = sessionManager.validate(sessionId);
+    const session = await sessionManager.validate(sessionId);
     if (!session) {
       return NextResponse.json({ error: 'Session expired' }, { status: 401 });
     }
 
-    const tokens = await replitDb.tokens.findByUserId(session.user_id);
+    const tokens = await db.tokens.findByUserId(session.user_id);
     
     return NextResponse.json({ 
       pages: tokens.map(t => ({
@@ -44,12 +44,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
     
-    const session = sessionManager.validate(sessionId);
+    const session = await sessionManager.validate(sessionId);
     if (!session) {
       return NextResponse.json({ error: 'Session expired' }, { status: 401 });
     }
 
-    const user = await replitDb.users.findById(session.user_id);
+    const user = await db.users.findById(session.user_id);
     if (!user || user.subscription_status !== 'active') {
       return NextResponse.json({ error: 'Subscription not active' }, { status: 403 });
     }
@@ -81,13 +81,13 @@ export async function POST(request: Request) {
       ? tokenData.pages.filter((p: any) => selectedPageIds.includes(p.id))
       : tokenData.pages;
 
-    const canAdd = await replitDb.users.canAddPage(user.id);
+    const canAdd = await db.users.canAddPage(user.id);
     if (!canAdd.allowed) {
       return NextResponse.json({ error: canAdd.reason }, { status: 403 });
     }
 
-    const limits = replitDb.users.getPlanLimits(user.plan_type);
-    const currentCount = await replitDb.tokens.countByUserId(user.id);
+    const limits = db.users.getPlanLimits(user.plan_type);
+    const currentCount = await db.tokens.countByUserId(user.id);
     const maxAllowed = limits.maxPages === -1 ? Infinity : limits.maxPages;
     const allowedToAdd = maxAllowed - currentCount;
 
@@ -99,15 +99,15 @@ export async function POST(request: Request) {
 
     const savedPages = [];
     for (const page of pagesToConnect) {
-      const existing = await replitDb.tokens.findByPageId(page.id);
+      const existing = await db.tokens.findByPageId(page.id);
       if (existing) {
-        await replitDb.tokens.update(existing.id, {
+        await db.tokens.update(existing.id, {
           access_token: page.access_token,
           page_name: page.name
         });
         savedPages.push({ ...page, updated: true });
       } else {
-        await replitDb.tokens.create({
+        await db.tokens.create({
           user_id: user.id,
           platform: 'facebook',
           page_id: page.id,
@@ -118,7 +118,7 @@ export async function POST(request: Request) {
       }
     }
 
-    await replitDb.logs.add({
+    await db.logs.add({
       user_id: user.id,
       level: 'info',
       message: `Connected ${savedPages.length} Facebook page(s)`,
