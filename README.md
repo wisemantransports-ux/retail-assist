@@ -322,7 +322,7 @@ Private repository - All rights reserved
 
 ## 👨‍💻 About
 
-Built by Samuel Marketplace team using Next.js, Supabase, and OpenAI.
+Built by Retail Pro team using Next.js, Supabase, and OpenAI.
 
 **Vision:** Empower small businesses to automate customer engagement with AI, without technical expertise.
 

@@ -12,7 +12,7 @@ export default function Topbar() {
       <div className="flex items-center gap-6">
         <div>
           <h1 className="text-lg font-semibold">Dashboard</h1>
-          <p className="text-xs text-muted">Welcome back to Samuel</p>
+          <p className="text-xs text-muted">Welcome to Retail Pro</p>
         </div>
       </div>
 

@@ -25,7 +25,7 @@ export default function CTA() {
                   Start Free Trial
                 </button>
               </Link>
-              <Link href="mailto:support@samuel.dev">
+              <Link href="mailto:support@retailpro.com">
                 <button className="btn-secondary px-8 py-3 text-lg">
                   Schedule Demo
                 </button>

@@ -5,7 +5,7 @@ const testimonials = [
     name: "Sarah Chen",
     role: "CEO, TechStore",
     quote:
-      "Samuel's AI agents cut our customer support costs by 60%. Our team can focus on strategy while AI handles routine inquiries.",
+      "Retail Pro's AI agents cut our customer support costs by 60%. Our team can focus on strategy while AI handles routine inquiries.",
     avatar: "SC",
   },
   {

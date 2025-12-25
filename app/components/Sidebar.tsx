@@ -20,9 +20,9 @@ export default function Sidebar() {
       {/* Logo */}
       <Link href="/" className="flex items-center gap-3 mb-8">
         <div className="w-8 h-8 bg-gradient-to-br from-primary to-accent rounded-lg flex items-center justify-center font-bold">
-          S
+          R
         </div>
-        <span className="font-bold text-xl">Samuel</span>
+        <span className="font-bold text-xl">Retail Pro</span>
       </Link>
 
       {/* Navigation */}

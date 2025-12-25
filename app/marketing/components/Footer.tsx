@@ -13,7 +13,7 @@ const footerLinks = {
     { name: "About", href: "#" },
     { name: "Blog", href: "#" },
     { name: "Careers", href: "#" },
-    { name: "Contact", href: "mailto:support@samuel.dev" },
+    { name: "Contact", href: "mailto:support@retailpro.com" },
   ],
   Legal: [
     { name: "Privacy", href: "#" },
@@ -36,7 +36,7 @@ export default function Footer() {
         <div className="grid md:grid-cols-5 gap-12 mb-12">
           {/* Brand */}
           <div>
-            <h3 className="text-2xl font-bold mb-4">Samuel</h3>
+            <h3 className="text-2xl font-bold mb-4">Retail Pro</h3>
             <p className="text-muted">
               AI-powered customer automation for modern businesses.
             </p>
@@ -64,7 +64,7 @@ export default function Footer() {
 
         {/* Bottom */}
         <div className="border-t border-card-border pt-8 flex flex-col sm:flex-row justify-between items-center gap-4 text-muted text-sm">
-          <p>&copy; 2024 Samuel Marketplace. All rights reserved.</p>
+          <p>&copy; 2024 Retail Pro. All rights reserved.</p>
           <div className="flex gap-6">
             <a href="#" className="hover:text-foreground transition-colors">
               Twitter
