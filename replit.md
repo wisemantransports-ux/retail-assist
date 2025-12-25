@@ -1,4 +1,4 @@
-# Retail Assist - Facebook/Instagram Automation Bot
+# Retail Pro - Facebook/Instagram Automation Bot
 
 ## Overview
 AI-powered social media automation tool for businesses to auto-reply to Facebook & Instagram comments and messages, manage conversations, and increase sales. Designed for African SMBs.

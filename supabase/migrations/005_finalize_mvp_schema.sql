@@ -1,0 +1,208 @@
+-- Finalized MVP schema and RLS policies
+-- Designed for: public.users (profile) + auth.users for authentication
+-- Read-only free dashboard model: client can SELECT required data but writes require workspace subscription_status = 'active'
+
+-- Ensure subscription_status enum exists
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'subscription_status') THEN
+    CREATE TYPE subscription_status AS ENUM ('pending','active','cancelled','past_due');
+  END IF;
+END$$;
+
+-- Users table (profile/business) mapped to auth.users via `auth_uid`
+CREATE TABLE IF NOT EXISTS users (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  auth_uid uuid UNIQUE,
+  email text,
+  full_name text,
+  business_name text,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+-- Workspaces
+CREATE TABLE IF NOT EXISTS workspaces (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  name text,
+  plan_type text,
+  subscription_status subscription_status DEFAULT 'pending',
+  payment_status text,
+  plan_limits jsonb DEFAULT '{}'::jsonb,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+-- Workspace members
+CREATE TABLE IF NOT EXISTS workspace_members (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id uuid REFERENCES workspaces(id) ON DELETE CASCADE,
+  user_id uuid REFERENCES users(id) ON DELETE CASCADE,
+  role text DEFAULT 'member',
+  created_at timestamptz DEFAULT now()
+);
+
+-- Agents (examples of a writable resource)
+CREATE TABLE IF NOT EXISTS agents (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id uuid REFERENCES workspaces(id) ON DELETE CASCADE,
+  name text,
+  description text,
+  system_prompt text,
+  model text,
+  enabled boolean DEFAULT true,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+-- Automation rules (example writable resource)
+CREATE TABLE IF NOT EXISTS automation_rules (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id uuid REFERENCES workspaces(id) ON DELETE CASCADE,
+  name text,
+  enabled boolean DEFAULT true,
+  config jsonb DEFAULT '{}'::jsonb,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+-- Helper: is_workspace_active
+CREATE OR REPLACE FUNCTION is_workspace_active(wid uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
+  SELECT CASE WHEN subscription_status = 'active' THEN true ELSE false END FROM workspaces WHERE id = wid LIMIT 1;
+$$;
+
+-- Enable RLS where appropriate
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE workspaces ENABLE ROW LEVEL SECURITY;
+ALTER TABLE workspace_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE agents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE automation_rules ENABLE ROW LEVEL SECURITY;
+
+-- USERS policies
+-- Insert: user can create their own profile that maps to their auth.uid()
+CREATE POLICY users_insert_own ON users FOR INSERT WITH CHECK (auth.uid() IS NOT NULL AND auth.uid()::uuid = auth_uid);
+
+-- Select: allow user to select their own profile, and allow members of any workspace to select profiles of members
+CREATE POLICY users_select_own_or_workspace ON users FOR SELECT USING (
+  auth.uid()::uuid = auth_uid OR
+  EXISTS (
+    SELECT 1 FROM workspace_members wm JOIN users u ON u.id = wm.user_id
+    WHERE wm.workspace_id IN (
+      SELECT workspace_id FROM workspace_members wm2 JOIN users u2 ON u2.id = wm2.user_id WHERE u2.auth_uid = auth.uid()::uuid
+    ) AND u.id = users.id
+  )
+);
+
+-- Update: only the user themselves (or server via service role) can update their profile
+CREATE POLICY users_update_own ON users FOR UPDATE USING (auth.uid()::uuid = auth_uid) WITH CHECK (auth.uid()::uuid = auth_uid);
+
+-- WORKSPACES policies
+-- Select: members of a workspace (including owner) can read workspace
+CREATE POLICY workspaces_select_members ON workspaces FOR SELECT USING (
+  EXISTS (
+    SELECT 1 FROM workspace_members wm JOIN users u ON u.id = wm.user_id WHERE wm.workspace_id = workspaces.id AND u.auth_uid = auth.uid()::uuid
+  )
+);
+
+-- Insert: authenticated user may create a workspace where they are the owner
+CREATE POLICY workspaces_insert_owner ON workspaces FOR INSERT WITH CHECK (
+  (SELECT auth_uid FROM users WHERE id = owner_id LIMIT 1) = auth.uid()::uuid
+);
+
+-- Update/Delete: only owner or workspace admins can update/delete workspace
+CREATE POLICY workspaces_update_owner_or_admin ON workspaces FOR UPDATE USING (
+  (SELECT auth_uid FROM users WHERE id = owner_id LIMIT 1) = auth.uid()::uuid OR
+  EXISTS (
+    SELECT 1 FROM workspace_members wm JOIN users u ON u.id = wm.user_id WHERE wm.workspace_id = workspaces.id AND u.auth_uid = auth.uid()::uuid AND wm.role = 'admin'
+  )
+) WITH CHECK (
+  (SELECT auth_uid FROM users WHERE id = owner_id LIMIT 1) = auth.uid()::uuid OR
+  EXISTS (
+    SELECT 1 FROM workspace_members wm JOIN users u ON u.id = wm.user_id WHERE wm.workspace_id = workspaces.id AND u.auth_uid = auth.uid()::uuid AND wm.role = 'admin'
+  )
+);
+
+-- WORKSPACE_MEMBERS policies
+-- Select: allow members of a workspace to list its members
+CREATE POLICY workspace_members_select_member ON workspace_members FOR SELECT USING (
+  EXISTS (
+    SELECT 1 FROM users u2 WHERE u2.auth_uid = auth.uid()::uuid AND EXISTS (SELECT 1 FROM workspace_members wm2 WHERE wm2.workspace_id = workspace_members.workspace_id AND wm2.user_id = u2.id)
+  )
+);
+
+-- Insert: allow a user to join (self-insert) or workspace admins to add members
+CREATE POLICY workspace_members_insert_self_or_admin ON workspace_members FOR INSERT WITH CHECK (
+  (SELECT auth_uid FROM users WHERE id = new.user_id LIMIT 1) = auth.uid()::uuid OR
+  EXISTS (
+    SELECT 1 FROM workspace_members wm JOIN users u ON u.id = wm.user_id WHERE wm.workspace_id = new.workspace_id AND u.auth_uid = auth.uid()::uuid AND wm.role = 'admin'
+  )
+);
+
+-- Update/Delete: allow users to remove themselves or workspace admins
+CREATE POLICY workspace_members_update_self_or_admin ON workspace_members FOR UPDATE USING (
+  (SELECT auth_uid FROM users WHERE id = user_id LIMIT 1) = auth.uid()::uuid OR
+  EXISTS (
+    SELECT 1 FROM workspace_members wm JOIN users u ON u.id = wm.user_id WHERE wm.workspace_id = workspace_members.workspace_id AND u.auth_uid = auth.uid()::uuid AND wm.role = 'admin'
+  )
+) WITH CHECK (
+  (SELECT auth_uid FROM users WHERE id = user_id LIMIT 1) = auth.uid()::uuid OR
+  EXISTS (
+    SELECT 1 FROM workspace_members wm JOIN users u ON u.id = wm.user_id WHERE wm.workspace_id = workspace_members.workspace_id AND u.auth_uid = auth.uid()::uuid AND wm.role = 'admin'
+  )
+);
+
+-- AGENTS policies (example resource that should be read-only unless workspace active)
+-- Select: allow members to read agents for their workspace
+CREATE POLICY agents_select_members ON agents FOR SELECT USING (
+  EXISTS (
+    SELECT 1 FROM workspace_members wm JOIN users u ON u.id = wm.user_id WHERE wm.workspace_id = agents.workspace_id AND u.auth_uid = auth.uid()::uuid
+  )
+);
+
+-- Insert/Update/Delete: allow only when workspace is active and requester is admin/owner
+CREATE POLICY agents_write_if_active_admin ON agents FOR INSERT, UPDATE, DELETE USING (
+  (is_workspace_active(agents.workspace_id) AND (
+    (SELECT auth_uid FROM users WHERE id = (SELECT owner_id FROM workspaces WHERE id = agents.workspace_id LIMIT 1) LIMIT 1) = auth.uid()::uuid OR
+    EXISTS (
+      SELECT 1 FROM workspace_members wm JOIN users u ON u.id = wm.user_id WHERE wm.workspace_id = agents.workspace_id AND u.auth_uid = auth.uid()::uuid AND wm.role = 'admin'
+    )
+  ))
+) WITH CHECK (
+  (is_workspace_active(agents.workspace_id) AND (
+    (SELECT auth_uid FROM users WHERE id = (SELECT owner_id FROM workspaces WHERE id = agents.workspace_id LIMIT 1) LIMIT 1) = auth.uid()::uuid OR
+    EXISTS (
+      SELECT 1 FROM workspace_members wm JOIN users u ON u.id = wm.user_id WHERE wm.workspace_id = agents.workspace_id AND u.auth_uid = auth.uid()::uuid AND wm.role = 'admin'
+    )
+  ))
+);
+
+-- AUTOMATION_RULES policies (same pattern)
+CREATE POLICY automation_select_members ON automation_rules FOR SELECT USING (
+  EXISTS (
+    SELECT 1 FROM workspace_members wm JOIN users u ON u.id = wm.user_id WHERE wm.workspace_id = automation_rules.workspace_id AND u.auth_uid = auth.uid()::uuid
+  )
+);
+
+CREATE POLICY automation_write_if_active_admin ON automation_rules FOR INSERT, UPDATE, DELETE USING (
+  (is_workspace_active(automation_rules.workspace_id) AND (
+    (SELECT auth_uid FROM users WHERE id = (SELECT owner_id FROM workspaces WHERE id = automation_rules.workspace_id LIMIT 1) LIMIT 1) = auth.uid()::uuid OR
+    EXISTS (
+      SELECT 1 FROM workspace_members wm JOIN users u ON u.id = wm.user_id WHERE wm.workspace_id = automation_rules.workspace_id AND u.auth_uid = auth.uid()::uuid AND wm.role = 'admin'
+    )
+  ))
+) WITH CHECK (
+  (is_workspace_active(automation_rules.workspace_id) AND (
+    (SELECT auth_uid FROM users WHERE id = (SELECT owner_id FROM workspaces WHERE id = automation_rules.workspace_id LIMIT 1) LIMIT 1) = auth.uid()::uuid OR
+    EXISTS (
+      SELECT 1 FROM workspace_members wm JOIN users u ON u.id = wm.user_id WHERE wm.workspace_id = automation_rules.workspace_id AND u.auth_uid = auth.uid()::uuid AND wm.role = 'admin'
+    )
+  ))
+);
+
+-- Indexes for common lookups
+CREATE INDEX IF NOT EXISTS idx_users_auth_uid ON users(auth_uid);
+CREATE INDEX IF NOT EXISTS idx_workspace_members_workspace_id ON workspace_members(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_agents_workspace_id ON agents(workspace_id);
+
+-- Notes: Seeds are provided in migration 004; ensure auth.users exist and map `auth_uid` values in `users`.

@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSubscription } from '@/components/SubscriptionGuard';
+import UpsellModal from '@/components/UpsellModal';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createAutomationRule } from '@/lib/supabase/queries';
@@ -28,6 +30,8 @@ export default function NewAutomationRulePage() {
     autoSkipReplies: false,
     delaySeconds: 0,
   });
+  const { readOnly } = useSubscription();
+  const [showUpsell, setShowUpsell] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -82,6 +86,11 @@ export default function NewAutomationRulePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // prevent read-only users from creating automation rules
+    if (readOnly) {
+      setShowUpsell(true);
+      return;
+    }
     setSubmitting(true);
     setError(null);
 
@@ -161,6 +170,7 @@ export default function NewAutomationRulePage() {
           </div>
           <p className="mt-4 text-muted">Loading...</p>
         </div>
+          <UpsellModal open={showUpsell} onClose={() => setShowUpsell(false)} reason="Creating automation rules requires an active subscription." />
       </div>
     );
   }

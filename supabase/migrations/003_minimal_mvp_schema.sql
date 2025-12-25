@@ -1,0 +1,104 @@
+-- Minimal Supabase schema for Retail Pro MVP
+-- Purpose: allow signup/login, workspaces, roles, subscription gating, and read-only dashboards
+
+-- Enable uuid generation
+create extension if not exists pgcrypto;
+
+-- Subscription status enum
+do $$ begin
+    if not exists (select 1 from pg_type where typname = 'subscription_status') then
+        create type subscription_status as enum ('pending','awaiting_approval','active','suspended');
+    end if;
+end$$;
+
+-- Users (lightweight, maps optionally to auth.users via auth_uid)
+create table if not exists users (
+  id uuid primary key default gen_random_uuid(),
+  auth_uid uuid, -- optional link to Supabase Auth user id
+  email text unique,
+  full_name text,
+  created_at timestamptz default now()
+);
+
+-- Workspaces: owner, plan, subscription status, and plan limits stored as JSONB
+create table if not exists workspaces (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references users(id) on delete cascade,
+  name text not null,
+  plan_type text not null default 'starter',
+  subscription_status subscription_status not null default 'pending',
+  payment_status text not null default 'unpaid',
+  -- plan_limits: { maxPages: number, hasInstagram: bool, hasAiResponses: bool, commentToDmLimit: number }
+  plan_limits jsonb not null default ('{"maxPages":1,"hasInstagram":false,"hasAiResponses":false,"commentToDmLimit":0}'::jsonb),
+  created_at timestamptz default now()
+);
+
+-- Workspace membership + roles
+create table if not exists workspace_members (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references workspaces(id) on delete cascade,
+  user_id uuid not null references users(id) on delete cascade,
+  role text not null check (role in ('admin','member')),
+  joined_at timestamptz default now(),
+  unique (workspace_id, user_id)
+);
+
+-- Simple helper: is_read_only(user, workspace)
+create or replace function is_read_only(p_user uuid, p_workspace uuid)
+returns boolean language plpgsql stable as $$
+declare
+  m_role text;
+  sub_status subscription_status;
+begin
+  if p_user is null or p_workspace is null then
+    return true;
+  end if;
+
+  select role into m_role
+  from workspace_members
+  where workspace_id = p_workspace and user_id = p_user
+  limit 1;
+
+  -- Admins are never read-only
+  if m_role = 'admin' then
+    return false;
+  end if;
+
+  select subscription_status into sub_status
+  from workspaces
+  where id = p_workspace
+  limit 1;
+
+  -- Only active subscriptions have full access
+  if sub_status is null or sub_status <> 'active' then
+    return true;
+  end if;
+
+  return false;
+end$$;
+
+-- Helper to check feature access per workspace and feature name
+create or replace function can_use_feature(p_user uuid, p_workspace uuid, p_feature text)
+returns boolean language sql stable as $$
+  select case
+    when (select role from workspace_members where workspace_id = p_workspace and user_id = p_user limit 1) = 'admin' then true
+    when (select subscription_status from workspaces where id = p_workspace limit 1) <> 'active' then false
+    when p_feature = 'instagram' then (select (plan_limits->>'hasInstagram')::boolean from workspaces where id = p_workspace limit 1)
+    when p_feature = 'ai' then (select (plan_limits->>'hasAiResponses')::boolean from workspaces where id = p_workspace limit 1)
+    when p_feature = 'unlimited_pages' then ((select (plan_limits->>'maxPages')::int from workspaces where id = p_workspace limit 1) = -1)
+    else true
+  end;
+$$;
+
+-- Useful views
+create or replace view workspace_users as
+select wm.workspace_id, wm.user_id, wm.role, w.subscription_status, w.plan_type
+from workspace_members wm
+join workspaces w on w.id = wm.workspace_id;
+
+-- Indexes for lookups
+create index if not exists idx_workspaces_owner on workspaces(owner_id);
+create index if not exists idx_workspace_members_user on workspace_members(user_id);
+
+-- Minimal seed example (optional) — comment out in production
+-- insert into users (email, full_name) values ('admin@example.com','Admin User');

@@ -1,4 +1,4 @@
-# Retail Assist App - Setup & Deployment Guide
+# Retail Pro - Setup & Deployment Guide
 
 ## 🚀 Quick Start
 

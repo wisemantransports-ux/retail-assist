@@ -124,7 +124,7 @@ CREATE TABLE IF NOT EXISTS direct_messages (
   agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
   recipient_id TEXT NOT NULL, -- Email or external user ID
   recipient_name TEXT,
-  sender_display TEXT DEFAULT 'Retail Assist Bot',
+  sender_display TEXT DEFAULT 'Retail Pro Bot',
   content TEXT NOT NULL,
   platform TEXT DEFAULT 'email', -- email, facebook_messenger, whatsapp, instagram_dm
   platform_message_id TEXT, -- External ID if sent via API
