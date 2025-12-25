@@ -3,8 +3,26 @@
  * These exports exist to satisfy imports without breaking the build.
  */
 
+import { getBrowserSupabaseClient } from './client';
+import { getServiceSupabaseClient } from './serverClient';
+
+const IS_MOCK = (process.env.NEXT_PUBLIC_USE_DEV_AUTH === 'true' || process.env.USE_MOCK_DB === 'true');
+
+async function getClient(forWrite = false) {
+  if (IS_MOCK) return null;
+  try {
+    return forWrite ? getServiceSupabaseClient() : getBrowserSupabaseClient();
+  } catch (err) {
+    return null;
+  }
+}
+
 export async function getPendingMobileMoneyPayments(workspaceId: string) {
-  return { error: null, data: [] };
+  if (IS_MOCK) return { error: null, data: [] };
+  const sb = await getClient();
+  if (!sb) return { error: 'supabase-not-configured', data: [] };
+  const { data, error } = await sb.from('mobile_money_payments').select('*').eq('workspace_id', workspaceId).eq('status', 'pending');
+  return { error, data };
 }
 
 export async function insertSystemLog(...args: any[]) {
@@ -12,15 +30,33 @@ export async function insertSystemLog(...args: any[]) {
 }
 
 export async function acceptInvite(token: string, userId: string) {
-  return { error: 'Not implemented - using file-based JSON storage', data: null };
+  if (IS_MOCK) return { error: 'mock-mode', data: null };
+  const sb = await getClient(true);
+  if (!sb) return { error: 'supabase-not-configured', data: null };
+  // token handling depends on invite implementation; basic example
+  const { data: invite, error: inviteErr } = await sb.from('invites').select('*').eq('token', token).limit(1).single();
+  if (inviteErr || !invite) return { error: inviteErr || 'invite-not-found', data: null };
+  const { data, error } = await sb.from('workspace_members').insert({ workspace_id: invite.workspace_id, user_id: userId, role: invite.role }).select().single();
+  return { error, data };
 }
 
 export async function getWorkspaceMembers(workspaceId: string) {
-  return { error: null, data: [] };
+  if (IS_MOCK) return { error: null, data: [] };
+  const sb = await getClient();
+  if (!sb) return { error: 'supabase-not-configured', data: [] };
+  const { data, error } = await sb
+    .from('workspace_members')
+    .select('role, users(id, auth_uid, email, full_name)')
+    .eq('workspace_id', workspaceId);
+  return { error, data };
 }
 
 export async function removeWorkspaceMember(workspaceId: string, userId: string) {
-  return { error: null, data: null };
+  if (IS_MOCK) return { error: null, data: null };
+  const sb = await getClient(true);
+  if (!sb) return { error: 'supabase-not-configured', data: null };
+  const { error, data } = await sb.from('workspace_members').delete().match({ workspace_id: workspaceId, user_id: userId });
+  return { error, data };
 }
 
 export async function updateMemberRole(...args: any[]) {
@@ -28,32 +64,29 @@ export async function updateMemberRole(...args: any[]) {
 }
 
 export async function createInvite(workspaceId: string, email: string, role: string) {
-  return { error: null, data: null };
+  if (IS_MOCK) return { error: null, data: null };
+  const sb = await getClient(true);
+  if (!sb) return { error: 'supabase-not-configured', data: null };
+  const token = cryptoRandomToken();
+  const { data, error } = await sb.from('invites').insert({ workspace_id: workspaceId, email, role, token }).select().single();
+  return { error, data };
+}
+
+function cryptoRandomToken(len = 48) {
+  // simple token generator for seeds; for production use a secure method
+  return [...Array(len)].map(() => Math.random().toString(36)[2]).join('');
 }
 
 export async function getAgent(agentId: string) {
-  return { error: null, data: null };
+  if (IS_MOCK) return { error: null, data: null };
+  const sb = await getClient();
+  if (!sb) return { error: 'supabase-not-configured', data: null };
+  const { data, error } = await sb.from('agents').select('*').eq('id', agentId).limit(1).single();
+  return { error, data };
 }
 
 export async function getAgentById(agentId: string): Promise<any> {
-  return { 
-    error: null, 
-    data: null, 
-    enabled: false, 
-    workspace_id: null, 
-    system_prompt: null, 
-    model: null, 
-    name: null,
-    temperature: null,
-    max_tokens: null,
-    id: null,
-    created_at: null,
-    updated_at: null,
-    fallback: null,
-    api_key: null,
-    description: null,
-    greeting: null
-  };
+  return getAgent(agentId);
 }
 
 export async function updateAgent(agentId: string, data: any) {
@@ -189,11 +222,20 @@ export async function handlePayPalWebhook(event: any) {
 }
 
 export async function getAgents(workspaceId: string) {
-  return { error: null, data: [] };
+  if (IS_MOCK) return { error: null, data: [] };
+  const sb = await getClient();
+  if (!sb) return { error: 'supabase-not-configured', data: [] };
+  const { data, error } = await sb.from('agents').select('*').eq('workspace_id', workspaceId);
+  return { error, data };
 }
 
 export async function createAgent(workspaceIdOrData: any, data?: any) {
-  return { error: null, data: null };
+  if (IS_MOCK) return { error: null, data: null };
+  const sb = await getClient(true);
+  if (!sb) return { error: 'supabase-not-configured', data: null };
+  const payload = data || workspaceIdOrData;
+  const { data: inserted, error } = await sb.from('agents').insert(payload).select().single();
+  return { error, data: inserted };
 }
 
 export async function createAuditLog(...args: any[]) {
@@ -229,19 +271,35 @@ export async function capturePayPalOrder(orderId: string) {
 }
 
 export async function getUser(userId: string) {
-  return { error: null, data: null };
+  if (IS_MOCK) return { error: null, data: null };
+  const sb = await getClient();
+  if (!sb) return { error: 'supabase-not-configured', data: null };
+  const { data, error } = await sb.from('users').select('*').eq('id', userId).limit(1).single();
+  return { error, data };
 }
 
 export async function updateUser(userId: string, data: any) {
-  return { error: null, data: null };
+  if (IS_MOCK) return { error: null, data: null };
+  const sb = await getClient(true);
+  if (!sb) return { error: 'supabase-not-configured', data: null };
+  const { data: updated, error } = await sb.from('users').update(data).eq('id', userId).select().single();
+  return { error, data: updated };
 }
 
 export async function getWorkspace(workspaceId: string) {
-  return { error: null, data: null };
+  if (IS_MOCK) return { error: null, data: null };
+  const sb = await getClient();
+  if (!sb) return { error: 'supabase-not-configured', data: null };
+  const { data, error } = await sb.from('workspaces').select('*').eq('id', workspaceId).limit(1).single();
+  return { error, data };
 }
 
 export async function updateWorkspace(workspaceId: string, data: any) {
-  return { error: null, data: null };
+  if (IS_MOCK) return { error: null, data: null };
+  const sb = await getClient(true);
+  if (!sb) return { error: 'supabase-not-configured', data: null };
+  const { data: updated, error } = await sb.from('workspaces').update(data).eq('id', workspaceId).select().single();
+  return { error, data: updated };
 }
 
 export async function resetPassword(email: string) {
@@ -272,9 +330,18 @@ export async function saveMobileMoneyPayment(...args: any[]) {
   return { error: null, data: null };
 }
 
-export async function removeMember(...args: any[]) {
-  return { error: null, data: null };
+export async function removeMember(workspaceId: string, userId: string) {
+  return removeWorkspaceMember(workspaceId, userId);
 }
+
+export async function addWorkspaceMember(workspaceId: string, userId: string, role = 'member') {
+  if (IS_MOCK) return { error: null, data: null };
+  const sb = await getClient(true);
+  if (!sb) return { error: 'supabase-not-configured', data: null };
+  const { data, error } = await sb.from('workspace_members').insert({ workspace_id: workspaceId, user_id: userId, role }).select().single();
+  return { error, data };
+}
+
 
 export async function inviteMember(...args: any[]) {
   return { error: null, data: null };
