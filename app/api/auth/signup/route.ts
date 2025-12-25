@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { sessionManager } from '@/lib/session';
 
 export async function POST(request: Request) {
   try {
@@ -44,8 +45,10 @@ export async function POST(request: Request) {
       message: `New user signup: ${business_name} (${email})`,
       meta: { plan_type: selectedPlan }
     });
-    
-    return NextResponse.json({
+
+    // create a session so the user can immediately access the dashboard (free/limited)
+    const session = await sessionManager.create(user.id, 24 * 30);
+    const res = NextResponse.json({
       success: true,
       user: {
         id: user.id,
@@ -54,8 +57,10 @@ export async function POST(request: Request) {
         subscription_status: user.subscription_status,
         plan_type: user.plan_type
       },
-      message: 'Account created successfully. Please complete payment and wait for admin activation.'
+      message: 'Account created successfully. You can access the dashboard — upgrade to unlock premium features.'
     });
+    res.cookies.set('session_id', session.id, { path: '/', httpOnly: true });
+    return res;
   } catch (error: any) {
     console.error('[Auth Signup] Error:', error.message);
     

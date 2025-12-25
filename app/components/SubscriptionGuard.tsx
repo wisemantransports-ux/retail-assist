@@ -60,15 +60,17 @@ export default function SubscriptionGuard({ children, requiredFeature }: Subscri
       const subStatus = userData.subscription_status || "pending";
 
       if (paymentStatus === "unpaid" || subStatus === "pending") {
+        // allow free/pending users into the dashboard but mark as limited access
         setUserStatus("unpaid");
         setLoading(false);
-        return;
+        // don't return — let them access the dashboard with limited features
       }
 
       if (subStatus === "awaiting_approval") {
+        // payment received but awaiting admin approval — allow access with notice
         setUserStatus("awaiting_approval");
         setLoading(false);
-        return;
+        // don't return — show info banner instead of blocking
       }
 
       if (subStatus === "suspended") {
@@ -115,56 +117,53 @@ export default function SubscriptionGuard({ children, requiredFeature }: Subscri
   }
 
   if (userStatus === "unpaid") {
+    // show a non-blocking banner and let the user access the dashboard with limited features
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-gray-800 border border-gray-700 rounded-xl p-8 text-center">
-          <div className="text-6xl mb-4">💳</div>
-          <h1 className="text-2xl font-bold text-white mb-4">Payment Required</h1>
-          <p className="text-gray-400 mb-6">
-            Please complete your payment to activate your account and access all features.
-          </p>
-          <div className="space-y-3">
-            <button
-              onClick={() => router.push("/dashboard/billing/payment-required")}
-              className="block w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg cursor-pointer"
-            >
-              Complete Payment
-            </button>
-            <button
-              onClick={() => router.push("/auth/login")}
-              className="block w-full text-gray-400 hover:text-white text-sm cursor-pointer"
-            >
-              Back to Login
-            </button>
+      <>
+        <div className="w-full bg-yellow-900/90 text-yellow-200 py-3">
+          <div className="max-w-7xl mx-auto px-4 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="text-2xl">💳</div>
+              <div>
+                <div className="font-semibold">Limited Access</div>
+                <div className="text-sm text-yellow-200/90">You're on the free plan — some premium features are locked. Upgrade anytime.</div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Link href="/pricing" className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md font-semibold">View Plans</Link>
+              <button onClick={() => router.push('/dashboard/billing/payment-required')} className="text-sm text-white/90 underline">Complete Payment</button>
+            </div>
           </div>
         </div>
-      </div>
+
+        {children}
+      </>
     );
   }
 
   if (userStatus === "awaiting_approval") {
+    // show an info banner while still allowing access
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-gray-800 border border-gray-700 rounded-xl p-8 text-center">
-          <div className="text-6xl mb-4">⏳</div>
-          <h1 className="text-2xl font-bold text-white mb-4">Awaiting Admin Approval</h1>
-          <p className="text-gray-400 mb-6">
-            Thank you for your payment! Your account is being reviewed and will be activated within 24 hours.
-          </p>
-          <div className="bg-green-900/30 border border-green-600 rounded-lg p-4 mb-6">
-            <p className="text-green-200 text-sm">
-              <strong>Payment Status:</strong> Confirmed<br />
-              <strong>Next Step:</strong> Admin review in progress
-            </p>
+      <>
+        <div className="w-full bg-blue-900/90 text-blue-200 py-3">
+          <div className="max-w-7xl mx-auto px-4 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="text-2xl">⏳</div>
+              <div>
+                <div className="font-semibold">Awaiting Approval</div>
+                <div className="text-sm text-blue-200/90">Payment received — your account is under review. Some features may be pending activation.</div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Link href="/dashboard/billing" className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md font-semibold">Billing</Link>
+            </div>
           </div>
-          <Link
-            href="/auth/login"
-            className="block text-gray-400 hover:text-white text-sm"
-          >
-            Back to Login
-          </Link>
         </div>
-      </div>
+
+        {children}
+      </>
     );
   }
 

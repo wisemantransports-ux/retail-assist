@@ -29,9 +29,9 @@ function SignupForm() {
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [businessName, setBusinessName] = useState("");
   const [phone, setPhone] = useState("");
+  // keep a selectedPlan in state so we can honour ?plan= links but keep UI minimal
   const [selectedPlan, setSelectedPlan] = useState("starter");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,11 +48,6 @@ function SignupForm() {
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-
-    if (password !== confirmPassword) {
-      setError("Passwords don't match");
-      return;
-    }
 
     if (password.length < 6) {
       setError("Password must be at least 6 characters");
@@ -85,7 +80,8 @@ function SignupForm() {
         throw new Error(data.error || 'Signup failed');
       }
 
-      setSuccess(true);
+      // automatically go to dashboard (session created server-side)
+      router.push('/dashboard');
     } catch (err: any) {
       setError(err.message || "Failed to sign up");
     } finally {
@@ -94,7 +90,6 @@ function SignupForm() {
   }
 
   if (success) {
-    const plan = PLANS.find(p => p.id === selectedPlan);
     return (
       <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-gray-900 to-gray-800">
         <div className="w-full max-w-md text-center">
@@ -102,28 +97,12 @@ function SignupForm() {
             <div className="text-6xl mb-4 text-green-400">&#10003;</div>
             <h1 className="text-2xl font-bold text-white mb-4">Account Created!</h1>
             <p className="text-gray-400 mb-4">
-              Your account for the <span className="text-blue-400 font-semibold">{plan?.name}</span> plan ({plan?.price}) has been created.
+              Your account has been created. You can access the dashboard now — some premium features are locked until you upgrade.
             </p>
-            <div className="bg-yellow-900/30 border border-yellow-600 rounded-lg p-4 mb-6">
-              <p className="text-yellow-200 text-sm">
-                <strong>Next Step:</strong> Complete payment via PayPal to activate your subscription. 
-                Our team will review and activate your account within 24 hours.
-              </p>
+            <div className="space-y-3">
+              <Link href="/dashboard" className="block w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg">Go to Dashboard</Link>
+              <Link href="/pricing" className="block w-full text-gray-400 hover:text-white text-sm">View Plans & Upgrade</Link>
             </div>
-            <a
-              href={`https://paypal.com/paypalme/retailassist/${plan?.price?.replace('$', '').replace('/month', '')}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg mb-3"
-            >
-              Pay with PayPal
-            </a>
-            <Link 
-              href="/auth/login"
-              className="block text-gray-400 hover:text-white text-sm"
-            >
-              Go to Login
-            </Link>
           </div>
         </div>
       </div>
@@ -134,8 +113,8 @@ function SignupForm() {
     <div className="min-h-screen flex items-center justify-center px-4 py-8 bg-gradient-to-br from-gray-900 to-gray-800">
       <div className="w-full max-w-2xl">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Create Your Account</h1>
-          <p className="text-gray-400">Start automating Facebook & Instagram conversations today</p>
+          <h1 className="text-4xl font-extrabold text-white mb-2">Get Started — It’s Free</h1>
+          <p className="text-gray-400">Sign up to access your dashboard. Upgrade anytime to unlock premium features.</p>
         </div>
 
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-6 space-y-6">
@@ -197,57 +176,12 @@ function SignupForm() {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Confirm Password</label>
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Confirm password"
-                  className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
-                  required
-                />
-              </div>
+
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-3">Select Plan</label>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {PLANS.map((plan) => (
-                  <div
-                    key={plan.id}
-                    onClick={() => setSelectedPlan(plan.id)}
-                    className={`cursor-pointer border rounded-lg p-4 transition-all ${
-                      selectedPlan === plan.id
-                        ? 'border-blue-500 bg-blue-900/30'
-                        : 'border-gray-600 hover:border-gray-500'
-                    }`}
-                  >
-                    <h3 className="font-semibold text-white">{plan.name}</h3>
-                    <p className="text-blue-400 text-sm font-medium mb-2">{plan.price}</p>
-                    <ul className="text-xs text-gray-400 space-y-1">
-                      {plan.features.map((f, i) => (
-                        <li key={i}>- {f}</li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            </div>
 
-            <label className="flex items-start gap-3 text-sm">
-              <input type="checkbox" className="mt-1" required />
-              <span className="text-gray-400">
-                I agree to the{" "}
-                <Link href="#" className="text-blue-400 hover:underline">
-                  Terms of Service
-                </Link>{" "}
-                and{" "}
-                <Link href="#" className="text-blue-400 hover:underline">
-                  Privacy Policy
-                </Link>
-              </span>
-            </label>
+
+
 
             <button
               type="submit"

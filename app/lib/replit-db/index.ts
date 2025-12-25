@@ -1,66 +1,7 @@
-import * as fs from 'fs';
-import * as path from 'path';
+// DEPRECATED: Replit storage removed. Use `@/lib/db` and `@/lib/session` (Supabase) instead.
+// This file was kept only to avoid accidental deletes; all logic has been moved to `@/lib/db` and `@/lib/session`.
 
-const DATA_DIR = process.env.DATA_DIR || './.data';
-
-interface User {
-  id: string;
-  email: string;
-  password_hash: string;
-  business_name: string;
-  phone: string;
-  plan_type: 'starter' | 'pro' | 'enterprise';
-  payment_status: 'unpaid' | 'paid';
-  subscription_status: 'pending' | 'awaiting_approval' | 'active' | 'suspended';
-  billing_start_date?: string;
-  billing_end_date?: string;
-  paypal_subscription_id?: string;
-  activated_at?: string;
-  role: 'user' | 'admin';
-  created_at: string;
-  updated_at: string;
-}
-
-interface Token {
-  id: string;
-  user_id: string;
-  platform: 'facebook' | 'instagram';
-  page_id: string;
-  page_name: string;
-  access_token: string;
-  created_at: string;
-  updated_at: string;
-}
-
-interface BusinessSettings {
-  id: string;
-  user_id: string;
-  auto_reply_enabled: boolean;
-  comment_to_dm_enabled: boolean;
-  greeting_message: string;
-  away_message: string;
-  keywords: string[];
-  ai_enabled: boolean;
-  system_prompt: string;
-  created_at: string;
-  updated_at: string;
-}
-
-interface LogEntry {
-  id: string;
-  user_id?: string;
-  level: 'info' | 'warn' | 'error';
-  message: string;
-  meta?: Record<string, any>;
-  created_at: string;
-}
-
-interface Database {
-  users: Record<string, User>;
-  tokens: Record<string, Token>;
-  business_settings: Record<string, BusinessSettings>;
-  logs: LogEntry[];
-}
+throw new Error('Replit-based storage has been removed. Import from "@/lib/db" and "@/lib/session" instead.');
 
 export const PLAN_LIMITS = {
   starter: {
