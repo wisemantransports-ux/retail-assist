@@ -1,4 +1,4 @@
-# Retail Assist App - Implementation Roadmap & Next Steps
+# Retail Pro - Implementation Roadmap & Next Steps
 
 **Prepared by:** GitHub Copilot  
 **Date:** December 7, 2025  
