@@ -5,9 +5,9 @@ import { getBrand } from "./config/branding";
 
 export async function generateMetadata(): Promise<Metadata> {
   const brand = getBrand();
-  return {
-    title: brand.name,
-    description: brand.tagline,
+    return {
+      title: "Retail Pro — AI automation for retail",
+      description: "AI-powered retail automation built with Next.js + Supabase",
   };
 }
 

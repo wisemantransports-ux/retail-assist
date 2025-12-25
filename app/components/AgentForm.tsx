@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useSubscription } from "@/components/SubscriptionGuard";
+import UpsellModal from "@/components/UpsellModal";
 import { useRouter } from 'next/navigation';
 
 export default function AgentForm({ onCreate }: { onCreate?: (data: any) => void }) {
@@ -9,10 +11,17 @@ export default function AgentForm({ onCreate }: { onCreate?: (data: any) => void
   const [greeting, setGreeting] = useState("");
   const [fallback, setFallback] = useState("");
   const [loading, setLoading] = useState(false);
+  const { readOnly } = useSubscription();
+  const [showUpsell, setShowUpsell] = useState(false);
   const router = useRouter();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    // read-only guard: show upsell if user cannot create agents
+    if (readOnly) {
+      setShowUpsell(true);
+      return;
+    }
     setLoading(true);
 
     try {
@@ -37,7 +46,8 @@ export default function AgentForm({ onCreate }: { onCreate?: (data: any) => void
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <>
+      <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="block text-sm font-medium mb-2">Agent Name</label>
         <input
@@ -88,5 +98,7 @@ export default function AgentForm({ onCreate }: { onCreate?: (data: any) => void
         </button>
       </div>
     </form>
+      <UpsellModal open={showUpsell} onClose={() => setShowUpsell(false)} reason="Creating agents requires an active subscription." />
+    </>
   );
 }

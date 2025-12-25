@@ -16,13 +16,13 @@ export default function CTA() {
               Ready to Transform Your Customer Service?
             </h2>
             <p className="text-xl text-muted mb-8 max-w-2xl mx-auto">
-              Get started in minutes. No credit card required. Start your free trial today.
+              Get started in minutes. No credit card required — sign up to capture leads.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/auth/signup">
                 <button className="btn-primary px-8 py-3 text-lg">
-                  Start Free Trial
+                  Get Started
                 </button>
               </Link>
               <Link href="mailto:support@retailpro.com">

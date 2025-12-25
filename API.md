@@ -1,4 +1,4 @@
-# Retail Assist App - API Documentation
+# Retail Pro - API Documentation
 
 **Base URL:** `https://retail-assist-app.netlify.app` (Production) or `http://localhost:5000` (Dev)
 
