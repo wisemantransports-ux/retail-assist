@@ -1,4 +1,4 @@
-# ⚡ QUICK REFERENCE - Retail Assist App Architecture
+# ⚡ QUICK REFERENCE - Retail Pro Architecture
 
 **Last Updated:** December 7, 2025
 

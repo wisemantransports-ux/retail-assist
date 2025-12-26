@@ -20,7 +20,7 @@ export interface BrandConfig {
 }
 
 export const DEFAULT_BRAND: BrandConfig = {
-  name: "Retail Assist",
+  name: "Retail Pro",
   tagline: "AI-Powered Customer Automation",
   logo: "/logo.png",
   favicon: "/favicon.ico",

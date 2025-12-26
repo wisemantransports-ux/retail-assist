@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSubscription } from '@/components/SubscriptionGuard';
+import UpsellModal from '@/components/UpsellModal';
 import { useSearchParams } from 'next/navigation';
 
 interface ConnectedPage {
@@ -25,6 +27,8 @@ export default function IntegrationsPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [selectedPages, setSelectedPages] = useState<string[]>([]);
+  const { readOnly } = useSubscription();
+  const [showUpsell, setShowUpsell] = useState(false);
 
   useEffect(() => {
     loadConnectedPages();
@@ -70,18 +74,24 @@ export default function IntegrationsPage() {
   }
 
   async function handleConnectFacebook() {
+    // guard for read-only users
+    if (readOnly) {
+      setShowUpsell(true);
+      return;
+    }
+
     setLoading(true);
     setMessage(null);
-    
+
     try {
       const res = await fetch('/api/meta/oauth');
       const data = await res.json();
-      
+
       if (!res.ok) {
         setMessage({ type: 'error', text: data.error });
         return;
       }
-      
+
       window.location.href = data.authUrl;
     } catch (error: any) {
       setMessage({ type: 'error', text: error.message });
@@ -162,6 +172,7 @@ export default function IntegrationsPage() {
   }
 
   return (
+    <>
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white">Integrations</h1>
@@ -316,5 +327,7 @@ export default function IntegrationsPage() {
         </div>
       </div>
     </div>
+    <UpsellModal open={showUpsell} onClose={() => setShowUpsell(false)} reason="Connecting pages requires an active subscription." />
+    </>
   );
 }
