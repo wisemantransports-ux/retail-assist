@@ -1,4 +1,4 @@
-# Retail Assist App
+# Retail Pro
 
 **AI-powered retail automation platform for small businesses**
 

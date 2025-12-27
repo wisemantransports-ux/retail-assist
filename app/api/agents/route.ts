@@ -31,11 +31,38 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's default workspace
+    // Get user record from public.users table using auth.uid
+    let { data: userRecord, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', session.user.id)
+      .single();
+
+    // If user doesn't exist, auto-create
+    if (userError || !userRecord) {
+      console.log('[GET /api/agents] Auto-creating user record for auth.uid:', session.user.id);
+      const { data: createdUser, error: createError } = await supabase
+        .from('users')
+        .insert({
+          id: session.user.id,
+          email: session.user.email,
+        })
+        .select('id')
+        .single();
+
+      if (createError) {
+        console.error('[GET /api/agents] Failed to create user:', createError);
+        return NextResponse.json({ agents: [] });
+      }
+
+      userRecord = createdUser;
+    }
+
+    // Get user's default workspace (support `owner` or `owner_id` column)
     const { data: workspace, error: workspaceError } = await supabase
       .from('workspaces')
       .select('id')
-      .eq('owner_id', session.user.id)
+      .or(`owner.eq.${userRecord.id},owner_id.eq.${userRecord.id}`)
       .limit(1)
       .single();
 
@@ -92,6 +119,33 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Get user record from public.users table using auth.uid
+    let { data: userRecord, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', session.user.id)
+      .single();
+
+    // If user doesn't exist, auto-create
+    if (userError || !userRecord) {
+      console.log('[POST /api/agents] Auto-creating user record for auth.uid:', session.user.id);
+      const { data: createdUser, error: createError } = await supabase
+        .from('users')
+        .insert({
+          id: session.user.id,
+          email: session.user.email,
+        })
+        .select('id')
+        .single();
+
+      if (createError) {
+        console.error('[POST /api/agents] Failed to create user:', createError);
+        return NextResponse.json({ error: 'User record not found' }, { status: 401 });
+      }
+
+      userRecord = createdUser;
+    }
+
     const body = await request.json();
     const { name, systemPrompt, greeting, fallback, model, workspaceId } = body;
 
@@ -109,7 +163,7 @@ export async function POST(request: Request) {
       const { data: workspace } = await supabase
         .from('workspaces')
         .select('id')
-        .eq('owner_id', session.user.id)
+        .or(`owner.eq.${userRecord.id},owner_id.eq.${userRecord.id}`)
         .limit(1)
         .single();
 
@@ -127,7 +181,7 @@ export async function POST(request: Request) {
       .from('workspace_members')
       .select('role')
       .eq('workspace_id', workspace_id)
-      .eq('user_id', session.user.id)
+      .eq('user_id', userRecord.id)
       .single();
 
     if (!member) {
