@@ -49,10 +49,45 @@ export default function NewAutomationRulePage() {
         return;
       }
 
+      // Ensure backend provisioning (helper called in /api/auth/me)
+      try {
+        await fetch('/api/auth/me');
+      } catch (e) {
+        // best-effort; ignore errors
+      }
+
+      // Get user record from public.users table
+      let { data: userRecord, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', session.user.id)
+        .single();
+
+      // If user doesn't exist, auto-create
+      if (userError || !userRecord) {
+        console.log('Auto-creating user record for auth.uid:', session.user.id);
+        const { data: createdUser, error: createError } = await supabase
+          .from('users')
+          .insert({
+            id: session.user.id,
+            email: session.user.email,
+          })
+          .select('id')
+          .single();
+
+        if (createError) {
+          console.error('Failed to create user:', createError);
+          setError('Failed to initialize user account');
+          return;
+        }
+
+        userRecord = createdUser;
+      }
+
       const { data: workspaceData } = await supabase
         .from('workspaces')
         .select('*')
-        .eq('owner_id', session.user.id)
+        .or(`owner.eq.${userRecord.id},owner_id.eq.${userRecord.id}`)
         .limit(1)
         .single();
 
@@ -67,8 +102,7 @@ export default function NewAutomationRulePage() {
         .from('agents')
         .select('*')
         .eq('workspace_id', workspaceData.id)
-        .eq('enabled', true)
-        .is('deleted_at', null);
+        .eq('enabled', true);
 
       if (agentsData) {
         setAgents(agentsData);
@@ -396,8 +430,9 @@ export default function NewAutomationRulePage() {
           <div className="flex gap-4">
             <button
               type="submit"
-              disabled={submitting || !form.agentId}
+              disabled={submitting || !workspace || agents.length === 0 || readOnly}
               className="btn-primary px-8 py-2 disabled:opacity-50"
+              title={!workspace ? 'No workspace available' : agents.length === 0 ? 'No agents available' : readOnly ? 'Action restricted by subscription' : ''}
             >
               {submitting ? 'Creating...' : 'Create Rule'}
             </button>

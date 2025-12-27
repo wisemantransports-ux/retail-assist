@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { db, PLAN_LIMITS } from '@/lib/db';
 import { sessionManager } from '@/lib/session';
+import { env } from '@/lib/env';
+import ensureWorkspaceForUser from '@/lib/supabase/ensureWorkspaceForUser';
 
 export async function GET(request: Request) {
   try {
@@ -34,6 +36,15 @@ export async function GET(request: Request) {
     }
     
     const planLimits = PLAN_LIMITS[user.plan_type];
+
+    // In production (non-mock) ensure workspace exists for this user
+    if (!env.useMockMode) {
+      try {
+        await ensureWorkspaceForUser(user.id, user.email)
+      } catch (e) {
+        console.error('[Auth Me] ensureWorkspaceForUser failed:', e)
+      }
+    }
     
     return NextResponse.json({
       user: {
