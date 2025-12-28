@@ -3,6 +3,7 @@ import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/sup
 import { createAgent, getCurrentUser } from '@/lib/supabase/queries';
 import { generateApiKey } from '@/lib/utils/helpers';
 import { env } from '@/lib/env';
+import { checkWorkspaceActive } from '@/lib/supabase/subscriptionCheck';
 
 /**
  * GET /api/agents
@@ -133,6 +134,15 @@ export async function POST(request: Request) {
     if (!member) {
       return NextResponse.json(
         { error: 'No access to workspace' },
+        { status: 403 }
+      );
+    }
+
+    // Check workspace subscription status
+    const subStatus = await checkWorkspaceActive(supabase, workspace_id);
+    if (!subStatus.active) {
+      return NextResponse.json(
+        { error: subStatus.error || 'Workspace subscription is not active' },
         { status: 403 }
       );
     }

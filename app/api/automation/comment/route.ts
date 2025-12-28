@@ -33,6 +33,8 @@ import {
   applyDelay,
 } from '@/lib/automation';
 import { env } from '@/lib/env';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { checkWorkspaceActive } from '@/lib/supabase/subscriptionCheck';
 
 interface CommentAutomationRequest {
   postId: string;
@@ -79,6 +81,22 @@ export async function POST(request: Request): Promise<NextResponse> {
       workspaceId: body.workspaceId,
       platform: body.platform,
     });
+
+    // Check workspace subscription status
+    const supabase = await createServerSupabaseClient();
+    const subStatus = await checkWorkspaceActive(supabase, body.workspaceId);
+    if (!subStatus.active) {
+      console.warn('[API] Workspace subscription inactive:', body.workspaceId);
+      return NextResponse.json(
+        {
+          status: 'error',
+          replied: false,
+          sentDM: false,
+          error: subStatus.error || 'Workspace subscription is not active',
+        },
+        { status: 403 }
+      );
+    }
 
     // Step 1: Check if already replied to this comment
     const alreadyReplied = await hasAlreadyReplied(body.commentId);

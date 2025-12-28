@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/server'
+import { createServerClient, createServerSupabaseClient } from '@/lib/supabase/server'
 import { sessionManager } from '@/lib/session'
 import { db } from '@/lib/db'
 import { env } from '@/lib/env'
+import { ensureWorkspaceForUser } from '@/lib/supabase/ensureWorkspaceForUser'
 
 // Use mock mode to avoid calling Supabase in CI or while testing.
 // To go live, set NEXT_PUBLIC_USE_MOCK_SUPABASE=false and configure SUPABASE_* env vars.
@@ -44,9 +45,16 @@ export async function POST(request: Request) {
       )
     }
 
+    // Ensure user has a workspace (safe to call multiple times)
+    const workspaceResult = await ensureWorkspaceForUser()
+    if (workspaceResult.error) {
+      console.warn('[LOGIN] Workspace provisioning warning:', workspaceResult.error)
+      // Don't fail login if workspace provisioning fails - user can create/join later
+    }
+
     // create our session record (keeps behavior consistent with local dev)
     const session = await sessionManager.create(data.user.id, 24 * 30)
-    const res = NextResponse.json({ success: true, user: { id: data.user.id, email: data.user.email, role: (data.user as any).role || 'user' } })
+    const res = NextResponse.json({ success: true, user: { id: data.user.id, email: data.user.email, role: (data.user as any).role || 'user' }, workspaceId: workspaceResult.workspaceId })
     res.cookies.set('session_id', session.id, { path: '/', httpOnly: true })
     return res
   } catch (err) {

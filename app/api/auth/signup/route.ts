@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { sessionManager } from '@/lib/session';
+import { ensureWorkspaceForUser } from '@/lib/supabase/ensureWorkspaceForUser';
 
 export async function POST(request: Request) {
   try {
@@ -55,6 +56,15 @@ export async function POST(request: Request) {
       meta: { plan_type: selectedPlan }
     });
 
+    // Attempt to ensure workspace exists (safe to call, handles auth context)
+    // Note: This is best-effort in signup context as auth might not be fully set up
+    try {
+      await ensureWorkspaceForUser();
+    } catch (wsErr) {
+      console.warn('[SIGNUP] Workspace provisioning deferred to first login:', wsErr);
+      // Workspace will be created on first login if not created here
+    }
+
     // create a session so the user can immediately access the dashboard (free/limited)
     const session = await sessionManager.create(user.id, 24 * 30);
     const res = NextResponse.json({
@@ -78,6 +88,7 @@ export async function POST(request: Request) {
         { error: 'An account with this email already exists' },
         { status: 409 }
       );
+
     }
     
     return NextResponse.json(
