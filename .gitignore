@@ -15,4 +15,5 @@ dist
 build
 .replit
 .cache
-*.log
+*.log.env*
+.env*
