@@ -1,56 +1,79 @@
 "use client";
 
-import Link from "next/link";
+import React from "react";
+import PricingCard, { Plan } from "./PricingCard";
 
-const plans = [
+// Sample pricing data with default props — easy to update later.
+const PLANS: Plan[] = [
   {
     id: "starter",
     name: "Starter",
-    price: "$22",
+    price: "BWP 350",
     period: "/month",
-    description: "Perfect for small businesses getting started",
+    description: "Good for micro businesses and pilot projects",
+    channels: ["Facebook Messenger"],
     features: [
-      "Facebook Messenger auto-reply",
-      "Comment-to-DM automation (100/month)",
-      "1 Facebook Page",
-      "Basic AI responses",
-      "Email support",
+      "Basic automation triggers & actions",
+      "Comment-to-DM (200/month)",
+      "1 Page / Account",
     ],
+    aiLimits: "5,000 AI requests / month",
+    support: "Email support",
     cta: "Get Started",
     popular: false,
   },
   {
     id: "pro",
     name: "Pro",
-    price: "$45",
+    price: "BWP 600",
     period: "/month",
-    description: "For growing businesses with higher volume",
+    description: "Recommended for growing stores (most popular)",
+    channels: ["Facebook Messenger", "Instagram"],
     features: [
-      "Facebook + Instagram automation",
-      "Comment-to-DM automation (500/month)",
-      "3 Pages/Accounts",
-      "AI-powered responses",
-      "Priority support",
+      "Advanced automation triggers & actions",
+      "Comment-to-DM (1,000/month)",
+      "3 Pages / Accounts",
+      "AI-enhanced responses",
     ],
+    aiLimits: "25,000 AI requests / month",
+    support: "Priority support",
     cta: "Get Started",
-    popular: true,
+    popular: true, // highlighted as recommended
+  },
+  {
+    id: "advanced",
+    name: "Advanced",
+    price: "BWP 900",
+    period: "/month",
+    description: "For high-volume retailers and scaling operations",
+    channels: ["Facebook Messenger", "Instagram"],
+    features: [
+      "All Pro automations + scheduled workflows",
+      "Comment-to-DM (5,000/month)",
+      "10 Pages / Accounts",
+      "Custom integrations",
+    ],
+    aiLimits: "100,000 AI requests / month",
+    support: "Dedicated support",
+    cta: "Get Started",
+    popular: false,
   },
   {
     id: "enterprise",
     name: "Enterprise",
-    price: "$75",
-    period: "/month",
-    description: "Enterprise solution with full customization",
+    price: "Custom",
+    description: "Custom enterprise plan with dedicated onboarding",
+    channels: ["Facebook Messenger", "Instagram", "WhatsApp"],
     features: [
-      "All features unlocked",
       "Unlimited pages/accounts",
-      "Unlimited Comment-to-DM",
-      "Priority support",
-      "Custom automation rules",
+      "Custom automation & SLAs",
       "Dedicated account manager",
     ],
-    cta: "Get Started",
+    aiLimits: "Custom",
+    support: "Dedicated account manager",
+    cta: "Contact Sales",
     popular: false,
+    note: "WhatsApp automation coming soon",
   },
 ];
 
@@ -58,62 +81,26 @@ export default function Pricing() {
   return (
     <section className="py-20">
       <div className="container-max">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl sm:text-5xl font-bold mb-4">
-            Simple, Transparent Pricing
-          </h2>
-          <p className="text-muted text-lg max-w-2xl mx-auto">
-            Choose the perfect plan for your business. No hidden fees, cancel anytime.
+        <div className="text-center mb-12">
+          <h2 className="text-4xl sm:text-5xl font-bold mb-3">Plans for every business</h2>
+          <p className="text-muted max-w-2xl mx-auto">
+            Transparent monthly pricing in Botswana Pula — simple, predictable billing and
+            upgrades when you need them.
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-          {plans.map((plan, index) => (
-            <div
-              key={index}
-              className={`card relative flex flex-col ${
-                plan.popular ? "md:scale-105 border-primary" : ""
-              }`}
-            >
-              {plan.popular && (
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                  <span className="bg-gradient-to-r from-primary to-accent text-background px-4 py-1 rounded-full text-sm font-semibold">
-                    Most Popular
-                  </span>
-                </div>
-              )}
-
-              <div className="mb-8">
-                <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
-                <p className="text-muted text-sm mb-4">{plan.description}</p>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-4xl font-bold">{plan.price}</span>
-                  <span className="text-muted">{plan.period}</span>
-                </div>
-              </div>
-
-              <ul className="flex-1 space-y-4 mb-8">
-                {plan.features.map((feature, i) => (
-                  <li key={i} className="flex items-center gap-3">
-                    <span className="text-secondary">&#10003;</span>
-                    <span className="text-muted">{feature}</span>
-                  </li>
-                ))}
-              </ul>
-
-              <Link href={`/auth/signup?plan=${plan.id}`}>
-                <button
-                  className={`w-full py-3 px-4 rounded-lg font-semibold transition-colors ${
-                    plan.popular
-                      ? "btn-primary"
-                      : "bg-card-border text-foreground hover:bg-card-border/80"
-                  }`}
-                >
-                  {plan.cta}
-                </button>
-              </Link>
-            </div>
+        {/* Responsive grid: 1 column on mobile, 2 on small screens, 4 on large */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
+          {PLANS.map((plan) => (
+            <PricingCard key={plan.id} plan={plan} />
           ))}
+        </div>
+
+        <div className="mt-10 text-center">
+          <p className="text-sm text-muted max-w-3xl mx-auto">
+            All plans include Facebook and Instagram automation where available. Need a
+            custom quote or pilot? <a className="text-primary font-semibold" href="mailto:samuelhelp80@gmail.com">Contact Sales</a> or <a className="text-primary font-semibold" href="https://wa.me/26775902379" target="_blank" rel="noopener noreferrer">WhatsApp +267 759 02379</a>.
+          </p>
         </div>
       </div>
     </section>
