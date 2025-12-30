@@ -7,15 +7,16 @@ declare module '@/lib/supabase/server' {
   import type { SupabaseClient } from '@supabase/supabase-js';
   export function createServerSupabaseClient(): SupabaseClient;
   export function createAdminSupabaseClient(): SupabaseClient;
+  export function createServerClient(): SupabaseClient;
+  export function createMockAdminSupabaseClient(): Promise<any>;
   export default createServerSupabaseClient;
-}
-
-declare module '@/lib/supabase/queries' {
-  export function createDirectMessage(workspaceId: string, payload: any): Promise<any>;
 }
 
 declare module '@/lib/openai/server' {
   export function generateAgentResponse(systemPrompt: string, userMessage: string, opts?: any): Promise<string>;
+  export function callOpenAIChat(messages: Array<any>, model?: string, options?: any): Promise<string>;
+  export function estimateTokens(text: string): number;
+  export function calculateOpenAICost(inputTokens: number, outputTokens: number, model?: string): number;
 }
 
 declare module '@/lib/env' {

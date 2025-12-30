@@ -20,7 +20,16 @@ export async function getPendingMobileMoneyPayments(workspaceId: string) {
   return { error, data };
 }
 
-export async function insertSystemLog(entry: any) {
+export async function insertSystemLog(...args: any[]) {
+  // Flexible signature to support legacy calls: (entry) or (level, workspaceId, userId, source, message, metadata?, stackTrace?)
+  let entry: any;
+  if (args.length === 1 && typeof args[0] === 'object') {
+    entry = args[0];
+  } else {
+    const [level, workspaceId, userId, source, message, metadata, stackTrace] = args;
+    entry = { level, workspace_id: workspaceId, user_id: userId, source, message, metadata, stack_trace: stackTrace };
+  }
+
   if (IS_MOCK) return { error: null };
   const sb = await getClient(true);
   if (!sb) return { error: 'supabase-not-configured' };
@@ -54,7 +63,8 @@ export async function removeWorkspaceMember(workspaceId: string, userId: string)
   return { error, data };
 }
 
-export async function updateMemberRole(workspaceId: string, userId: string, role: string) {
+export async function updateMemberRole(workspaceId: string, userId: string, role: string, actorId?: string) {
+  // actorId optional for auditing; do not change behavior
   if (IS_MOCK) return { error: null, data: null };
   const sb = await getClient(true);
   if (!sb) return { error: 'supabase-not-configured', data: null };
@@ -62,12 +72,14 @@ export async function updateMemberRole(workspaceId: string, userId: string, role
   return { error, data };
 }
 
-export async function createInvite(workspaceId: string, email: string, role: string) {
+export async function createInvite(workspaceId: string, email: string, role: string, inviterId?: string) {
   if (IS_MOCK) return { error: null, data: null };
   const sb = await getClient(true);
   if (!sb) return { error: 'supabase-not-configured', data: null };
   const token = cryptoRandomToken();
-  const { data, error } = await sb.from('invites').insert({ workspace_id: workspaceId, email, role, token }).select().single();
+  const payload: any = { workspace_id: workspaceId, email, role, token };
+  if (inviterId) payload.inviter_id = inviterId;
+  const { data, error } = await sb.from('invites').insert(payload).select().single();
   return { error, data };
 }
 
@@ -191,7 +203,22 @@ export async function updateSubscriptionBilling(workspaceId: string, data: any) 
   return { error, data: updated };
 }
 
-export async function recordBillingEvent(event: any) {
+export async function recordBillingEvent(...args: any[]) {
+  // Support legacy call signatures (workspaceId, type, subjectId, userId?, metadata?)
+  let event: any;
+  if (args.length === 1 && typeof args[0] === 'object') {
+    event = args[0];
+  } else {
+    const [workspaceId, type, subjectId, userId, metadata] = args;
+    event = {
+      workspace_id: workspaceId,
+      type,
+      subject_id: subjectId,
+      user_id: userId,
+      metadata,
+    };
+  }
+
   if (IS_MOCK) return { error: null, data: null };
   const sb = await getClient(true);
   if (!sb) return { error: 'supabase-not-configured', data: null };
@@ -217,11 +244,14 @@ export async function createDirectMessage(workspaceIdOrData: any, data?: any): P
   return { error, data: inserted, id: inserted?.id || null };
 }
 
-export async function markCommentProcessed(commentId: string) {
+export async function markCommentProcessed(commentId: string, reply?: string, publicReplyId?: string) {
   if (IS_MOCK) return { error: null, data: null };
   const sb = await getClient(true);
   if (!sb) return { error: 'supabase-not-configured', data: null };
-  const { data, error } = await sb.from('comments').update({ processed: true }).eq('id', commentId).select().single();
+  const updates: any = { processed: true };
+  if (typeof reply === 'string') updates.bot_reply = reply;
+  if (typeof publicReplyId === 'string') updates.public_reply_id = publicReplyId;
+  const { data, error } = await sb.from('comments').update(updates).eq('id', commentId).select().single();
   return { error, data };
 }
 
@@ -315,11 +345,22 @@ export async function createAuditLog(...args: any[]) {
   return { error: null, data: null };
 }
 
-export async function createAutomationRule(workspaceIdOrData: any, data?: any) {
+export async function createAutomationRule(...args: any[]) {
+  // Support signatures: (data) or (workspaceId, agentId, data) or (workspaceId, data)
+  let payload: any;
+  if (args.length === 1) {
+    payload = args[0];
+  } else if (args.length === 2) {
+    const [workspaceId, data] = args;
+    payload = typeof workspaceId === 'string' && typeof data === 'object' ? { workspace_id: workspaceId, ...data } : data || workspaceId;
+  } else {
+    const [workspaceId, agentId, data] = args;
+    payload = { workspace_id: workspaceId, agent_id: agentId, ...(data || {}) };
+  }
+
   if (IS_MOCK) return { error: null, data: null };
   const sb = await getClient(true);
   if (!sb) return { error: 'supabase-not-configured', data: null };
-  const payload = data || workspaceIdOrData;
   const { data: inserted, error } = await sb.from('automation_rules').insert(payload).select().single();
   return { error, data: inserted };
 }
@@ -424,16 +465,30 @@ export async function saveMobileMoneyPayment(...args: any[]) {
   return { error: 'payments-not-enabled', data: null };
 }
 
-export async function removeMember(workspaceId: string, userId: string) {
+export async function removeMember(workspaceId: string, userId: string, actorId?: string) {
+  // actorId optional for auditing; preserve behavior
   return removeWorkspaceMember(workspaceId, userId);
 }
 
-export async function inviteMember(workspaceId: string, userId: string, role = 'member') {
-  return addWorkspaceMember(workspaceId, userId, role);
+export async function inviteMember(workspaceId: string, email: string, role = 'member', inviterId?: string) {
+  // Create an invite record (preserves existing behavior but supports optional inviter)
+  return createInvite(workspaceId, email, role, inviterId);
 }
 
-export async function updateSubscriptionStatus(workspaceId: string, status: string) {
-  return updateSubscription(workspaceId, { subscription_status: status });
+export async function addWorkspaceMember(workspaceId: string, userId: string, role = 'member') {
+  if (IS_MOCK) return { error: null, data: null };
+  const sb = await getClient(true);
+  if (!sb) return { error: 'supabase-not-configured', data: null };
+  const { data, error } = await sb.from('workspace_members').insert({ workspace_id: workspaceId, user_id: userId, role }).select().single();
+  return { error, data };
+}
+
+export async function updateSubscriptionStatus(workspaceId: string, statusOrObj: any) {
+  // Accept either a status string or an object containing subscription fields
+  if (typeof statusOrObj === 'string') {
+    return updateSubscription(workspaceId, { subscription_status: statusOrObj });
+  }
+  return updateSubscription(workspaceId, statusOrObj);
 }
 
 export async function getSubscriptionByProviderId(providerId: string): Promise<any> {

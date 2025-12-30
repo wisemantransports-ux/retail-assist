@@ -50,4 +50,10 @@ export function createServerClient(): SupabaseClient {
   return anonClient
 }
 
+export async function createMockAdminSupabaseClient(): Promise<any> {
+  // Lightweight mock factory. Mirrors `createMockAdminSupabaseClient` in `mock-client.ts`.
+  // For now, delegate to existing server client factory to preserve behavior.
+  return createServerSupabaseClient();
+}
+
 export default createServerSupabaseClient

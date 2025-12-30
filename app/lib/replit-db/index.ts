@@ -1,7 +1,21 @@
+import fs from 'fs'
+import path from 'path'
+
 // DEPRECATED: Replit storage removed. Use `@/lib/db` and `@/lib/session` (Supabase) instead.
 // This file was kept only to avoid accidental deletes; all logic has been moved to `@/lib/db` and `@/lib/session`.
 
+const DATA_DIR = process.env.DATA_DIR || './.data'
+
+const DB_PATH = path.join(DATA_DIR, 'database.json')
+
 throw new Error('Replit-based storage has been removed. Import from "@/lib/db" and "@/lib/session" instead.');
+
+// Minimal type aliases to keep this DEPRECATED module type-checking clean
+type Database = any
+type User = any
+type BusinessSettings = any
+type Token = any
+type LogEntry = any
 
 export const PLAN_LIMITS = {
   starter: {
@@ -43,12 +57,12 @@ function getDbPath(): string {
   return path.join(DATA_DIR, 'database.json');
 }
 
-function readDb(): Database {
+function readDb(): any {
   ensureDataDir();
   const dbPath = getDbPath();
   
   if (!fs.existsSync(dbPath)) {
-    const defaultDb: Database = {
+    const defaultDb: any = {
       users: {},
       tokens: {},
       business_settings: {},
@@ -143,7 +157,7 @@ export const replitDb = {
       try {
         const db = readDb();
         
-        const existing = Object.values(db.users).find(u => u.email === data.email);
+        const existing = Object.values(db.users).find((u: any) => u.email === data.email);
         if (existing) {
           throw new Error('Email already exists');
         }
@@ -218,7 +232,7 @@ Always represent ${data.business_name} professionally and aim to convert inquiri
     
     async findByEmail(email: string): Promise<User | null> {
       const db = readDb();
-      const user = Object.values(db.users).find(u => u.email === email);
+      const user = Object.values(db.users).find((u: any) => u.email === email);
       return user ? migrateUser(user) : null;
     },
     
@@ -238,7 +252,7 @@ Always represent ${data.business_name} professionally and aim to convert inquiri
     
     async getAll(): Promise<User[]> {
       const db = readDb();
-      return Object.values(db.users).map(u => migrateUser(u));
+      return Object.values(db.users).map((u: any) => migrateUser(u));
     },
     
     async update(id: string, data: Partial<Omit<User, 'id' | 'created_at'>>): Promise<User | null> {
@@ -289,7 +303,7 @@ Always represent ${data.business_name} professionally and aim to convert inquiri
       if (limits.maxPages === -1) return { allowed: true };
       
       const db = readDb();
-      const pageCount = Object.values(db.tokens).filter(t => t.user_id === userId).length;
+      const pageCount = Object.values(db.tokens).filter((t: any) => t.user_id === userId).length;
       
       if (pageCount >= limits.maxPages) {
         return { 
@@ -333,12 +347,12 @@ Always represent ${data.business_name} professionally and aim to convert inquiri
     
     async findByUserId(userId: string): Promise<Token[]> {
       const db = readDb();
-      return Object.values(db.tokens).filter(t => t.user_id === userId);
+      return Object.values(db.tokens).filter((t: any) => t.user_id === userId);
     },
     
     async findByPageId(pageId: string): Promise<Token | null> {
       const db = readDb();
-      return Object.values(db.tokens).find(t => t.page_id === pageId) || null;
+      return Object.values(db.tokens).find((t: any) => t.page_id === pageId) || null;
     },
     
     async update(id: string, data: Partial<Omit<Token, 'id' | 'created_at'>>): Promise<Token | null> {
@@ -365,28 +379,28 @@ Always represent ${data.business_name} professionally and aim to convert inquiri
 
     async countByUserId(userId: string): Promise<number> {
       const db = readDb();
-      return Object.values(db.tokens).filter(t => t.user_id === userId).length;
+      return Object.values(db.tokens).filter((t: any) => t.user_id === userId).length;
     }
   },
   
   settings: {
     async findByUserId(userId: string): Promise<BusinessSettings | null> {
       const db = readDb();
-      return Object.values(db.business_settings).find(s => s.user_id === userId) || null;
+      return Object.values(db.business_settings).find((s: any) => s.user_id === userId) || null;
     },
     
     async update(userId: string, data: Partial<Omit<BusinessSettings, 'id' | 'user_id' | 'created_at'>>): Promise<BusinessSettings | null> {
       const db = readDb();
-      const settings = Object.values(db.business_settings).find(s => s.user_id === userId);
+      const settings = Object.values(db.business_settings).find((s: any) => s.user_id === userId);
       if (!settings) return null;
       
-      db.business_settings[settings.id] = {
-        ...settings,
+      db.business_settings[(settings as any).id] = {
+        ...(settings as any),
         ...data,
         updated_at: new Date().toISOString()
       };
       writeDb(db);
-      return db.business_settings[settings.id];
+      return db.business_settings[(settings as any).id];
     }
   },
   

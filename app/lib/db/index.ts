@@ -345,7 +345,7 @@ export const db = {
   },
 
   logs: {
-    async add(data: { user_id?: string; level: 'info' | 'warn' | 'error'; message: string; meta?: Record<string, any> }) {
+    async add(data: { user_id?: string; level: 'info' | 'warn' | 'error' | 'lead'; message: string; meta?: Record<string, any> }) {
       const s = supabase()
       const entry = { id: generateId(), ...data, created_at: new Date().toISOString() }
       const { error } = await s.from('logs').insert(entry)

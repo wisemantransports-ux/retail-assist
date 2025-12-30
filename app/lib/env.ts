@@ -68,8 +68,6 @@ export const env = {
 
   // Test/Debug mode
   isTestMode: process.env.NEXT_PUBLIC_TEST_MODE === 'true',
-  // Mock payments are disabled in production
-  useMockPayments: false,
 
   // App environment
   isDevelopment: process.env.NODE_ENV === 'development',

@@ -62,6 +62,6 @@ export function createBrowserSupabaseClient() {
   return stubClient;
 }
 
-export const createClient = createBrowserSupabaseClient;
+export const createBrowserClient = createBrowserSupabaseClient;
 export const supabase = stubClient;
-export default createBrowserSupabaseClient;
+export default createBrowserSupabaseClient; 

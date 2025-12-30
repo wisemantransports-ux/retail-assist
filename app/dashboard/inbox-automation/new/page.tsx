@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createAutomationRule } from '@/lib/supabase/queries';
-import { createClient } from '@/lib/supabase/client';
+import { createBrowserClient } from '@/lib/supabase/client';
 import type { Agent } from '@/lib/types/database';
 
 export default function NewAutomationRulePage() {
@@ -37,7 +37,7 @@ export default function NewAutomationRulePage() {
     try {
       setLoading(true);
 
-      const supabase = createClient();
+      const supabase = createBrowserClient();
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session) {

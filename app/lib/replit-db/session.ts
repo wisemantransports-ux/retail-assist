@@ -1,6 +1,15 @@
+import fs from 'fs'
+import path from 'path'
+
+const DATA_DIR = process.env.DATA_DIR || './.data'
+const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json')
+
 // DEPRECATED: Replit session storage removed. Use `@/lib/session` (Supabase) instead.
 
 throw new Error('Replit-based session storage has been removed. Import from "@/lib/session" instead.');
+
+// Minimal type alias
+type Session = any
 
 function ensureDataDir(): void {
   if (!fs.existsSync(DATA_DIR)) {

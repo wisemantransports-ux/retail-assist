@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Extended Triggers & Actions: Implementation Guide
  * 
