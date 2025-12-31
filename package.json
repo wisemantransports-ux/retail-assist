@@ -10,7 +10,8 @@
     "build": "next build",
     "start": "next start -H 0.0.0.0 -p 5000",
     "lint": "eslint",
-    "test:supabase": "node scripts/supabase-policy-test.js"
+    "test:supabase": "node scripts/supabase-policy-test.js",
+    "provision:users": "node -r ts-node/register -r tsconfig-paths/register scripts/create-admin-users.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.4.1",
@@ -29,6 +30,8 @@
     "eslint": "^9",
     "eslint-config-next": "^16.0.7",
     "tailwindcss": "^4",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "ts-node": "^10.9.1",
+    "tsconfig-paths": "^4.1.0"
   }
 }

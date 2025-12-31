@@ -123,14 +123,13 @@ export default function PricingCard({ plan }: { plan: Plan }) {
               </a>
             </div>
           ) : (
-            <Link href={`/auth/signup?plan=${plan.id}`}>
-              <a
-                onClick={() => trackPricingCTA(plan.id, plan.name, 'signup')}
-                className="inline-block w-full text-center py-3 px-4 rounded-md bg-primary text-white font-semibold hover:bg-primary/90 focus:ring-2 focus:ring-primary/30 transition-colors"
-                aria-label={buttonLabel}
-              >
-                {plan.cta}
-              </a>
+            <Link
+              href={`/auth/signup?plan=${plan.id}`}
+              onClick={() => trackPricingCTA(plan.id, plan.name, 'signup')}
+              className="inline-block w-full text-center py-3 px-4 rounded-md bg-primary text-white font-semibold hover:bg-primary/90 focus:ring-2 focus:ring-primary/30 transition-colors"
+              aria-label={buttonLabel}
+            >
+              {plan.cta}
             </Link>
           )}
         </div>

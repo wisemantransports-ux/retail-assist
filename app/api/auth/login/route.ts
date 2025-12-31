@@ -39,6 +39,13 @@ export async function POST(request: Request) {
     })
 
     if (error || !data.user) {
+      // Temporary debug logging to help diagnose auth failures without printing secrets
+      try {
+        console.error('[LOGIN] Supabase signIn error:', { message: error?.message, status: (error as any)?.status, data: data ? { user: !!data.user } : null })
+      } catch (logErr) {
+        console.error('[LOGIN] Supabase signIn error (failed to log details)', logErr)
+      }
+
       return NextResponse.json(
         { error: 'Invalid email or password' },
         { status: 401 }

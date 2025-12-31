@@ -25,6 +25,32 @@
       "role": "user",
       "created_at": "2025-12-24T20:28:56.807Z",
       "updated_at": "2025-12-24T20:28:56.807Z"
+    },
+    "c12d2003-0347-47aa-b56d-76acf0a12cbe": {
+      "id": "c12d2003-0347-47aa-b56d-76acf0a12cbe",
+      "email": "sam@gmail.com",
+      "password": "123456",
+      "business_name": "sam",
+      "phone": "7658899",
+      "plan_type": "starter",
+      "payment_status": "unpaid",
+      "subscription_status": "pending",
+      "role": "user",
+      "created_at": "2025-12-31T06:31:27.725Z",
+      "updated_at": "2025-12-31T06:31:27.725Z"
+    },
+    "2da0bca7-5abd-471f-ae1e-a66e19b936cf": {
+      "id": "2da0bca7-5abd-471f-ae1e-a66e19b936cf",
+      "email": "sam@gmail.com",
+      "password": "123456",
+      "business_name": "sam",
+      "phone": "7655544",
+      "plan_type": "starter",
+      "payment_status": "unpaid",
+      "subscription_status": "pending",
+      "role": "user",
+      "created_at": "2025-12-31T06:40:57.482Z",
+      "updated_at": "2025-12-31T06:40:57.482Z"
     }
   },
   "tokens": {},

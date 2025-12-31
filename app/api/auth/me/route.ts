@@ -21,7 +21,8 @@ export async function GET(request: Request) {
         { error: 'Session expired' },
         { status: 401 }
       );
-      response.cookies.delete('session_id');
+      // Clear cookie using same path
+      response.cookies.delete('session_id', { path: '/' });
       return response;
     }
     

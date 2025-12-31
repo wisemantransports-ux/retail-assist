@@ -12,7 +12,8 @@ export async function POST(request: Request) {
     }
     
     const response = NextResponse.json({ success: true });
-    response.cookies.delete('session_id');
+    // Ensure we delete the cookie with the same path used when setting it
+    response.cookies.delete('session_id', { path: '/' });
     
     return response;
   } catch (error: any) {

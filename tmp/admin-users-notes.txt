@@ -1,0 +1,28 @@
+ERROR: admin@demo.com - TypeError: fetch failed
+ERROR: demo@example.com - TypeError: fetch failed
+ERROR: admin@demo.com - Could not find the table 'public.auth.users' in the schema cache
+ERROR: demo@demo.com - Could not find the table 'public.auth.users' in the schema cache
+ERROR: admin@demo.com - fetch failed
+ERROR: demo@example.com - fetch failed
+ERROR: admin@demo.comexport - fetch failed
+ERROR: demo@demo.comexport - fetch failed
+ERROR: admin@demo.comexport - fetch failed
+ERROR: demo@demo.comexport - fetch failed
+Auth user exists: admin@demo.com (id: 13c98994-8a41-4010-a89a-24a5c0248a30)
+Created auth user: demo@demo.com (id: 0e2b39cb-6d64-4edf-a099-00d82520e946) - temporary password: DemoPassword123!
+ERROR: demo@demo.com - Failed to insert users row for demo@demo.com: Could not find the 'business_name' column of 'users' in the schema cache
+ERROR: admin@demo.com - Invalid API key
+ERROR: demo@demo.com - Invalid API key
+ERROR: admin@demo.com - Invalid API key
+ERROR: demo@demo.com - Invalid API key
+Auth user exists: admin@demo.com (id: 13c98994-8a41-4010-a89a-24a5c0248a30)
+Auth user exists: demo@demo.com (id: 0e2b39cb-6d64-4edf-a099-00d82520e946)
+ERROR: demo@demo.com - Failed to insert users row for demo@demo.com: Could not find the 'business_name' column of 'users' in the schema cache
+Auth user exists: admin@demo.com (id: 13c98994-8a41-4010-a89a-24a5c0248a30)
+Auth user exists: demo@demo.com (id: 0e2b39cb-6d64-4edf-a099-00d82520e946)
+ERROR: demo@demo.com - Failed to insert users row for demo@demo.com: Could not find the 'full_name' column of 'users' in the schema cache
+Auth user exists: admin@demo.com (id: 13c98994-8a41-4010-a89a-24a5c0248a30)
+Updated auth password for existing user: admin@demo.com
+Auth user exists: demo@demo.com (id: 0e2b39cb-6d64-4edf-a099-00d82520e946)
+Updated auth password for existing user: demo@demo.com
+ERROR: demo@demo.com - Failed to insert users row for demo@demo.com: Could not find the 'full_name' column of 'users' in the schema cache

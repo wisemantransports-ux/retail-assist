@@ -480,6 +480,24 @@ NODE_ENV=production
 NEXT_PUBLIC_USE_MOCK_SUPABASE=false
 ```
 
+Important: Netlify injects these environment variables at runtime — you don't need a local `.env.local` file in production. Make sure **NEXT_PUBLIC_USE_MOCK_SUPABASE=false** is set so the app uses your Supabase project for auth and sessions (this enables correct sign-in / sign-out behavior).
+
+Quick verification (after deploy):
+
+1. Sign in through the app and confirm you receive a `session_id` cookie (HTTP-only).
+2. Call logout and verify the response clears the cookie and `/api/auth/me` returns 401.
+
+Curl examples:
+
+- Login (replace with real credentials):
+  curl -i -X POST https://your-site.netlify.app/api/auth/login -H "Content-Type: application/json" -d '{"email":"user@example.com","password":"password"}'
+
+- Logout (reuse cookie from login response):
+  curl -i -X POST https://your-site.netlify.app/api/auth/logout -H "Cookie: session_id=YOUR_SESSION_ID" -c -
+
+- Verify session cleared:
+  curl -i https://your-site.netlify.app/api/auth/me -H "Cookie: session_id=YOUR_SESSION_ID"
+
 ### Step 4: Deploy
 Push to main branch - Netlify auto-deploys!
 

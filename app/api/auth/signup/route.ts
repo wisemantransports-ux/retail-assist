@@ -41,20 +41,29 @@ export async function POST(request: Request) {
     }
     
     // record signup as a lead for follow-up (business + phone + email)
-    await db.logs.add({
-      user_id: user.id,
-      level: 'lead',
-      message: `Lead captured: ${business_name} (${email})`,
-      meta: { plan_type: selectedPlan, phone, business_name }
-    });
+    try {
+      await db.logs.add({
+        user_id: user.id,
+        level: 'lead',
+        message: `Lead captured: ${business_name} (${email})`,
+        meta: { plan_type: selectedPlan, phone, business_name }
+      });
+    } catch (e: any) {
+      // Non-fatal: logging should not prevent signup (e.g., mock mode without Supabase)
+      console.warn('[SIGNUP] Failed to record lead log (non-fatal):', e?.message || e);
+    }
 
     // keep an info log as well
-    await db.logs.add({
-      user_id: user.id,
-      level: 'info',
-      message: `New user signup: ${business_name} (${email})`,
-      meta: { plan_type: selectedPlan }
-    });
+    try {
+      await db.logs.add({
+        user_id: user.id,
+        level: 'info',
+        message: `New user signup: ${business_name} (${email})`,
+        meta: { plan_type: selectedPlan }
+      });
+    } catch (e: any) {
+      console.warn('[SIGNUP] Failed to record info log (non-fatal):', e?.message || e);
+    }
 
     // Attempt to ensure workspace exists (safe to call, handles auth context)
     // Note: This is best-effort in signup context as auth might not be fully set up
