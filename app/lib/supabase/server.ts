@@ -1,59 +1,97 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { env } from '@/lib/env'
 
-// IMPORTANT: Do not use Supabase server clients while mock mode is enabled.
-// The factory functions below will throw if `env.useMockMode` is true to prevent accidental live DB calls.
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
+/**
+ * Environment variables
+ * - Public: used by browser + server
+ * - Service role: server-only (admin operations)
+ */
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
 
-import { env } from '../env.ts'
+const SUPABASE_ANON_KEY =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
 
-function requireConfig() {
-  // Respect mock mode: prevent accidental use of Supabase clients when mock mode is enabled
+const SUPABASE_SERVICE_ROLE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+
+/**
+ * Guards
+ */
+function assertPublicConfig() {
   if (env.useMockMode) {
-    throw new Error('Supabase client disabled: mock mode is enabled (NEXT_PUBLIC_USE_MOCK_SUPABASE=true). Set NEXT_PUBLIC_USE_MOCK_SUPABASE=false and provide SUPABASE_* env vars to enable Supabase.')
-  }
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    throw new Error('Missing Supabase configuration. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in environment.')
-  }
-}
-
-let adminClient: SupabaseClient | null = null
-let anonClient: SupabaseClient | null = null
-
-export function createServerSupabaseClient(): SupabaseClient {
-  requireConfig()
-  if (!adminClient) {
-    adminClient = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!, {
-      auth: { persistSession: false }
-    })
-  }
-  return adminClient
-}
-
-export function createAdminSupabaseClient(): SupabaseClient {
-  return createServerSupabaseClient()
-}
-
-export function createServerClient(): SupabaseClient {
-  if (env.useMockMode) {
-    throw new Error('Supabase client disabled: mock mode is enabled (NEXT_PUBLIC_USE_MOCK_SUPABASE=true). Set NEXT_PUBLIC_USE_MOCK_SUPABASE=false and provide NEXT_PUBLIC_SUPABASE_* env vars to enable the client.')
+    throw new Error(
+      'Supabase disabled: mock mode is enabled (NEXT_PUBLIC_USE_MOCK_SUPABASE=true)'
+    )
   }
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    throw new Error('Missing Supabase configuration. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY for server client.')
+    throw new Error(
+      'Missing Supabase public config. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY'
+    )
   }
+}
+
+function assertServiceConfig() {
+  if (env.useMockMode) {
+    throw new Error(
+      'Supabase disabled: mock mode is enabled (NEXT_PUBLIC_USE_MOCK_SUPABASE=true)'
+    )
+  }
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error(
+      'Missing Supabase service role config. Set SUPABASE_SERVICE_ROLE_KEY'
+    )
+  }
+}
+
+/**
+ * Singleton clients (important for Netlify + Next.js)
+ */
+let anonClient: SupabaseClient | null = null
+let adminClient: SupabaseClient | null = null
+
+/**
+ * 🔐 Server-side client (uses anon key)
+ * Used for auth/session validation
+ */
+export function createServerClient(): SupabaseClient {
+  assertPublicConfig()
+
   if (!anonClient) {
-    anonClient = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
-      auth: { persistSession: false }
-    })
+    anonClient = createClient(
+      SUPABASE_URL!,
+      SUPABASE_ANON_KEY!,
+      {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+        },
+      }
+    )
   }
+
   return anonClient
 }
 
-export async function createMockAdminSupabaseClient(): Promise<any> {
-  // Lightweight mock factory. Mirrors `createMockAdminSupabaseClient` in `mock-client.ts`.
-  // For now, delegate to existing server client factory to preserve behavior.
-  return createServerSupabaseClient();
-}
+/**
+ * 👑 Admin client (service role)
+ * Used ONLY in API routes for admin tasks
+ */
+export function createAdminSupabaseClient(): SupabaseClient {
+  assertServiceConfig()
 
-export default createServerSupabaseClient
+  if (!adminClient) {
+    adminClient = createClient(
+      SUPABASE_URL!,
+      SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+        },
+      }
+    )
+  }
+
+  return adminClient
+}
