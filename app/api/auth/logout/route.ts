@@ -6,23 +6,25 @@ import { createServerClient } from '@/lib/supabase/server'
 
 export async function POST() {
   try {
-    const cookieStore = cookies()
+    // ✅ cookies() is async in Next 16
+    const cookieStore = await cookies()
     const sessionId = cookieStore.get('session_id')?.value
 
     if (sessionId) {
       await sessionManager.destroy(sessionId)
     }
 
-    // Best-effort Supabase sign out (non-fatal)
+    // Best-effort Supabase sign out (production only)
     if (!env.useMockMode) {
       try {
         const supabase = createServerClient()
         await supabase.auth.signOut()
       } catch (e: any) {
-        console.warn('[LOGOUT] Supabase signOut failed:', e?.message || e)
+        console.warn('[LOGOUT] Supabase signOut failed (non-fatal):', e?.message || e)
       }
     }
 
+    // ✅ Correct cookie deletion
     cookieStore.set('session_id', '', {
       path: '/',
       maxAge: 0,
