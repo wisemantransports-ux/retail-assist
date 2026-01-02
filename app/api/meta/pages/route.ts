@@ -1,17 +1,16 @@
 import { NextResponse } from 'next/server';
 import { sessionManager } from '@/lib/session';
 import { db } from '@/lib/db';
+import { cookies } from 'next/headers';
 
 export async function GET(request: Request) {
   try {
-    const sessionId = request.headers.get('cookie')?.split(';')
-      .find(c => c.trim().startsWith('session_id='))
-      ?.split('=')[1];
-    
+    const cookieStore = await cookies();
+    const sessionId = cookieStore.get('session_id')?.value;
     if (!sessionId) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
-    
+
     const session = await sessionManager.validate(sessionId);
     if (!session) {
       return NextResponse.json({ error: 'Session expired' }, { status: 401 });
@@ -36,14 +35,12 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const sessionId = request.headers.get('cookie')?.split(';')
-      .find(c => c.trim().startsWith('session_id='))
-      ?.split('=')[1];
-    
+    const cookieStore = await cookies();
+    const sessionId = cookieStore.get('session_id')?.value;
     if (!sessionId) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
-    
+
     const session = await sessionManager.validate(sessionId);
     if (!session) {
       return NextResponse.json({ error: 'Session expired' }, { status: 401 });

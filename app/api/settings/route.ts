@@ -14,7 +14,8 @@ export async function GET() {
     const session = await sessionManager.validate(sessionCookie.value);
     if (!session) {
       const res = NextResponse.json({ error: 'Session expired' }, { status: 401 });
-      res.cookies.delete('session_id');
+      const cookieStore = await cookies();
+      cookieStore.set('session_id', '', { path: '/', maxAge: 0, httpOnly: true, secure: false, sameSite: 'lax' });
       return res;
     }
 
@@ -54,7 +55,8 @@ export async function PUT(request: Request) {
     const session = await sessionManager.validate(sessionCookie.value);
     if (!session) {
       const res = NextResponse.json({ error: 'Session expired' }, { status: 401 });
-      res.cookies.delete('session_id');
+      const cookieStore = await cookies();
+      cookieStore.set('session_id', '', { path: '/', maxAge: 0, httpOnly: true, secure: false, sameSite: 'lax' });
       return res;
     }
 

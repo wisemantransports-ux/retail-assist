@@ -4,10 +4,13 @@ import { sessionManager } from '@/lib/session'
 import { db } from '@/lib/db'
 import { env } from '@/lib/env'
 import { ensureWorkspaceForUser } from '@/lib/supabase/ensureWorkspaceForUser'
+import { cookies } from 'next/headers'
 
 // Use mock mode to avoid calling Supabase in CI or while testing.
 // To go live, set NEXT_PUBLIC_USE_MOCK_SUPABASE=false and configure SUPABASE_* env vars.
 const useDev = env.useMockMode
+
+// session TTL is determined by sessionManager.create -> use returned session.expires_at
 
 export async function POST(request: Request) {
   try {
@@ -25,9 +28,11 @@ export async function POST(request: Request) {
       const user = await db.users.authenticate(email, password)
       if (!user) return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
 
-      const session = await sessionManager.create(user.id, 24 * 30)
+      const session = await sessionManager.create(user.id)
+      const maxAge = Math.max(0, Math.floor((new Date(session.expires_at).getTime() - Date.now()) / 1000))
       const res = NextResponse.json({ success: true, user: { id: user.id, email: user.email, role: user.role } })
-      res.cookies.set('session_id', session.id, { path: '/', httpOnly: true, secure: env.isProduction, sameSite: 'lax' })
+      const cookieStore = await cookies()
+      cookieStore.set('session_id', session.id, { path: '/', httpOnly: true, secure: env.isProduction, sameSite: 'lax', maxAge })
       return res
     }
 
@@ -60,9 +65,11 @@ export async function POST(request: Request) {
     }
 
     // create our session record (keeps behavior consistent with local dev)
-    const session = await sessionManager.create(data.user.id, 24 * 30)
+    const session = await sessionManager.create(data.user.id)
+    const maxAge = Math.max(0, Math.floor((new Date(session.expires_at).getTime() - Date.now()) / 1000))
     const res = NextResponse.json({ success: true, user: { id: data.user.id, email: data.user.email, role: (data.user as any).role || 'user' }, workspaceId: workspaceResult.workspaceId })
-    res.cookies.set('session_id', session.id, { path: '/', httpOnly: true, secure: env.isProduction, sameSite: 'lax' })
+    const cookieStore = await cookies()
+    cookieStore.set('session_id', session.id, { path: '/', httpOnly: true, secure: env.isProduction, sameSite: 'lax', maxAge })
     return res
   } catch (err) {
     console.error('[LOGIN_ERROR]', err)

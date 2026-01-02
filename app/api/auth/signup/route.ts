@@ -3,6 +3,8 @@ import { db } from '@/lib/db';
 import { sessionManager } from '@/lib/session';
 import { ensureWorkspaceForUser } from '@/lib/supabase/ensureWorkspaceForUser';
 import { env } from '@/lib/env';
+import { createServerClient, createServerSupabaseClient } from '@/lib/supabase/server'
+import { cookies } from 'next/headers'
 
 export async function POST(request: Request) {
   try {
@@ -26,13 +28,51 @@ export async function POST(request: Request) {
     const validPlans = ['starter', 'pro', 'enterprise'];
     const selectedPlan = validPlans.includes(plan_type) ? plan_type : 'starter';
     
-    const user = await db.users.create({
-      email,
-      password,
-      business_name,
-      phone,
-      plan_type: selectedPlan
-    });
+    let user: any = null
+    if (env.useMockMode) {
+      user = await db.users.create({
+        email,
+        password,
+        business_name,
+        phone,
+        plan_type: selectedPlan
+      })
+    } else {
+      // Production: create auth user via Supabase, then create profile row without storing passwords
+      const supabase = createServerClient()
+      const { data, error } = await supabase.auth.signUp({ email, password })
+      if (error) {
+        console.error('[SIGNUP] Supabase signUp error:', error.message)
+        if ((error as any)?.status === 409) {
+          return NextResponse.json({ error: 'An account with this email already exists' }, { status: 409 })
+        }
+        return NextResponse.json({ error: 'Failed to create user' }, { status: 500 })
+      }
+      if (!data || !data.user) {
+        return NextResponse.json({ error: 'Failed to create user' }, { status: 500 })
+      }
+
+      const admin = createServerSupabaseClient()
+      const now = new Date().toISOString()
+      const profile = {
+        id: data.user.id,
+        email,
+        business_name,
+        phone,
+        plan_type: selectedPlan,
+        payment_status: 'unpaid',
+        subscription_status: 'pending',
+        role: 'user',
+        created_at: now,
+        updated_at: now
+      }
+      const { error: insertErr } = await admin.from('users').insert(profile)
+      if (insertErr) {
+        console.error('[SIGNUP] Failed to create profile row:', insertErr.message)
+        // Not fatal for signup; continue
+      }
+      user = { id: data.user.id, email, business_name, phone, plan_type: selectedPlan }
+    }
     
     if (!user) {
       return NextResponse.json(
@@ -76,7 +116,8 @@ export async function POST(request: Request) {
     }
 
     // create a session so the user can immediately access the dashboard (free/limited)
-    const session = await sessionManager.create(user.id, 24 * 30);
+    const session = await sessionManager.create(user.id);
+    const maxAge = Math.max(0, Math.floor((new Date(session.expires_at).getTime() - Date.now()) / 1000))
     const res = NextResponse.json({
       success: true,
       user: {
@@ -88,7 +129,8 @@ export async function POST(request: Request) {
       },
       message: 'Account created successfully. You can access the dashboard — upgrade to unlock premium features.'
     });
-    res.cookies.set('session_id', session.id, { path: '/', httpOnly: true, secure: env.isProduction, sameSite: 'lax' });
+    const cookieStore = await cookies();
+    cookieStore.set('session_id', session.id, { path: '/', httpOnly: true, secure: env.isProduction, sameSite: 'lax', maxAge });
     return res;
   } catch (error: any) {
     console.error('[Auth Signup] Error:', error.message);

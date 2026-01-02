@@ -97,3 +97,11 @@ export function validateEnv(required: string[]): boolean {
     return true;
   });
 }
+
+// Production safety: do not allow mock mode in production builds.
+// Require explicit NEXT_PUBLIC_USE_MOCK_SUPABASE=false in production; otherwise fail-fast.
+if (process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_USE_MOCK_SUPABASE !== 'false') {
+  throw new Error(
+    'Production cannot run with mock Supabase. Set NEXT_PUBLIC_USE_MOCK_SUPABASE=false and provide SUPABASE_* env vars.'
+  );
+}

@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { db, PLAN_LIMITS } from '@/lib/db';
 import { sessionManager } from '@/lib/session';
+import { cookies } from 'next/headers';
+import { env } from '@/lib/env';
 
 export async function GET(request: Request) {
   try {
-    const sessionId = request.headers.get('cookie')?.split(';')
-      .find(c => c.trim().startsWith('session_id='))
-      ?.split('=')[1];
-    
+    const cookieStore = await cookies();
+    const sessionId = cookieStore.get('session_id')?.value;
     if (!sessionId) {
       return NextResponse.json(
         { error: 'Not authenticated' },
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
         { status: 401 }
       );
       // Clear cookie using same path
-      response.cookies.delete('session_id', { path: '/' });
+      cookieStore.set('session_id', '', { path: '/', maxAge: 0, httpOnly: true, secure: env.isProduction, sameSite: 'lax' });
       return response;
     }
     

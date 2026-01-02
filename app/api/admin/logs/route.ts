@@ -1,20 +1,19 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { sessionManager } from '@/lib/session';
+import { cookies } from 'next/headers';
 
 async function verifyAdmin(request: Request) {
-  const sessionId = request.headers.get('cookie')?.split(';')
-    .find(c => c.trim().startsWith('session_id='))
-    ?.split('=')[1];
-  
+  const cookieStore = await cookies();
+  const sessionId = cookieStore.get('session_id')?.value;
   if (!sessionId) return null;
-  
+
   const session = await sessionManager.validate(sessionId);
   if (!session) return null;
-  
+
   const user = await db.users.findById(session.user_id);
   if (!user || user.role !== 'admin') return null;
-  
+
   return user;
 }
 
