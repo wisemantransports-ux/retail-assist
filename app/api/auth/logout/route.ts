@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { sessionManager } from '@/lib/session'
+import { env } from '@/lib/env'
 
 export async function POST(request: Request) {
   try {
@@ -12,7 +13,7 @@ export async function POST(request: Request) {
     }
 
     // Clear cookie using cookies() helper (explicit path + maxAge=0)
-    cookies().set('session_id', '', { path: '/', maxAge: 0 })
+    cookies().set('session_id', '', { path: '/', maxAge: 0, httpOnly: true, secure: env.isProduction, sameSite: 'lax' })
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

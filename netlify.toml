@@ -9,9 +9,8 @@
   SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,SUPABASE_SERVICE_ROLE_KEY,META_PAGE_ACCESS_TOKEN,NEXT_PUBLIC_USE_MOCK_SUPABASE"
 
 [context.production.environment]
-  # NOTE: This intentionally keeps the site in mock mode to prevent accidental go-live.
+  # NOTE: Production environment variables should be set in the Netlify UI.
   # To go-live, set NEXT_PUBLIC_USE_MOCK_SUPABASE = "false" in the Netlify environment and add Supabase keys.
-  NEXT_PUBLIC_USE_MOCK_SUPABASE = "true"
   # Add other production variables in Netlify UI
   # OPENAI_API_KEY = "sk-..."
   # META_PAGE_ACCESS_TOKEN = "..."

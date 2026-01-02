@@ -27,7 +27,7 @@ export async function POST(request: Request) {
 
       const session = await sessionManager.create(user.id, 24 * 30)
       const res = NextResponse.json({ success: true, user: { id: user.id, email: user.email, role: user.role } })
-      res.cookies.set('session_id', session.id, { path: '/', httpOnly: true })
+      res.cookies.set('session_id', session.id, { path: '/', httpOnly: true, secure: env.isProduction, sameSite: 'lax' })
       return res
     }
 
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     // create our session record (keeps behavior consistent with local dev)
     const session = await sessionManager.create(data.user.id, 24 * 30)
     const res = NextResponse.json({ success: true, user: { id: data.user.id, email: data.user.email, role: (data.user as any).role || 'user' }, workspaceId: workspaceResult.workspaceId })
-    res.cookies.set('session_id', session.id, { path: '/', httpOnly: true })
+    res.cookies.set('session_id', session.id, { path: '/', httpOnly: true, secure: env.isProduction, sameSite: 'lax' })
     return res
   } catch (err) {
     console.error('[LOGIN_ERROR]', err)

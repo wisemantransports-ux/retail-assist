@@ -19,6 +19,6 @@ export async function POST(req: Request) {
 
   const session = await sessionManager.create(user.id, 24 * 30)
   const res = NextResponse.json({ success: true, user: { id: user.id, email: user.email, role: user.role } })
-  res.cookies.set('session_id', session.id, { path: '/', httpOnly: true })
+  res.cookies.set('session_id', session.id, { path: '/', httpOnly: true, secure: env.isProduction, sameSite: 'lax' })
   return res
 }

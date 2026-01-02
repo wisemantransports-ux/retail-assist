@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { sessionManager } from '@/lib/session';
 import { ensureWorkspaceForUser } from '@/lib/supabase/ensureWorkspaceForUser';
+import { env } from '@/lib/env';
 
 export async function POST(request: Request) {
   try {
@@ -87,7 +88,7 @@ export async function POST(request: Request) {
       },
       message: 'Account created successfully. You can access the dashboard — upgrade to unlock premium features.'
     });
-    res.cookies.set('session_id', session.id, { path: '/', httpOnly: true });
+    res.cookies.set('session_id', session.id, { path: '/', httpOnly: true, secure: env.isProduction, sameSite: 'lax' });
     return res;
   } catch (error: any) {
     console.error('[Auth Signup] Error:', error.message);
