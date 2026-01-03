@@ -1,9 +1,9 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/supabase/server'
 import { env } from '@/lib/env'
 import * as fs from 'fs'
 import * as path from 'path'
 
-const supabase = () => createServerSupabaseClient()
+const supabase = () => createServerClient()
 const DEV_SESSIONS = path.join(process.cwd(), 'tmp', 'dev-seed', 'sessions.json')
 
 function generateSessionId(): string {

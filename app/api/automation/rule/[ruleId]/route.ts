@@ -1,5 +1,5 @@
 import { updateAutomationRule, deleteAutomationRule } from '@/lib/supabase/queries';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/supabase/server';
 import { checkWorkspaceActive } from '@/lib/supabase/subscriptionCheck';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -12,7 +12,7 @@ export async function PATCH(
     const body = await request.json();
 
     // Check authentication and workspace subscription
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createServerClient();
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -59,7 +59,7 @@ export async function DELETE(
     const { ruleId } = await params;
 
     // Check authentication and workspace subscription
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createServerClient();
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

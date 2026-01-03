@@ -1,5 +1,5 @@
-import { createServerSupabaseClient } from './server';
+import { createServerClient } from './server';
 
 export async function createAdminSupabaseClient(): Promise<any> {
-  return createServerSupabaseClient();
+  return createServerClient();
 }

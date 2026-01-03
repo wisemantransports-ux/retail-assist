@@ -37,7 +37,7 @@ Checklist - mock → live switch (quick):
 3. Run the `psql` loop above to apply migrations in `supabase/migrations` in order.
 4. Create Auth users in Supabase Auth for admin/demo/test. Note their `id` (UID) values.
 5. Update `supabase/migrations/004_rls_policies_and_seed.sql` to replace placeholder `auth_uid` values with real UIDs, or insert rows into `users` mapping `auth_uid` -> `users.id`.
-6. In your app `.env` (local), set `NEXT_PUBLIC_USE_DEV_AUTH=false` and `USE_MOCK_DB=false`.
+6. In your app `.env` (local), set `NEXT_PUBLIC_USE_MOCK_SUPABASE=false`.
 7. Restart the dev server and test: sign in as seeded users and confirm dashboards load. Attempt write actions from a pending workspace — they should be rejected by RLS and your UI should show the upsell modal.
 8. For admin operations (migrations, billing, webhooks), use the `SUPABASE_SERVICE_ROLE_KEY` only on server code; never expose it to the browser.
 

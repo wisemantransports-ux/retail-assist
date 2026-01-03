@@ -134,7 +134,7 @@ export async function handleWebsiteFormWebhook(
 
     // Validate workspace and subscription
     const env = (globalThis as any).env || {};
-    const supabase = (globalThis as any).createServerSupabaseClient?.() || null;
+      const supabase = (globalThis as any).createServerClient?.() || null;
     const executeAutomationRulesForMessage = (globalThis as any).executeAutomationRulesForMessage;
 
     if (supabase) {

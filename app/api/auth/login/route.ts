@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createServerClient, createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/supabase/server'
 import { sessionManager } from '@/lib/session'
 import { db } from '@/lib/db'
 import { env } from '@/lib/env'
@@ -57,8 +57,8 @@ export async function POST(request: Request) {
       )
     }
 
-    // Ensure user has a workspace (safe to call multiple times)
-    const workspaceResult = await ensureWorkspaceForUser()
+    // Ensure user has a workspace (safe to call multiple times) — pass user id
+    const workspaceResult = await ensureWorkspaceForUser(data.user.id)
     if (workspaceResult.error) {
       console.warn('[LOGIN] Workspace provisioning warning:', workspaceResult.error)
       // Don't fail login if workspace provisioning fails - user can create/join later

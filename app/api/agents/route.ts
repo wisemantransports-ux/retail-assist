@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
+import { createServerClient, createAdminSupabaseClient } from '@/lib/supabase/server';
 import { createAgent, getCurrentUser } from '@/lib/supabase/queries';
 import { generateApiKey } from '@/lib/utils/helpers';
 import { env } from '@/lib/env';
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
       });
     }
 
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createServerClient();
     const { data: { session } } = await supabase.auth.getSession();
     
     if (!session) {
@@ -86,7 +86,7 @@ export async function POST(request: Request) {
       });
     }
 
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createServerClient();
     const { data: { session } } = await supabase.auth.getSession();
 
     if (!session) {

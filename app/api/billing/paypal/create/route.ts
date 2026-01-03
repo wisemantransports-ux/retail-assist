@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/supabase/server';
 import { createPayPalSubscription } from '@/lib/paypal/server';
 import { createSubscription } from '@/lib/supabase/queries';
 import { env } from '@/lib/env';

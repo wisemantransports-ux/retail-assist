@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/supabase/server';
 import { checkWorkspaceActive } from '@/lib/supabase/subscriptionCheck';
 import { validateCreateInput, validateUpdateInput } from '@/lib/automation/validation';
 import { env } from '@/lib/env';
@@ -30,7 +30,7 @@ export async function GET(request: Request) {
       });
     }
 
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createServerClient();
     const { data: { session } } = await supabase.auth.getSession();
     
     if (!session) {
@@ -137,7 +137,7 @@ export async function POST(request: Request) {
       }, { status: 201 });
     }
 
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createServerClient();
     const { data: { session } } = await supabase.auth.getSession();
 
     if (!session) {

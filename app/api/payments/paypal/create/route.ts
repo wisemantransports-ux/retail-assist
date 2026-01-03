@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/supabase/server';
 import { createPayPalOrder } from '@/lib/paypal/server';
 import { createPayment } from '@/lib/supabase/queries';
 
@@ -9,7 +9,7 @@ import { createPayment } from '@/lib/supabase/queries';
  */
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createServerClient();
 
     // Get authenticated user
     const {

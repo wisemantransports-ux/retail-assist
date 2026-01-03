@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/supabase/server';
 import { saveMobileMoneyPayment } from '@/lib/supabase/queries';
 
 export async function POST(request: Request) {
@@ -11,7 +11,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing phoneNumber' }, { status: 400 });
     }
 
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createServerClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });

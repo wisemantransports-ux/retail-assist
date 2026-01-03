@@ -32,7 +32,11 @@ export function createServerSupabaseClient(): SupabaseClient {
 }
 
 export function createAdminSupabaseClient(): SupabaseClient {
-  return createServerSupabaseClient()
+  if (env.useMockMode) {
+    // In mock/dev mode, delegate to the server client (anon) to avoid throwing
+    return createServerClient();
+  }
+  return createServerSupabaseClient();
 }
 
 export function createServerClient(): SupabaseClient {
@@ -51,9 +55,11 @@ export function createServerClient(): SupabaseClient {
 }
 
 export async function createMockAdminSupabaseClient(): Promise<any> {
-  // Lightweight mock factory. Mirrors `createMockAdminSupabaseClient` in `mock-client.ts`.
-  // For now, delegate to existing server client factory to preserve behavior.
-  return createServerSupabaseClient();
+  // Backwards compatibility: previously code used `createMockAdminSupabaseClient` to get
+  // a dev-friendly admin client. Delegate to `createAdminSupabaseClient` which
+  // now handles mock-mode branching.
+  return createAdminSupabaseClient();
 }
 
-export default createServerSupabaseClient
+// Default to the recommended server client export
+export default createServerClient

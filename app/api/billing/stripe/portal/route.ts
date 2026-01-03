@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/supabase/server';
 import { createBillingPortalSession } from '@/lib/stripe/billing';
 import { insertSystemLog } from '@/lib/supabase/queries';
 
@@ -12,7 +12,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'workspaceId is required' }, { status: 400 });
     }
 
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createServerClient();
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user?.id;
 

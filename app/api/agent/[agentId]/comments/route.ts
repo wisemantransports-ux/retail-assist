@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient, createAdminSupabaseClient } from '@/lib/supabase/server';
-import { createMockAdminSupabaseClient } from '@/lib/supabase/server';
+import { createServerClient, createAdminSupabaseClient } from '@/lib/supabase/server';
 import { getAgentById, saveComment, createDirectMessage, markCommentProcessed } from '@/lib/supabase/queries';
 import { generateAgentResponse, estimateTokens } from '@/lib/openai/server';
 import { generateMockResponse } from '@/lib/openai/mock';
@@ -25,7 +24,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
       return NextResponse.json({ reply: mockReply });
     }
 
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createServerClient();
     const adminSupabase = await createAdminSupabaseClient();
 
     // Get agent

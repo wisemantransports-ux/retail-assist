@@ -1,20 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { env } from '@/lib/env';
 
 let client: SupabaseClient | null = null;
-
-export function getBrowserSupabaseClient(): SupabaseClient {
-  if (client) return client;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-  client = createClient(url, key, {
-    auth: { persistSession: false },
-  });
-  return client;
-}
-/**
- * Stub Supabase client - This app uses file-based JSON storage, not Supabase.
- * These exports exist to satisfy imports without breaking the build.
- */
 
 const createChainableMock = () => {
   const chain: any = {
@@ -59,9 +46,22 @@ const stubClient = {
 };
 
 export function createBrowserSupabaseClient() {
-  return stubClient;
+  // If mock mode is enabled, return stub to avoid dialing Supabase
+  if (env.useMockMode) return stubClient as unknown as SupabaseClient;
+
+  // Ensure required client-side env vars exist
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+  if (!url || !key) {
+    console.warn('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY; falling back to stub client');
+    return stubClient as unknown as SupabaseClient;
+  }
+
+  if (client) return client;
+  client = createClient(url, key, { auth: { persistSession: false } });
+  return client;
 }
 
 export const createBrowserClient = createBrowserSupabaseClient;
-export const supabase = stubClient;
-export default createBrowserSupabaseClient; 
+export const supabase = createBrowserSupabaseClient();
+export default createBrowserSupabaseClient;

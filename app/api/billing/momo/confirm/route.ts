@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/supabase/server';
 import { confirmMobileMoneyPaymentBilling, updateSubscriptionBilling, recordBillingEvent } from '@/lib/supabase/queries';
 
 /**
@@ -14,7 +14,7 @@ import { confirmMobileMoneyPaymentBilling, updateSubscriptionBilling, recordBill
  */
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createServerClient();
 
     // Get authenticated user
     const {

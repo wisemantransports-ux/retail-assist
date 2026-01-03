@@ -95,7 +95,7 @@ export async function handleWhatsAppWebhook(
     }
 
     const env = (globalThis as any).env || {};
-    const supabase = (globalThis as any).createServerSupabaseClient?.() || null;
+    const supabase = (globalThis as any).createServerClient?.() || null;
     const executeAutomationRulesForMessage = (globalThis as any).executeAutomationRulesForMessage;
 
     // Process each entry

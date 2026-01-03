@@ -43,7 +43,7 @@ declare global {
   var env: GlobalEnv | undefined;
 
   // Supabase client
-  function createServerSupabaseClient(): any;
+    function createServerClient(): any;
 }
 
 export {};

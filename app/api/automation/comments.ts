@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/supabase/server';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const workspaceId = searchParams.get('workspaceId');
   if (!workspaceId) return NextResponse.json({ error: 'Missing workspaceId' }, { status: 400 });
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createServerClient();
   const { data: rule } = await supabase
     .from('comment_automation_rules')
     .select('*')
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { workspaceId, enabled, trigger_words, auto_reply_message, send_public_reply, public_reply_template } = body;
   if (!workspaceId) return NextResponse.json({ error: 'Missing workspaceId' }, { status: 400 });
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createServerClient();
   const { data, error } = await supabase
     .from('comment_automation_rules')
     .upsert({

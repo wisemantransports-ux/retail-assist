@@ -8,7 +8,7 @@
  */
 /// <reference path="./automation-shim.d.ts" />
 
-import { createServerSupabaseClient } from '../supabase/server';
+import { createServerClient } from '../supabase/server';
 import { createDirectMessage } from '../supabase/queries';
 import { generateAgentResponse } from '../openai/server';
 import { env } from '../env';
@@ -83,7 +83,7 @@ export async function executeAutomationRulesForComment(
       };
     }
 
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createServerClient();
 
     // Step 1: Get all enabled automation rules for this agent with trigger_type = 'comment'
     const { data: rules, error: rulesError } = await supabase
@@ -419,7 +419,7 @@ export async function executeAutomationRulesForMessage(
       };
     }
 
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createServerClient();
 
     // Load all enabled automation rules for this agent
     const { data: rules, error: rulesError } = await supabase
@@ -731,7 +731,7 @@ export async function executeTimeTriggerRules(
       };
     }
 
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createServerClient();
     const now = new Date();
 
     // Load all enabled time-based rules for this agent
@@ -935,7 +935,7 @@ export async function executeManualTrigger(
       };
     }
 
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createServerClient();
 
     // Load the specific rule
     const { data: rule, error: ruleError } = await supabase

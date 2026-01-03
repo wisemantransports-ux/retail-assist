@@ -66,7 +66,7 @@ const mockCreateDirectMessage = async (workspaceId: string, payload: any) => {
 // Mock the imports by setting up global substitutes
 // ============================================================================
 
-(globalThis as any).createServerSupabaseClient = () => mockSupabase;
+(globalThis as any).createServerClient = () => mockSupabase;
 (globalThis as any).createDirectMessage = mockCreateDirectMessage;
 (globalThis as any).generateAgentResponse = mockGenerateAgentResponse;
 (globalThis as any).env = mockEnv;

@@ -6,7 +6,7 @@
  * Safe to call multiple times (uses INSERT ... ON CONFLICT)
  */
 
-import { createServerSupabaseClient } from './server';
+import { createServerClient } from './server';
 
 export interface EnsureWorkspaceResult {
   workspaceId: string;
@@ -25,28 +25,20 @@ export interface EnsureWorkspaceResult {
  * 
  * Safe to call multiple times (idempotent via CONFLICT handling)
  */
-export async function ensureWorkspaceForUser(): Promise<EnsureWorkspaceResult> {
+export async function ensureWorkspaceForUser(userId: string): Promise<EnsureWorkspaceResult> {
   try {
-    const supabase = await createServerSupabaseClient();
-    
-    // Get authenticated user
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user?.id) {
-      return {
-        workspaceId: '',
-        created: false,
-        error: 'Not authenticated',
-      };
+    if (!userId) {
+      return { workspaceId: '', created: false, error: 'Missing userId' };
     }
 
-    const userId = session.user.id;
+    const supabase = await createServerClient();
 
     // Check if user exists in users table
     const { data: userRecord, error: userError } = await supabase
       .from('users')
       .select('id')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
 
     if (userError && userError.code !== 'PGRST116') {
       // PGRST116 = no rows found (which is ok, we'll create)
@@ -65,11 +57,9 @@ export async function ensureWorkspaceForUser(): Promise<EnsureWorkspaceResult> {
           {
             id: userId,
             auth_uid: userId,
-            email: session.user.email || '',
+            email: '',
           },
-        ])
-        .select()
-        .single();
+        ]);
 
       if (createUserError) {
         return {

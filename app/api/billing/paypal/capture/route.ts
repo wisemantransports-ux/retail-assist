@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { capturePayment } from '@/lib/paypal/billing';
 import { recordBillingPayment, recordBillingEvent, updateSubscriptionBilling, insertSystemLog } from '@/lib/supabase/queries';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/supabase/server';
 
 /**
  * PayPal Capture Endpoint

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { detectCommentEvent } from '@/lib/meta/comment';
 import { runCommentAutomationTest } from '@/lib/automation/comment/runCommentAutomationTest';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/supabase/server';
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, ignored: true });
   }
   // Find workspace by pageId
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createServerClient();
   const { data: workspace } = await supabase
     .from('workspaces')
     .select('id, meta_page_id')

@@ -3,7 +3,7 @@ import { db } from '@/lib/db';
 import { sessionManager } from '@/lib/session';
 import { ensureWorkspaceForUser } from '@/lib/supabase/ensureWorkspaceForUser';
 import { env } from '@/lib/env';
-import { createServerClient, createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient, createAdminSupabaseClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
 
 export async function POST(request: Request) {
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Failed to create user' }, { status: 500 })
       }
 
-      const admin = createServerSupabaseClient()
+      const admin = await createAdminSupabaseClient()
       const now = new Date().toISOString()
       const profile = {
         id: data.user.id,
@@ -106,10 +106,9 @@ export async function POST(request: Request) {
       console.warn('[SIGNUP] Failed to record info log (non-fatal):', e?.message || e);
     }
 
-    // Attempt to ensure workspace exists (safe to call, handles auth context)
-    // Note: This is best-effort in signup context as auth might not be fully set up
+    // Attempt to ensure workspace exists (pass user id explicitly)
     try {
-      await ensureWorkspaceForUser();
+      await ensureWorkspaceForUser(user.id);
     } catch (wsErr) {
       console.warn('[SIGNUP] Workspace provisioning deferred to first login:', wsErr);
       // Workspace will be created on first login if not created here

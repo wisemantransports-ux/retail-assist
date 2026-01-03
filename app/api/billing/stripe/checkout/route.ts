@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/supabase/server';
 import { createStripeCustomer, createCheckoutSession, getSubscription } from '@/lib/stripe/billing';
 import { getPlanById, insertSystemLog } from '@/lib/supabase/queries';
 import { env } from '@/lib/env';
@@ -14,7 +14,7 @@ export async function POST(req: Request) {
     }
 
     // Get current user & workspace info
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createServerClient();
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user?.id;
 

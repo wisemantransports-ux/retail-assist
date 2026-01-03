@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/supabase/server';
 import { saveMobileMoneyPayment, createPayment } from '@/lib/supabase/queries';
 import { generateReferenceCode, sendAdminNotificationEmail } from '@/lib/mobile-money/server';
 
@@ -9,7 +9,7 @@ import { generateReferenceCode, sendAdminNotificationEmail } from '@/lib/mobile-
  */
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createServerClient();
 
     // Get authenticated user
     const {

@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/supabase/server'
 import { env } from '@/lib/env'
 
 // NOTE: Mock mode is enabled by default while we are preparing to go-live.
@@ -8,7 +8,7 @@ import { env } from '@/lib/env'
 //  3) Run migrations (see supabase/migrations) and optionally run migrate-replit-to-supabase.ts
 //  4) Re-run the site and verify production flows (payments, webhooks)
 // Until then, DB operations use the local dev seed at tmp/dev-seed/database.json when `env.useMockMode` is true.
-const supabase = () => createServerSupabaseClient()
+const supabase = () => createServerClient()
 
 export const PLAN_LIMITS = {
   starter: {

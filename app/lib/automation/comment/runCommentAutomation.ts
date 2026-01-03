@@ -3,7 +3,7 @@
  * Processes detected comments and executes automation rules
  */
 
-import { createAdminSupabaseClient, createMockAdminSupabaseClient } from '@/lib/supabase/server';
+import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { 
   saveComment, 
   markCommentProcessed, 
@@ -61,8 +61,7 @@ export async function runCommentAutomation(
   } = input;
 
   try {
-    const useMock = env.useMockMode;
-    const supabase = useMock ? await createMockAdminSupabaseClient() : await createAdminSupabaseClient();
+    const supabase = await createAdminSupabaseClient();
 
     // Step 1: Store the comment in database
     console.log(`[Comment Automation] Processing comment: ${comment.commentId}`);

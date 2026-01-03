@@ -33,7 +33,7 @@ import {
   applyDelay,
 } from '@/lib/automation';
 import { env } from '@/lib/env';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/supabase/server';
 import { checkWorkspaceActive } from '@/lib/supabase/subscriptionCheck';
 
 interface CommentAutomationRequest {
@@ -83,7 +83,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     });
 
     // Check workspace subscription status
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createServerClient();
     const subStatus = await checkWorkspaceActive(supabase, body.workspaceId);
     if (!subStatus.active) {
       console.warn('[API] Workspace subscription inactive:', body.workspaceId);

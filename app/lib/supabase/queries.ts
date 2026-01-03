@@ -1,7 +1,7 @@
 import { getBrowserSupabaseClient } from './client';
 import { getServiceSupabaseClient } from './serverClient';
 
-const IS_MOCK = (process.env.NEXT_PUBLIC_USE_DEV_AUTH === 'true' || process.env.USE_MOCK_DB === 'true');
+const IS_MOCK = (process.env.NEXT_PUBLIC_USE_MOCK_SUPABASE === 'true');
 
 async function getClient(forWrite = false) {
   if (IS_MOCK) return null;

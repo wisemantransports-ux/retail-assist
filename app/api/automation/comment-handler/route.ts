@@ -11,7 +11,7 @@
 import { NextResponse } from 'next/server';
 import { detectCommentEvent } from '@/lib/meta/comment';
 import { runCommentAutomation } from '@/lib/automation/comment/runCommentAutomation';
-import { createAdminSupabaseClient, createMockAdminSupabaseClient } from '@/lib/supabase/server';
+import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { getAutomationRules, getAgentById } from '@/lib/supabase/queries';
 import { env } from '@/lib/env';
 import type { AutomationRule, Agent } from '@/lib/types/database';
@@ -32,8 +32,7 @@ export async function POST(request: Request) {
     console.log('[Comment Handler] Detected comment from platform:', platform);
 
     // Step 2: Find workspace by pageId (Facebook) or workspaceId (mock)
-    const useMock = env.useMockMode;
-    const supabase = useMock ? await createMockAdminSupabaseClient() : await createAdminSupabaseClient();
+    const supabase = await createAdminSupabaseClient();
 
     let workspaceId: string | null = null;
 

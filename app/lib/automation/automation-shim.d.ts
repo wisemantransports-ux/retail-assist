@@ -9,7 +9,7 @@ declare module '@/lib/supabase/server' {
   export function createAdminSupabaseClient(): SupabaseClient;
   export function createServerClient(): SupabaseClient;
   export function createMockAdminSupabaseClient(): Promise<any>;
-  export default createServerSupabaseClient;
+  export default createServerClient;
 }
 
 declare module '@/lib/openai/server' {
