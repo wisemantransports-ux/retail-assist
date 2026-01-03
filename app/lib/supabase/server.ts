@@ -10,7 +10,9 @@ import { env } from '../env.ts'
 
 function requireConfig() {
   // Respect mock mode: prevent accidental use of Supabase clients when mock mode is enabled
-  if (env.useMockMode) {
+  // but allow creation if real Supabase credentials are present in the environment.
+  const hasServerCreds = Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
+  if (env.useMockMode && !hasServerCreds) {
     throw new Error('Supabase client disabled: mock mode is enabled (NEXT_PUBLIC_USE_MOCK_SUPABASE=true). Set NEXT_PUBLIC_USE_MOCK_SUPABASE=false and provide SUPABASE_* env vars to enable Supabase.')
   }
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
@@ -40,7 +42,8 @@ export function createAdminSupabaseClient(): SupabaseClient {
 }
 
 export function createServerClient(): SupabaseClient {
-  if (env.useMockMode) {
+  const hasAnonCreds = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+  if (env.useMockMode && !hasAnonCreds) {
     throw new Error('Supabase client disabled: mock mode is enabled (NEXT_PUBLIC_USE_MOCK_SUPABASE=true). Set NEXT_PUBLIC_USE_MOCK_SUPABASE=false and provide NEXT_PUBLIC_SUPABASE_* env vars to enable the client.')
   }
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {

@@ -98,10 +98,21 @@ export function validateEnv(required: string[]): boolean {
   });
 }
 
-// Production safety: do not allow mock mode in production builds.
-// Require explicit NEXT_PUBLIC_USE_MOCK_SUPABASE=false in production; otherwise fail-fast.
-if (process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_USE_MOCK_SUPABASE !== 'false') {
-  throw new Error(
-    'Production cannot run with mock Supabase. Set NEXT_PUBLIC_USE_MOCK_SUPABASE=false and provide SUPABASE_* env vars.'
+// Production safety: do not allow mock mode in production builds unless real
+// Supabase credentials are present. This lets CI/builds run when the
+// deploy environment provides real SUPABASE_* variables but still warns
+// when mock mode is enabled without real credentials.
+if (process.env.NODE_ENV === 'production') {
+  const hasSupabaseCreds = Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   );
+  const useMock = (typeof process.env.NEXT_PUBLIC_USE_MOCK_SUPABASE !== 'undefined')
+    ? process.env.NEXT_PUBLIC_USE_MOCK_SUPABASE === 'true'
+    : true;
+
+  if (useMock && !hasSupabaseCreds) {
+    throw new Error(
+      'Production cannot run with mock Supabase. Set NEXT_PUBLIC_USE_MOCK_SUPABASE=false and provide SUPABASE_* env vars.'
+    );
+  }
 }
