@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerClient, createAdminSupabaseClient } from '@/lib/supabase/server';
-import { createAgent, getCurrentUser } from '@/lib/supabase/queries';
+import { createAgent, getCurrentUser, resolveUserId } from '@/lib/supabase/queries';
 import { generateApiKey } from '@/lib/utils/helpers';
 import { env } from '@/lib/env';
 import { checkWorkspaceActive } from '@/lib/supabase/subscriptionCheck';
@@ -32,11 +32,13 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Resolve session user to internal id (read-only)
+    const effectiveUserId = (await resolveUserId(session.user.id, false)) || session.user.id
     // Get user's default workspace
     const { data: workspace, error: workspaceError } = await supabase
       .from('workspaces')
       .select('id')
-      .eq('owner_id', session.user.id)
+      .eq('owner_id', effectiveUserId)
       .limit(1)
       .single();
 
@@ -107,10 +109,11 @@ export async function POST(request: Request) {
     // Get user's workspace if not specified
     let workspace_id = workspaceId;
     if (!workspace_id) {
+        const effectiveUserId2 = (await resolveUserId(session.user.id, false)) || session.user.id
       const { data: workspace } = await supabase
         .from('workspaces')
         .select('id')
-        .eq('owner_id', session.user.id)
+        .eq('owner_id', effectiveUserId2)
         .limit(1)
         .single();
 
@@ -124,11 +127,12 @@ export async function POST(request: Request) {
     }
 
     // Verify user has access to workspace
+    const effectiveUserId3 = (await resolveUserId(session.user.id, false)) || session.user.id
     const { data: member } = await supabase
       .from('workspace_members')
       .select('role')
       .eq('workspace_id', workspace_id)
-      .eq('user_id', session.user.id)
+      .eq('user_id', effectiveUserId3)
       .single();
 
     if (!member) {

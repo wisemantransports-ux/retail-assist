@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
 import { createStripeCustomer, createCheckoutSession, getSubscription } from '@/lib/stripe/billing';
-import { getPlanById, insertSystemLog } from '@/lib/supabase/queries';
+import { getPlanById, insertSystemLog, resolveUserId } from '@/lib/supabase/queries';
 import { env } from '@/lib/env';
 
 export async function POST(req: Request) {
@@ -17,6 +17,7 @@ export async function POST(req: Request) {
     const supabase = await createServerClient();
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user?.id;
+    const effectiveUserId = (await resolveUserId(userId, false)) || userId
 
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -27,7 +28,7 @@ export async function POST(req: Request) {
       .from('workspace_members')
       .select('*')
       .eq('workspace_id', workspaceId)
-      .eq('user_id', userId)
+      .eq('user_id', effectiveUserId)
       .maybeSingle();
 
     if (!member) {
@@ -46,7 +47,7 @@ export async function POST(req: Request) {
     // For now, create a temporary customer for this checkout
     const customerRes = await createStripeCustomer(workspaceId, session.user.email || 'customer@example.com');
     if (!customerRes.success) {
-      await insertSystemLog('error', workspaceId, userId, 'stripe_checkout', 'Failed to create Stripe customer', { error: customerRes.error });
+      await insertSystemLog('error', workspaceId, effectiveUserId || null, 'stripe_checkout', 'Failed to create Stripe customer', { error: customerRes.error });
       return NextResponse.json({ error: 'Failed to create billing customer' }, { status: 500 });
     }
 
@@ -67,11 +68,11 @@ export async function POST(req: Request) {
     });
 
     if (!sessionRes.success) {
-      await insertSystemLog('error', workspaceId, userId, 'stripe_checkout', 'Failed to create checkout session', { error: sessionRes.error });
+      await insertSystemLog('error', workspaceId, effectiveUserId || null, 'stripe_checkout', 'Failed to create checkout session', { error: sessionRes.error });
       return NextResponse.json({ error: 'Failed to create checkout session' }, { status: 500 });
     }
 
-    await insertSystemLog('info', workspaceId, userId, 'stripe_checkout', 'Stripe checkout initiated', { planId, billingCycle });
+    await insertSystemLog('info', workspaceId, effectiveUserId || null, 'stripe_checkout', 'Stripe checkout initiated', { planId, billingCycle });
 
     return NextResponse.json({
       success: true,

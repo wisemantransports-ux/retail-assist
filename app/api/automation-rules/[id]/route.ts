@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
+import { resolveUserId } from '@/lib/supabase/queries';
 import { checkWorkspaceActive } from '@/lib/supabase/subscriptionCheck';
 import { validateUpdateInput } from '@/lib/automation/validation';
 import { env } from '@/lib/env';
@@ -77,7 +78,8 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { rule, error } = await getRuleWithWorkspaceCheck(supabase, id, session.user.id);
+    const effectiveUserId = (await resolveUserId(session.user.id, false)) || session.user.id
+    const { rule, error } = await getRuleWithWorkspaceCheck(supabase, id, effectiveUserId);
 
     if (error) {
       return NextResponse.json({ error }, { status: error === 'Rule not found' ? 404 : 403 });
@@ -135,10 +137,11 @@ export async function PATCH(
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
+    const effectiveUserId2 = (await resolveUserId(session.user.id, false)) || session.user.id
     const { rule, workspace, error } = await getRuleWithWorkspaceCheck(
       supabase,
       id,
-      session.user.id
+      effectiveUserId2
     );
 
     if (error) {
@@ -216,7 +219,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { rule, error } = await getRuleWithWorkspaceCheck(supabase, id, session.user.id);
+    const effectiveUserId3 = (await resolveUserId(session.user.id, false)) || session.user.id
+    const { rule, error } = await getRuleWithWorkspaceCheck(supabase, id, effectiveUserId3);
 
     if (error) {
       return NextResponse.json({ error }, { status: error === 'Rule not found' ? 404 : 403 });

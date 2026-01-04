@@ -1,272 +1,747 @@
-// Supabase client placeholder (replace with real client)
-export const supabaseClient = null;
+
+import { createServerClient, createAdminSupabaseClient } from '@/lib/supabase/server'
+import type {
+	User,
+	Workspace,
+	WorkspaceMember,
+	WorkspaceInvite,
+	Agent,
+	Comment,
+	DirectMessage,
+	AutomationRule,
+	Invoice,
+	SubscriptionStatus,
+} from '../types/database'
+
+// Centralized Supabase query helpers used by server routes.
+// These functions are strongly typed to match the frontend expectations
+// (see `app/lib/types/database.ts`). Use `createAdminSupabaseClient()` for
+// privileged writes and `createServerClient()` for user-scoped reads when
+// appropriate.
+
+const admin = () => createAdminSupabaseClient()
+const anon = () => createServerClient()
+
+// Resolve a provided id which may be either the internal `users.id` or
+// the Supabase Auth UID (auth.users.id stored in `users.auth_uid`).
+// Returns the internal `users.id` (creating a lightweight users row if
+// none exists when `createIfMissing` is true).
+export async function resolveUserId(candidateId: string | null | undefined, createIfMissing = true) {
+	if (!candidateId) return null
+	const db = admin()
+
+	// 1) Try exact match on internal id
+	const { data: byId } = await db.from('users').select('id').eq('id', candidateId).maybeSingle()
+	if (byId && (byId as any).id) return (byId as any).id
+
+	// 2) Try match on auth_uid
+	const { data: byAuth } = await db.from('users').select('id').eq('auth_uid', candidateId).maybeSingle()
+	if (byAuth && (byAuth as any).id) return (byAuth as any).id
+
+	if (!createIfMissing) return null
+
+	// 3) Create a lightweight users row linking auth_uid -> internal id
+	const now = new Date().toISOString()
+	const { data: created } = await db.from('users').insert({ auth_uid: candidateId, email: '', created_at: now, updated_at: now }).select('id').limit(1).maybeSingle()
+	if (created && (created as any).id) return (created as any).id
+	return null
+}
 
 // -----------------------------
-// Invitations
+// Users / Profiles
 // -----------------------------
-export const acceptInvite = async (inviteId: string, userId?: string) => {
-	return { success: true, data: { inviteId, userId } } as any;
-};
+export async function getUserProfile(userId: string) {
+	const db = admin()
+	const { data, error } = await db.from('users').select('*').eq('id', userId).limit(1).maybeSingle()
+	return { data: data as User | null, error }
+}
+
+export async function upsertUserProfile(profile: Partial<User> & { id: string }) {
+	const db = admin()
+	const { data, error } = await db.from('users').upsert(profile).select().limit(1).maybeSingle()
+	return { data: data as User | null, error }
+}
+
+export async function createUserProfile(profile: Partial<User> & { email: string }) {
+	const db = admin()
+	const now = new Date().toISOString()
+	const record = { ...profile, created_at: now, updated_at: now }
+	const { data, error } = await db.from('users').insert(record).select().limit(1).maybeSingle()
+	return { data: data as User | null, error }
+}
+
+export async function findUserByEmail(email: string) {
+	const db = anon()
+	const { data, error } = await db.from('users').select('*').eq('email', email).limit(1).maybeSingle()
+	return { data: data as User | null, error }
+}
+
+export async function getCurrentUser() {
+	const db = anon()
+	try {
+		const { data, error } = await db.auth.getUser()
+		if (error) return null
+		return (data as any)?.user || null
+	} catch (e) {
+		return null
+	}
+}
 
 // -----------------------------
-// Mobile Money
+// Workspaces & Members
 // -----------------------------
-export const approveMobileMoneyPayment = async (paymentId: string, adminId?: string | null, options?: any) => {
-	// Stub: mark a mobile-money payment as approved and return a result object
-	return { success: true, data: { paymentId, adminId, options } } as any;
-};
-export const confirmMobileMoneyPaymentBilling = async (paymentId: string, userId?: string | null, notes?: string) => {
-	// Stub: confirm mobile-money payment and record confirmation details
-	return { success: true, data: { paymentId, userId, notes } } as any;
-};
-export const createMobileMoneyPaymentBilling = async (
-		subscriptionId: string,
-		workspaceId: string,
-		phoneNumber: string,
-		amount: number,
-		referenceCode: string,
-		provider: 'mtn' | 'vodacom' | 'airtel' | 'orange' | 'smega' | string
-	) => {
-		// Minimal stub for mobile-money billing records.
-		// In Botswana, common providers include Orange Money and Smega — include them here.
-		return {
-			data: {
-				id: `momo_${Date.now()}`,
-				subscription_id: subscriptionId,
-				workspace_id: workspaceId,
-				phone_number: phoneNumber,
-				amount,
-				reference_code: referenceCode,
-				provider,
-				status: 'pending',
-				currency: 'BWP',
-				created_at: new Date().toISOString(),
-			},
-		} as any;
-	};
-// Simple helper for botswana mobile-money flows: phone, name, provider
-export const createMobileMoneyPayment = async (phoneNumber: string, name: string, provider: 'orange' | 'smega' | string) => {
-	return {
- 		data: {
- 			id: `momo_${Date.now()}`,
- 			phone_number: phoneNumber,
- 			name,
- 			provider,
- 			status: 'pending',
- 			currency: 'BWP',
- 			created_at: new Date().toISOString(),
- 		},
- 	} as any;
-};
-export const saveMobileMoneyPayment = async (
-	workspaceIdOrData: any,
-	userId?: string,
-	phoneNumber?: string,
-	amount?: number,
-	referenceCode?: string
-) => {
-	if (typeof workspaceIdOrData === 'object') {
-		// legacy: single object
-		return { success: true, data: workspaceIdOrData } as any;
+export async function createWorkspace(payload: { owner_id: string; name: string; description?: string }) {
+	const db = admin()
+	const now = new Date().toISOString()
+	// owner_id may be an auth UID or an internal users.id — resolve to internal id
+	const owner_internal = await resolveUserId(payload.owner_id)
+	const record = { ...payload, owner_id: owner_internal || payload.owner_id, created_at: now, updated_at: now }
+	const { data, error } = await db.from('workspaces').insert(record).select().limit(1).maybeSingle()
+	return { data: data as Workspace | null, error }
+}
+
+export async function getWorkspaceById(workspaceId: string) {
+	const db = anon()
+	const { data, error } = await db.from('workspaces').select('*').eq('id', workspaceId).limit(1).maybeSingle()
+	return { data: data as Workspace | null, error }
+}
+
+export async function inviteMember(workspace_id: string, email: string, role: WorkspaceMember['role'] = 'staff', inviter_id?: string) {
+	const db = admin()
+	const token = `invite_${Date.now()}_${Math.random().toString(36).slice(2,8)}`
+	const now = new Date().toISOString()
+	const invite: Partial<WorkspaceInvite> = {
+		workspace_id,
+		email,
+		role,
+		token,
+		accepted: false,
+		expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString(), // 7 days
+		created_at: now,
+		created_by: inviter_id || null,
 	}
 
-	const record = {
-		id: `momo_${Date.now()}`,
-		workspace_id: workspaceIdOrData,
-		user_id: userId,
-		phone_number: phoneNumber,
-		amount,
-		reference_code: referenceCode,
-		status: 'pending',
+	const { data, error } = await db.from('workspace_invites').insert(invite).select().limit(1).maybeSingle()
+	return { data: data as WorkspaceInvite | null, error }
+}
+
+export async function acceptInvite(token: string, userId: string) {
+	const db = admin()
+	// Find invite
+	const { data: invite, error: inviteErr } = await db.from('workspace_invites').select('*').eq('token', token).limit(1).maybeSingle()
+	if (inviteErr) return { error: inviteErr }
+	if (!invite) return { error: 'Invite not found' }
+	if (invite.accepted) return { error: 'Invite already accepted' }
+	if (invite.expires_at && new Date(invite.expires_at) < new Date()) return { error: 'Invite expired' }
+
+	// Resolve provided userId (may be auth UID) to internal users.id
+	const internalUserId = await resolveUserId(userId)
+	// Create membership
+	const member = {
+		workspace_id: invite.workspace_id,
+		user_id: internalUserId || userId,
+		role: invite.role || 'staff',
+		invited_by: invite.created_by || null,
+		invited_at: invite.created_at || new Date().toISOString(),
+		accepted_at: new Date().toISOString(),
 		created_at: new Date().toISOString(),
-	};
+	}
 
-	return { success: true, data: record } as any;
-};
-export const rejectMobileMoneyPayment = async (paymentId: string, adminId?: string | null, reason?: string) => {
-	return { success: true, data: { paymentId, adminId, reason } } as any;
-};
+	const { data: created, error: createErr } = await db.from('workspace_members').insert(member).select().limit(1).maybeSingle()
+	if (createErr) return { error: createErr }
 
+	// Mark invite accepted
+	const { data: updatedInvite, error: updateErr } = await db.from('workspace_invites').update({ accepted: true, accepted_by: internalUserId || userId, accepted_at: new Date().toISOString() }).eq('id', invite.id).select().limit(1).maybeSingle()
+	if (updateErr) return { error: updateErr }
 
-// -----------------------------
-// Billing / Plans
-// -----------------------------
-export const getPlanById = async (planId: string) => ({ data: null, error: null });
-export const recordBillingEvent = async (
-	workspaceId: string,
-	event: string,
-	subscriptionId?: string,
-	userId?: string | undefined,
-	metadata?: any
-) => ({ success: true });
-export const updateSubscriptionBilling = async (subscriptionId: string, statusOrData: string | any) => {
-	// Accept either a status string or an object with billing fields (e.g. { status, last_payment_date })
-	return { success: true, data: { subscriptionId, payload: statusOrData } } as any;
-};
-export const updateSubscriptionStatus = async (subscriptionId: string, statusOrData: string | any) => {
-	return { success: true, data: { subscriptionId, payload: statusOrData } } as any;
-};
-export const getWorkspaceSubscription = async (workspaceId: string) => ({ data: null, error: null });
+	return { data: { member: created, invite: updatedInvite } }
+}
+
+export async function updateMemberRole(workspace_id: string, member_id: string, role: WorkspaceMember['role'], actor_id?: string) {
+	const db = admin()
+	const { data, error } = await db.from('workspace_members').update({ role, updated_at: new Date().toISOString() }).match({ id: member_id, workspace_id }).select().limit(1).maybeSingle()
+	return { data: data as WorkspaceMember | null, error }
+}
+
+export async function removeMember(workspace_id: string, member_id: string, actor_id?: string) {
+	const db = admin()
+	const { error } = await db.from('workspace_members').delete().match({ id: member_id, workspace_id })
+	return { success: !error, error }
+}
+
+export async function listWorkspaceMembers(workspace_id: string) {
+	const db = anon()
+	const { data, error } = await db.from('workspace_members').select('*, users(*)').eq('workspace_id', workspace_id)
+	return { data: data as Array<WorkspaceMember & { user?: User }> | null, error }
+}
+
+export async function listWorkspacesForUser(user_id: string) {
+	const db = anon()
+	// Resolve auth UID -> internal users.id (create lightweight user if missing)
+	const internalUserId = await resolveUserId(user_id)
+	const effectiveUserId = internalUserId || user_id
+	// Workspaces where user is a member or owner
+	const { data: ownerWorkspaces, error: ownerErr } = await db.from('workspaces').select('*').eq('owner_id', effectiveUserId)
+	const { data: memberRows, error: memberErr } = await db.from('workspace_members').select('workspace_id').eq('user_id', effectiveUserId)
+	const memberWorkspaceIds = (memberRows || []).map((r: any) => r.workspace_id)
+	let memberWorkspaces: any[] = []
+	if (memberWorkspaceIds.length > 0) {
+		const { data } = await db.from('workspaces').select('*').in('id', memberWorkspaceIds)
+		memberWorkspaces = data || []
+	}
+	return { data: [...(ownerWorkspaces || []), ...memberWorkspaces], error: ownerErr || memberErr }
+}
 
 // -----------------------------
 // Agents
 // -----------------------------
-export const createAgent = async (workspaceId: string, agentData: any) => ({ id: `a_${Date.now()}`, workspace_id: workspaceId, ...agentData });
-export const getCurrentUser = async () => ({ data: null });
+export async function createAgent(workspace_id: string, payload: Partial<Agent>) {
+	const db = admin()
+	const now = new Date().toISOString()
+	const record = { ...payload, workspace_id, created_at: now, updated_at: now }
+	const { data, error } = await db.from('agents').insert(record).select().limit(1).maybeSingle()
+	return { data: data as Agent | null, error }
+}
+
+export async function getAgentById(agentId: string) {
+	const db = anon()
+	const { data, error } = await db.from('agents').select('*').eq('id', agentId).limit(1).maybeSingle()
+	// Return the agent record directly to match call-sites that expect an Agent or null
+	return data as Agent | null
+}
+
+export async function listAgentsForWorkspace(workspace_id: string) {
+	const db = anon()
+	const { data, error } = await db.from('agents').select('*').eq('workspace_id', workspace_id)
+	return { data: data as Agent[] | null, error }
+}
 
 // -----------------------------
-// Automation
+// Comments & Direct Messages
 // -----------------------------
-export const createAutomationRule = async (workspaceIdOrData: any, agentId?: string, ruleData?: any) => {
-	if (typeof workspaceIdOrData === 'object') {
-		return { success: true, data: workspaceIdOrData } as any;
+export async function saveComment(agentIdOrPayload: string | Partial<Comment>, maybePayload?: Partial<Comment>) {
+	const db = admin()
+	const now = new Date().toISOString()
+	let record: any
+	if (typeof agentIdOrPayload === 'string') {
+		record = { ...(maybePayload || {}), agent_id: agentIdOrPayload, created_at: now, updated_at: now }
+	} else {
+		record = { ...agentIdOrPayload, created_at: now, updated_at: now }
 	}
-	const rule = { id: `rule_${Date.now()}`, workspace_id: workspaceIdOrData, agent_id: agentId, ...ruleData };
-	return { success: true, data: rule } as any;
-};
-export const updateAutomationRule = async (ruleId: string, ruleData: any) => ({ success: true, data: { ruleId, ...ruleData } } as any);
+	const { data, error } = await db.from('comments').insert(record).select().limit(1).maybeSingle()
+	if (!data) return null
+	return data as Comment
+}
+
+export async function createDirectMessage(workspace_id: string, payload: any) {
+	const db = admin()
+	const now = new Date().toISOString()
+	const record = { ...payload, workspace_id, created_at: now, updated_at: now }
+	const { data, error } = await db.from('direct_messages').insert(record).select().limit(1).maybeSingle()
+	if (error || !data) return { data: null, error }
+	// Return an object that includes both the raw record and wrapper fields so callers
+	// can destructure `{ data, error }` or use the returned object directly.
+	const out: any = { ...data, data, error: null }
+	return out
+}
+
+export async function listDirectMessages(workspace_id: string, agent_id?: string) {
+	const db = anon()
+	let q = db.from('direct_messages').select('*').eq('workspace_id', workspace_id).order('created_at', { ascending: false })
+	if (agent_id) q = q.eq('agent_id', agent_id)
+	const { data, error } = await q
+	return { data: data as DirectMessage[] | null, error }
+}
 
 // -----------------------------
-// Workspace / Members
+// Payments / Mobile Money / PayPal
 // -----------------------------
-export const updateMemberRole = async (workspaceId: string, userId: string, role: string, actorId?: string) => {
-	return { success: true, data: { workspaceId, userId, role, actorId } } as any;
-};
-
-// -----------------------------
-// Payments
-// -----------------------------
-export const updatePaymentStatus = async (paymentId: string, status: string, meta?: any) => {
-	return { success: true, data: { paymentId, status, meta } } as any;
-};
-
-// -----------------------------
-// Comments / Messages / Logs (stubs expected elsewhere in the app)
-// -----------------------------
-export const saveComment = async (agentId: string, commentData: any) => ({ id: `c_${Date.now()}`, ...commentData });
-export const markCommentProcessed = async (commentId: string, reply?: string, publicReplyId?: string) => {
-	return { success: true, data: { commentId, reply, publicReplyId } } as any;
-};
-export const createDirectMessage = async (workspaceId: string, data: any) => {
-	const dm = { id: `dm_${Date.now()}`, workspace_id: workspaceId, ...data, created_at: new Date().toISOString() };
-	return { success: true, data: dm, id: dm.id } as any;
-};
-export const createAuditLog = async (workspaceIdOrData: any, userId?: string | null, action?: string, itemType?: string, itemId?: string, metadata?: any) => {
-	if (typeof workspaceIdOrData === 'object') {
-		return { success: true, data: workspaceIdOrData } as any;
+export async function createPayment(paymentOrWorkspaceId: any, maybeUserId?: string | null, maybeAmount?: number, maybeMethodOrExtra?: any, maybeExtraMeta?: any) {
+	const db = admin()
+	const now = new Date().toISOString()
+	let record: any
+	if (typeof paymentOrWorkspaceId === 'object') {
+		const payment = paymentOrWorkspaceId
+		// If payment contains a user_id that may be an auth UID, resolve it
+		if (payment.user_id) {
+			payment.user_id = await resolveUserId(payment.user_id) || payment.user_id
+		}
+		record = { ...payment, currency: payment.currency || 'BWP', status: payment.status || 'pending', created_at: now }
+	} else {
+		// positional args: workspaceId, userId, amount, method, extraMeta
+		const resolvedUserId = maybeUserId ? await resolveUserId(maybeUserId) : null
+		record = {
+			workspace_id: paymentOrWorkspaceId,
+			user_id: resolvedUserId || maybeUserId || null,
+			amount: maybeAmount || 0,
+			currency: (maybeExtraMeta && maybeExtraMeta.currency) || 'BWP',
+			method: typeof maybeMethodOrExtra === 'string' ? maybeMethodOrExtra : (maybeMethodOrExtra?.method || 'paypal'),
+			status: (maybeExtraMeta && maybeExtraMeta.status) || 'pending',
+			provider: maybeExtraMeta?.provider || null,
+			provider_reference: maybeExtraMeta?.provider_reference || null,
+			metadata: maybeExtraMeta || {},
+			created_at: now,
+		}
 	}
-	const record = { id: `log_${Date.now()}`, workspace_id: workspaceIdOrData, user_id: userId, action, item_type: itemType, item_id: itemId, metadata, created_at: new Date().toISOString() };
-	return { success: true, data: record } as any;
-};
-export const logMessage = async (workspaceId: string, data: any) => ({ success: true });
+	const { data, error } = await db.from('payments').insert(record).select().limit(1).maybeSingle()
+	return { data: data || null, error }
+}
+
+export async function getPaymentsForWorkspace(workspace_id: string) {
+	const db = anon()
+	const { data, error } = await db.from('payments').select('*').eq('workspace_id', workspace_id).order('created_at', { ascending: false })
+	return { data: data as any[] | null, error }
+}
+
+export async function getPaymentById(paymentId: string) {
+	const db = anon()
+	const { data, error } = await db.from('payments').select('*').eq('id', paymentId).limit(1).maybeSingle()
+	return { data: data || null, error }
+}
+
+export async function approveMobileMoneyPayment(paymentId: string, adminId?: string, notesOrMeta?: string | any) {
+	const db = admin()
+	const payload: any = { status: 'completed', updated_at: new Date().toISOString() }
+	if (typeof notesOrMeta === 'string') {
+		payload.provider_reference = notesOrMeta
+	} else if (typeof notesOrMeta === 'object' && notesOrMeta !== null) {
+		// attach metadata and optional provider_reference
+		if (notesOrMeta.provider_reference) payload.provider_reference = notesOrMeta.provider_reference
+		payload.metadata = { ...(notesOrMeta.metadata || {}), ...notesOrMeta }
+	}
+	const { data, error } = await db.from('payments').update(payload).match({ id: paymentId, method: 'mobile_money' }).select().limit(1).maybeSingle()
+	return { data: data as any | null, error }
+}
+
+export async function rejectMobileMoneyPayment(paymentId: string, adminId?: string, reason?: string) {
+	const db = admin()
+	const { data, error } = await db.from('payments').update({ status: 'failed', provider_reference: reason, updated_at: new Date().toISOString() }).match({ id: paymentId, method: 'mobile_money' }).select().limit(1).maybeSingle()
+	return { data: data as any | null, error }
+}
+
+export async function updatePaymentStatus(paymentId: string, status: string, meta?: any) {
+	const db = admin()
+	const { data, error } = await db.from('payments').update({ status, metadata: meta, updated_at: new Date().toISOString() }).eq('id', paymentId).select().limit(1).maybeSingle()
+	return { data: data || null, error }
+}
+
+export async function recordPaymentSuccess(paymentId: string, metadata?: any) {
+	// Mark a payment as completed and attach metadata
+	try {
+		const res = await updatePaymentStatus(paymentId, 'completed', metadata)
+		return res
+	} catch (e: any) {
+		return { error: e?.message || e }
+	}
+}
 
 // -----------------------------
-// Agents / lookups
+// Automation Rules
 // -----------------------------
-export const getAgentById = async (agentId: string) => {
-	// Return a minimal agent object shape expected by callers.
-	// Replace with real DB lookup when integrating.
-	return {
-		id: agentId,
-		enabled: true,
-		workspace_id: 'workspace_default',
-		system_prompt: 'You are a helpful retail assistant',
-		model: 'gpt-4o-mini',
-		temperature: 0.2,
-		max_tokens: 1024,
-		fallback: 'Thank you for your comment. We will get back to you shortly.',
-	} as any;
-};
+export async function createAutomationRule(workspace_id: string, agent_id: string, payload: Partial<AutomationRule>) {
+	const db = admin()
+	const now = new Date().toISOString()
+	const record = { ...payload, workspace_id, agent_id, created_at: now, updated_at: now }
+	const { data, error } = await db.from('automation_rules').insert(record).select().limit(1).maybeSingle()
+	return { data: data as AutomationRule | null, error }
+}
+
+export async function updateAutomationRule(ruleId: string, payload: Partial<AutomationRule>) {
+	const db = admin()
+	const { data, error } = await db.from('automation_rules').update({ ...payload, updated_at: new Date().toISOString() }).eq('id', ruleId).select().limit(1).maybeSingle()
+	return { data: data as AutomationRule | null, error }
+}
+
+export async function deleteAutomationRule(ruleId: string) {
+	const db = admin()
+	const { error } = await db.from('automation_rules').delete().eq('id', ruleId)
+	return { success: !error, error }
+}
+
+export async function listAutomationRules(workspace_id: string, agent_id?: string) {
+	const db = anon()
+	let query = db.from('automation_rules').select('*').eq('workspace_id', workspace_id)
+	if (agent_id) query = query.eq('agent_id', agent_id)
+	const { data, error } = await query
+	return { data: data as AutomationRule[] | null, error }
+}
+
+export async function getAutomationRules(workspace_id: string, agent_id?: string, includeDisabled?: boolean) {
+	const res = await listAutomationRules(workspace_id, agent_id)
+	if (!res.data) return []
+	if (includeDisabled) return res.data
+	return (res.data || []).filter((r: any) => r.enabled)
+}
+
+export async function hasAlreadyReplied(commentIdentifier: string) {
+	// Check comments table for processed flag or bot_reply for given platform_comment_id
+	try {
+		const db = anon()
+		const { data } = await db.from('comments').select('*').or(`platform_comment_id.eq.${commentIdentifier},id.eq.${commentIdentifier}`).limit(1).maybeSingle()
+		if (!data) return false
+		return Boolean(data.processed || data.bot_reply || data.bot_reply_id)
+	} catch (e) {
+		return false
+	}
+}
+
+export async function logAutomationAction(payload: any) {
+	// Persist automation actions to audit_logs for now
+	const { workspace_id, agent_id, comment_id, action, metadata } = payload || {}
+	return createAuditLog(workspace_id, null, action || 'automated_action', 'rule', comment_id || null, { agent_id, ...metadata })
+}
+
+export async function logMessage(workspace_id: string, data: any) {
+	const db = admin()
+	try {
+		const now = new Date().toISOString()
+		// Resolve user_id in the payload if present (auth UID -> internal id)
+		let userIdResolved = null
+		if (data?.user_id) userIdResolved = await resolveUserId(data.user_id)
+		const record = { workspace_id, ...data, user_id: userIdResolved || data.user_id || null, created_at: now }
+		const { data: inserted, error } = await db.from('message_logs').insert(record).select().limit(1).maybeSingle()
+		if (!error) return { data: inserted || null }
+	} catch (e) {
+		// fallback
+	}
+	const fallbackUser = data?.user_id ? await resolveUserId(data.user_id) : null
+	return createAuditLog(workspace_id, fallbackUser || null, 'logged_message', 'agent', data.agent_id || null, data)
+}
+
+export async function insertSystemLog(level: string, workspaceId?: string | null, userId?: string | null, context?: string, message?: string, metadata?: any, stackTrace?: string | null) {
+	// Store system-level logs in audit_logs table with resource_type 'integration'
+	return createAuditLog(workspaceId || null, userId || null, level, 'integration', null, { context, message, metadata, stackTrace })
+}
+
+export async function markCommentProcessed(commentId: string, updates?: { reply?: string; publicReplyId?: string } | string, publicReplyId?: string) {
+	const db = admin()
+	const payload: any = { processed: true, processed_at: new Date().toISOString() }
+	if (typeof updates === 'string') {
+		payload.bot_reply = updates
+		if (publicReplyId) payload.bot_reply_id = publicReplyId
+	} else {
+		if (updates?.reply) payload.bot_reply = updates.reply
+		if (updates?.publicReplyId) payload.bot_reply_id = updates.publicReplyId
+		if (publicReplyId) payload.bot_reply_id = publicReplyId
+	}
+	const { data, error } = await db.from('comments').update(payload).eq('id', commentId).select().limit(1).maybeSingle()
+	if (!data) return null
+	return data
+}
 
 // -----------------------------
-// Payments / Billing helpers (additional stubs)
+// Subscriptions & Billing
 // -----------------------------
-export const createPayment = async (workspaceIdOrData: any, userId?: string, amount?: number, provider?: string, metadata?: any) => {
+export async function createSubscription(a: any, maybePayload?: any) {
+	const db = admin()
+	const now = new Date().toISOString()
+	let record: any
+	if (typeof a === 'object') {
+		const payload = a
+		record = { workspace_id: payload.workspace_id, plan_id: payload.plan_id, status: payload.status || 'active', provider: payload.provider || null, provider_subscription_id: payload.provider_subscription_id || null, metadata: payload.metadata || null, created_at: now, updated_at: now }
+	} else {
+		const workspace_id = a
+		const payload = maybePayload || {}
+		record = { workspace_id, plan_id: payload.plan_id, status: payload.status || 'active', provider: payload.provider || null, provider_subscription_id: payload.provider_subscription_id || null, metadata: payload.metadata || null, created_at: now, updated_at: now }
+	}
+	const { data, error } = await db.from('subscriptions').insert(record).select().limit(1).maybeSingle()
+	return { data: data || null, error }
+}
+
+// -----------------------------
+// Plans / Billing helpers
+// -----------------------------
+export async function getAllPlans() {
+	const db = anon()
+	// Try to read from a `plans` table if present, otherwise return a static list
+	try {
+		const { data, error } = await db.from('plans').select('*')
+		if (!error && data) return { data }
+	} catch (e) {
+		// ignore
+	}
+	const staticPlans = [
+		{
+			id: 'starter',
+			name: 'starter',
+			display_name: 'Starter',
+			price_monthly: 22,
+			price_yearly: 220,
+			included_monthly_usage: 1000,
+			is_active: true,
+			sort_order: 10,
+			created_at: new Date().toISOString(),
+			updated_at: new Date().toISOString(),
+		},
+		{
+			id: 'pro',
+			name: 'pro',
+			display_name: 'Pro',
+			price_monthly: 45,
+			price_yearly: 450,
+			included_monthly_usage: 5000,
+			is_active: true,
+			sort_order: 20,
+			created_at: new Date().toISOString(),
+			updated_at: new Date().toISOString(),
+		},
+		{
+			id: 'enterprise',
+			name: 'enterprise',
+			display_name: 'Enterprise',
+			price_monthly: 75,
+			price_yearly: 750,
+			included_monthly_usage: 20000,
+			is_active: true,
+			sort_order: 30,
+			created_at: new Date().toISOString(),
+			updated_at: new Date().toISOString(),
+		},
+	]
+	return { data: staticPlans, error: null }
+}
+
+export async function getPlanById(planId: string) {
+	const plans = await getAllPlans()
+	const found = (plans.data || []).find((p: any) => p.id === planId) || null
+	return { data: found, error: null }
+}
+
+export async function getBillingPaymentHistory(workspace_id: string) {
+	// reuse payments query
+	return getPaymentsForWorkspace(workspace_id)
+}
+
+export async function getPendingMobileMoneyPayments(workspace_id: string) {
+	const db = anon()
+	const { data, error } = await db.from('payments').select('*').eq('workspace_id', workspace_id).eq('method', 'mobile_money').eq('status', 'pending')
+	return { data: data || [], error }
+}
+
+export async function saveMobileMoneyPayment(workspaceIdOrData: any, userId?: string, phoneNumber?: string, amount?: number, referenceCode?: string) {
 	if (typeof workspaceIdOrData === 'object') {
-		return { success: true, data: workspaceIdOrData } as any;
+		return createPayment(workspaceIdOrData)
+	}
+	return createPayment({ workspace_id: workspaceIdOrData, user_id: userId || null, amount: amount || 0, currency: 'BWP', method: 'mobile_money', provider_reference: referenceCode || null, metadata: { phoneNumber } })
+}
+
+export async function createMobileMoneyPaymentBilling(
+	a: string | { workspace_id: string; user_id?: string | null; amount: number; currency?: string; provider?: string; phoneNumber?: string; metadata?: any },
+	workspaceId?: string,
+	phoneNumber?: string,
+	amount?: number,
+	referenceCode?: string,
+	provider?: string
+) {
+	if (typeof a === 'object') {
+		const opts = a
+		const { workspace_id, user_id, amount: amt, currency = 'BWP', provider: prov = 'mobile_money', phoneNumber: phone, metadata } = opts
+		const payment = {
+			workspace_id,
+			user_id: user_id || null,
+			amount: amt,
+			currency: currency,
+			method: 'mobile_money',
+			status: 'pending',
+			provider: prov || 'mobile_money',
+			provider_reference: null,
+			metadata: { phoneNumber: phone, ...metadata },
+		}
+		return createPayment(payment)
 	}
 
+	// Called with positional args: subscriptionId, workspaceId, phoneNumber, amount, referenceCode, provider
+	const subscriptionId = a
 	const payment = {
-		id: `pay_${Date.now()}`,
-		workspace_id: workspaceIdOrData,
-		user_id: userId,
-		amount,
-		provider,
-		metadata,
-		status: 'created',
-		created_at: new Date().toISOString(),
-	};
-
-	return { success: true, data: payment } as any;
-};
-export const recordBillingPayment = async (
-	subscriptionId: string,
- 	workspaceId: string,
- 	amount: number,
- 	currency: string,
- 	provider: string,
- 	providerReference?: string,
- 	metadata?: any
-) => {
- 	return { success: true, data: { subscriptionId, workspaceId, amount, currency, provider, providerReference, metadata } } as any;
-};
-export const createSubscription = async (workspaceIdOrData: any, data?: any) => {
-	if (typeof workspaceIdOrData === 'object') {
-		return { id: `sub_${Date.now()}`, ...workspaceIdOrData } as any;
+		workspace_id: workspaceId,
+		user_id: null,
+		amount: amount || 0,
+		currency: 'BWP',
+		method: 'mobile_money',
+		status: 'pending',
+		provider: provider || 'mobile_money',
+		provider_reference: referenceCode || null,
+		metadata: { phoneNumber: phoneNumber || null, subscriptionId },
 	}
-	return { id: `sub_${Date.now()}`, workspace_id: workspaceIdOrData, ...data } as any;
-};
-export const recordPaymentSuccess = async (workspaceId: string, paymentData: any) => ({ success: true, data: paymentData });
+	return createPayment(payment)
+}
+
+export async function confirmMobileMoneyPaymentBilling(paymentId: string, providerReference?: string, markCompleted = true) {
+	// Confirm a pending mobile-money payment used for billing flows.
+	// Update payment record, optionally mark completed and record billing event.
+	try {
+		if (markCompleted) {
+			const approved = await approveMobileMoneyPayment(paymentId, null, providerReference || undefined)
+			if (approved.error) return { error: approved.error }
+			// Optionally create a billing event linking to subscription metadata
+			const payment = approved.data
+			try {
+				const workspaceId = payment?.workspace_id
+				const amount = payment?.amount
+				const provider = payment?.provider || 'mobile_money'
+				await recordBillingPayment(payment?.metadata?.subscriptionId || '', workspaceId, amount, payment?.currency || 'BWP', provider, providerReference || null, payment?.metadata || {})
+				await recordBillingEvent(workspaceId, 'mobile_money_confirmed', payment?.metadata?.subscriptionId || null, null, { paymentId, providerReference })
+			} catch (e) {
+				// swallow record errors
+			}
+			return { data: approved.data }
+		}
+		// If not marking completed, just update provider_reference
+		const updated = await updatePaymentStatus(paymentId, 'created', { provider_reference: providerReference })
+		return updated
+	} catch (e: any) {
+		return { error: e?.message || e }
+	}
+}
+
+export async function recordBillingPayment(subscriptionId: string, workspaceId: string, amount: number, currency: string, provider: string, providerReference?: string, metadata?: any) {
+	// create a payment record and optionally link to subscription
+	const res = await createPayment({ workspace_id: workspaceId, amount, currency, method: provider || 'manual', status: 'completed', provider, provider_reference: providerReference || null, metadata: { subscriptionId, ...metadata } })
+	return res
+}
+
+export async function recordBillingEvent(workspaceId: string, event: string, subscriptionId?: string, userId?: string | undefined, metadata?: any) {
+	// Log billing-related event to audit_logs
+	return createAuditLog(workspaceId, userId || null, event, 'integration', subscriptionId || null, metadata)
+}
+
+export async function updateSubscriptionBilling(subscriptionId: string, statusOrData: string | any) {
+	// update subscriptions with flexible payload
+	const db = admin()
+	if (typeof statusOrData === 'string') {
+		return updateSubscriptionStatus(subscriptionId, statusOrData)
+	}
+	const { data, error } = await db.from('subscriptions').update({ ...statusOrData, updated_at: new Date().toISOString() }).eq('id', subscriptionId).select().limit(1).maybeSingle()
+	return { data: data || null, error }
+}
+
+export async function getSubscriptionByProviderId(providerOrId: string, idMaybe?: string) {
+	const db = anon()
+	const id = idMaybe ?? providerOrId
+	const provider = idMaybe ? providerOrId : 'paypal'
+	const { data, error } = await db.from('subscriptions').select('*').eq('provider', provider).eq('provider_subscription_id', id).limit(1).maybeSingle()
+	return data || null
+}
+
+export async function getWorkspaceSubscription(workspace_id: string) {
+	return getSubscriptionByWorkspace(workspace_id)
+}
+
+export async function getSubscriptionByWorkspace(workspace_id: string) {
+	const db = anon()
+	const { data, error } = await db.from('subscriptions').select('*').eq('workspace_id', workspace_id).limit(1).maybeSingle()
+	return { data: data || null, error }
+}
+
+export async function getUserSubscription(userId: string) {
+	const db = anon()
+	// Find workspaces where user is owner or member
+	const { data: ownerWorkspaces } = await db.from('workspaces').select('id').eq('owner_id', userId)
+	const { data: memberRows } = await db.from('workspace_members').select('workspace_id').eq('user_id', userId)
+	const workspaceIds: string[] = []
+	const ow = ownerWorkspaces || []
+	for (const w of ow as any[]) {
+		if (w?.id && !workspaceIds.includes(w.id)) workspaceIds.push(w.id)
+	}
+	const mr = memberRows || []
+	for (const m of mr as any[]) {
+		if (m?.workspace_id && !workspaceIds.includes(m.workspace_id)) workspaceIds.push(m.workspace_id)
+	}
+	const ids = workspaceIds
+	if (ids.length === 0) return null
+	const { data } = await db.from('subscriptions').select('*').in('workspace_id', ids).limit(1).maybeSingle()
+	return data || null
+}
+
+export async function updateSubscriptionStatus(subscriptionId: string, statusOrData: SubscriptionStatus | any) {
+	const db = admin()
+	if (typeof statusOrData === 'string') {
+		const { data, error } = await db.from('subscriptions').update({ status: statusOrData, updated_at: new Date().toISOString() }).eq('id', subscriptionId).select().limit(1).maybeSingle()
+		return { data: data || null, error }
+	}
+	const payload = { ...(statusOrData || {}), updated_at: new Date().toISOString() }
+	const { data, error } = await db.from('subscriptions').update(payload).eq('id', subscriptionId).select().limit(1).maybeSingle()
+	return { data: data || null, error }
+}
 
 // -----------------------------
-// Automation helpers
+// Audit / Logs
 // -----------------------------
-export const deleteAutomationRule = async (ruleId: string) => ({ success: true });
-export const getAutomationRules = async (workspaceId?: string, agentId?: string, includeDisabled?: boolean) => [] as any[];
-export const hasAlreadyReplied = async (params: any) => false;
-export const logAutomationAction = async (data: any) => ({ success: true });
+export async function createAuditLog(workspace_id: string, user_id: string | null, action: string, resource_type: string, resource_id?: string, changes?: any) {
+	const db = admin()
+	const now = new Date().toISOString()
+	const record = { workspace_id, user_id, action, resource_type, resource_id, changes, created_at: now }
+	const { data, error } = await db.from('audit_logs').insert(record).select().limit(1).maybeSingle()
+	return { data: data || null, error }
+}
 
-// -----------------------------
-// Plans / billing lookups
-// -----------------------------
-export const getAllPlans = async () => ({ data: [], error: null });
-export const getBillingPaymentHistory = async (workspaceId: string) => ({ data: [], error: null });
-export const getPendingMobileMoneyPayments = async (workspaceId: string) => ({ data: [], error: null });
+export async function listAuditLogs(workspace_id: string, limit = 100) {
+	const db = anon()
+	const { data, error } = await db.from('audit_logs').select('*').eq('workspace_id', workspace_id).order('created_at', { ascending: false }).limit(limit)
+	return { data: data || null, error }
+}
 
-// -----------------------------
-// Subscriptions / system
-// -----------------------------
-export const getSubscriptionByProviderId = async (providerOrId: string, idMaybe?: string) => {
-	// Flexible signature: callers sometimes pass (provider, id) and sometimes only the provider-specific id.
-	const id = idMaybe ?? providerOrId;
-	const provider = idMaybe ? providerOrId : 'paypal';
-	// Return a minimal subscription-like object; replace with real DB lookup when integrating.
-	return { id, provider, workspace_id: 'workspace_default' } as any;
-};
+export async function createInvoice(payload: Partial<Invoice>) {
+	const db = admin()
+	const now = new Date().toISOString()
+	const record = { ...payload, created_at: payload.created_at || now }
+	const { data, error } = await db.from('invoices').insert(record).select().limit(1).maybeSingle()
+	return { data: data || null, error }
+}
 
-// Return a user's subscription (minimal stub)
-export const getUserSubscription = async (userId: string) => {
-	// Replace with real DB lookup; return null if no subscription
-	return { id: `sub_${Date.now()}`, user_id: userId, status: 'inactive', workspace_id: 'workspace_default' } as any;
-};
-export const insertSystemLog = async (
-	level: string,
-	workspaceId?: string | null,
-	userId?: string | null,
-	context?: string,
-	message?: string,
-	metadata?: any,
-	stackTrace?: string | null
-) => {
-	return { success: true, data: { level, workspaceId, userId, context, message, metadata, stackTrace } } as any;
-};
+export async function getInvoiceById(invoiceId: string) {
+	const db = anon()
+	const { data, error } = await db.from('invoices').select('*').eq('id', invoiceId).limit(1).maybeSingle()
+	return { data: data || null, error }
+}
 
-// -----------------------------
-// Workspace invites / members
-// -----------------------------
-export const inviteMember = async (workspaceId: string, email: string, role?: string, inviterId?: string) => {
-	return { success: true, data: { workspaceId, email, role, inviterId } } as any;
-};
-export const removeMember = async (workspaceId: string, userId: string, actorId?: string) => {
-	return { success: true, data: { workspaceId, userId, actorId } } as any;
-};
+export default {
+	// users
+	getUserProfile,
+	upsertUserProfile,
+  createUserProfile,
+  findUserByEmail,
+	// workspaces
+	createWorkspace,
+	getWorkspaceById,
+	inviteMember,
+	listWorkspaceMembers,
+	updateMemberRole,
+	removeMember,
+  listWorkspacesForUser,
+	// agents
+	createAgent,
+	getAgentById,
+	listAgentsForWorkspace,
+	// comments/dms
+	saveComment,
+	createDirectMessage,
+  listDirectMessages,
+	// payments
+	createPayment,
+	getPaymentsForWorkspace,
+	approveMobileMoneyPayment,
+	rejectMobileMoneyPayment,
+  getPaymentById,
+	// automation
+	createAutomationRule,
+	updateAutomationRule,
+	deleteAutomationRule,
+	listAutomationRules,
+	getAutomationRules,
+	hasAlreadyReplied,
+	logAutomationAction,
+	logMessage,
+	insertSystemLog,
+	markCommentProcessed,
+	// subscriptions
+	createSubscription,
+	getSubscriptionByWorkspace,
+	updateSubscriptionStatus,
+	// audit
+	createAuditLog,
+  listAuditLogs,
+  // invoices
+  createInvoice,
+  getInvoiceById,
+}

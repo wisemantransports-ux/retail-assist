@@ -1,4 +1,5 @@
 import { createServerClient } from '@/lib/supabase/server'
+import { resolveUserId } from '@/lib/supabase/queries'
 import { env } from '@/lib/env'
 
 // NOTE: Mock mode is enabled by default while we are preparing to go-live.
@@ -195,7 +196,11 @@ export const db = {
         const s = supabase()
         const { data, error } = await s.from('users').select('*').eq('id', id).maybeSingle()
         if (error) throw error
-        return data ? migrateUser(data) : null
+        if (data) return migrateUser(data)
+        // Fallback: try to find by auth_uid (read-only, do not create)
+        const { data: byAuth, error: authErr } = await s.from('users').select('*').eq('auth_uid', id).maybeSingle()
+        if (authErr) throw authErr
+        return byAuth ? migrateUser(byAuth) : null
       }
 
       const fs = await import('fs')
@@ -266,7 +271,7 @@ export const db = {
       const limits = PLAN_LIMITS[user.plan_type]
       if (limits.maxPages === -1) return { allowed: true }
       const s = supabase()
-      const { data: tokens } = await s.from('tokens').select('*').eq('user_id', userId)
+      const { data: tokens } = await s.from('tokens').select('*').eq('user_id', user.id)
       const pageCount = (tokens || []).length
       if (pageCount >= limits.maxPages) return { allowed: false, reason: `Your ${limits.name} plan allows only ${limits.maxPages} page(s). Upgrade to add more.` }
       return { allowed: true }
@@ -282,9 +287,11 @@ export const db = {
   tokens: {
     async create(data: { user_id: string; platform: 'facebook' | 'instagram'; page_id: string; page_name: string; access_token: string }) {
       const s = supabase()
+      // Resolve provided user_id (may be auth UID) for safety; do not auto-create here
+      const effectiveUserId = data.user_id ? (await resolveUserId(data.user_id, false)) || data.user_id : null
       const id = generateId()
       const now = new Date().toISOString()
-      const token = { id, ...data, created_at: now, updated_at: now }
+      const token = { id, ...data, user_id: effectiveUserId, created_at: now, updated_at: now }
       const { error } = await s.from('tokens').insert(token)
       if (error) throw error
       return token
@@ -292,7 +299,8 @@ export const db = {
 
     async findByUserId(userId: string) {
       const s = supabase()
-      const { data, error } = await s.from('tokens').select('*').eq('user_id', userId)
+      const effectiveUserId = (await resolveUserId(userId, false)) || userId
+      const { data, error } = await s.from('tokens').select('*').eq('user_id', effectiveUserId)
       if (error) throw error
       return data || []
     },
@@ -320,7 +328,8 @@ export const db = {
 
     async countByUserId(userId: string) {
       const s = supabase()
-      const { data, error } = await s.from('tokens').select('*').eq('user_id', userId)
+      const effectiveUserId = (await resolveUserId(userId, false)) || userId
+      const { data, error } = await s.from('tokens').select('*').eq('user_id', effectiveUserId)
       if (error) throw error
       return (data || []).length
     }
@@ -329,13 +338,15 @@ export const db = {
   settings: {
     async findByUserId(userId: string) {
       const s = supabase()
-      const { data } = await s.from('business_settings').select('*').eq('user_id', userId).maybeSingle()
+      const effectiveUserId = (await resolveUserId(userId, false)) || userId
+      const { data } = await s.from('business_settings').select('*').eq('user_id', effectiveUserId).maybeSingle()
       return data || null
     },
 
     async update(userId: string, data: any) {
       const s = supabase()
-      const { data: existing } = await s.from('business_settings').select('*').eq('user_id', userId).maybeSingle()
+      const effectiveUserId = (await resolveUserId(userId, false)) || userId
+      const { data: existing } = await s.from('business_settings').select('*').eq('user_id', effectiveUserId).maybeSingle()
       if (!existing) return null
       const { error } = await s.from('business_settings').update({ ...data, updated_at: new Date().toISOString() }).eq('id', existing.id)
       if (error) throw error

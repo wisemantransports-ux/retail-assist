@@ -7,6 +7,7 @@
  */
 
 import { createServerClient } from './server';
+import { resolveUserId } from './queries';
 
 export interface EnsureWorkspaceResult {
   workspaceId: string;
@@ -33,48 +34,17 @@ export async function ensureWorkspaceForUser(userId: string): Promise<EnsureWork
 
     const supabase = await createServerClient();
 
-    // Check if user exists in users table
-    const { data: userRecord, error: userError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('id', userId)
-      .maybeSingle();
-
-    if (userError && userError.code !== 'PGRST116') {
-      // PGRST116 = no rows found (which is ok, we'll create)
-      return {
-        workspaceId: '',
-        created: false,
-        error: `Failed to check user: ${userError.message}`,
-      };
-    }
-
-    // Create user record if doesn't exist
-    if (!userRecord) {
-      const { error: createUserError } = await supabase
-        .from('users')
-        .insert([
-          {
-            id: userId,
-            auth_uid: userId,
-            email: '',
-          },
-        ]);
-
-      if (createUserError) {
-        return {
-          workspaceId: '',
-          created: false,
-          error: `Failed to create user: ${createUserError.message}`,
-        };
-      }
+    // Ensure there is an internal users.id for this auth UID (create if missing)
+    const internalUserId = await resolveUserId(userId, true)
+    if (!internalUserId) {
+      return { workspaceId: '', created: false, error: 'Failed to ensure internal user record' }
     }
 
     // Check if user has any workspace membership
     const { data: existingMemberships } = await supabase
       .from('workspace_members')
       .select('workspace_id')
-      .eq('user_id', userId)
+      .eq('user_id', internalUserId)
       .limit(1);
 
     if (existingMemberships && existingMemberships.length > 0) {
@@ -90,7 +60,7 @@ export async function ensureWorkspaceForUser(userId: string): Promise<EnsureWork
       .from('workspaces')
       .insert([
         {
-          owner_id: userId,
+          owner_id: internalUserId,
           name: `My Workspace`,
           plan_type: 'starter',
           subscription_status: 'pending',
@@ -114,7 +84,7 @@ export async function ensureWorkspaceForUser(userId: string): Promise<EnsureWork
       .insert([
         {
           workspace_id: newWorkspace.id,
-          user_id: userId,
+          user_id: internalUserId,
           role: 'admin',
         },
       ])

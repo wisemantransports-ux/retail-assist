@@ -1,10 +1,13 @@
 /**
  * Example: Facebook Webhook Handler using Automation Rules Executor
- * 
- * This shows how to integrate executeAutomationRulesForComment into
- * a webhook handler that receives comments from Facebook/Instagram.
- * 
- * This is a reference implementation. Adapt as needed for your webhook.
+ *
+ * Reference implementation for handling Facebook / Instagram comment events
+ * and passing them into the automation executor.
+ *
+ * This webhook is intentionally lightweight:
+ * - It validates the request
+ * - Normalizes incoming data
+ * - Delegates all business logic to the executor
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -12,35 +15,35 @@ import { executeAutomationRulesForComment } from '@/lib/automation/executeAutoma
 
 /**
  * Verify webhook authenticity
- * (Would validate Facebook signature in production)
+ * (Facebook signature verification should be implemented in production)
  */
-function verifyWebhookSignature(req: NextRequest): boolean {
-  // TODO: Validate X-Hub-Signature header
+function verifyWebhookSignature(_req: NextRequest): boolean {
+  // TODO: Validate X-Hub-Signature-256 header
   return true;
 }
 
 /**
- * Extract comment data from Facebook webhook payload
+ * Extract normalized comment data from feed webhook payload
  */
 function extractCommentData(event: any) {
   return {
-    commentId: event.comment.id,
-    postId: event.comment.post_id,
-    pageId: event.comment.page_id,
-    content: event.comment.message,
-    authorId: event.comment.from?.id,
-    authorName: event.comment.from?.name,
-    createdTime: event.comment.created_time,
-    permalink: event.comment.permalink_url,
+    commentId: event.comment_id,
+    postId: event.post_id,
+    pageId: event.page_id,
+    content: event.message,
+    authorId: event.from?.id,
+    authorName: event.from?.name,
+    createdTime: event.created_time,
+    permalink: event.permalink_url,
   };
 }
 
 /**
- * GET: Webhook verification
- * Facebook sends this to verify the webhook URL
+ * GET — Webhook verification endpoint
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
+
   const mode = searchParams.get('hub.mode');
   const token = searchParams.get('hub.verify_token');
   const challenge = searchParams.get('hub.challenge');
@@ -48,7 +51,7 @@ export async function GET(request: NextRequest) {
   const verifyToken = process.env.FACEBOOK_WEBHOOK_VERIFY_TOKEN;
 
   if (mode === 'subscribe' && token === verifyToken) {
-    console.log('[Facebook Webhook] Subscription verified');
+    console.log('[Facebook Webhook] Verification successful');
     return new NextResponse(challenge, { status: 200 });
   }
 
@@ -56,12 +59,10 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * POST: Handle incoming webhook events
- * Called when new comments are created on the page
+ * POST — Handle incoming webhook events
  */
 export async function POST(request: NextRequest) {
   try {
-    // Verify webhook signature
     if (!verifyWebhookSignature(request)) {
       console.warn('[Facebook Webhook] Invalid signature');
       return new NextResponse('Unauthorized', { status: 401 });
@@ -69,139 +70,98 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
-    // Handle batch of events
-    if (body.entry && Array.isArray(body.entry)) {
+    if (Array.isArray(body.entry)) {
       for (const entry of body.entry) {
         const pageId = entry.id;
-        const timestamp = entry.time;
 
-        // Handle each messaging event
-        if (entry.messaging && Array.isArray(entry.messaging)) {
-          for (const event of entry.messaging) {
-            if (event.message) {
-              await handleCommentEvent(pageId, event);
+        // Feed comments (page posts)
+        if (Array.isArray(entry.changes)) {
+          for (const change of entry.changes) {
+            if (change.field === 'feed' && change.value?.comment_id) {
+              await handleFeedCommentEvent(pageId, change.value);
             }
           }
         }
 
-        // Handle each comment event
-        if (entry.changes && Array.isArray(entry.changes)) {
-          for (const change of entry.changes) {
-            if (change.field === 'feed' && change.value.comment_id) {
-              await handleFeedCommentEvent(pageId, change.value);
-            }
+        // Messaging comments (Messenger / IG comments)
+        if (Array.isArray(entry.messaging)) {
+          for (const event of entry.messaging) {
+            await handleMessagingCommentEvent(pageId, event);
           }
         }
       }
     }
 
-    // Always return 200 to acknowledge receipt
-    return new NextResponse(JSON.stringify({ received: true }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return NextResponse.json({ received: true }, { status: 200 });
   } catch (error: any) {
-    console.error('[Facebook Webhook] Error processing event:', error);
-    return new NextResponse(
-      JSON.stringify({ error: error.message }),
+    console.error('[Facebook Webhook] Fatal error:', error);
+    return NextResponse.json(
+      { error: error.message },
       { status: 500 }
     );
   }
 }
 
 /**
- * Handle a single comment event from webhook
- * 
- * Note: This is a simplified example. In production, you would:
- * - Look up which workspace this page belongs to
- * - Find the agent configured for this page
- * - Fetch full comment data from Facebook API if needed
+ * Handle Messenger-style comment events
  */
-async function handleCommentEvent(pageId: string, event: any) {
+async function handleMessagingCommentEvent(pageId: string, event: any) {
   try {
-    console.log(`[Facebook Webhook] Processing comment event on page ${pageId}`);
+    if (!event.message?.text) return;
 
-    // Extract comment data from event
-    const comment = event.message || event.postback;
-    if (!comment) return;
+    console.log(`[Facebook Webhook] Messaging comment received on page ${pageId}`);
 
-    // TODO: Query database to find workspace and agent for this pageId
-    const workspaceId = 'ws_' + pageId; // Simplified - should be DB lookup
-    const agentId = 'agent_001'; // Simplified - should be DB lookup
+    // TODO: Replace with real DB lookup
+    const workspaceId = `ws_${pageId}`;
+    const agentId = 'agent_001';
 
-    // Check if workspace and agent exist
-    if (!workspaceId || !agentId) {
-      console.log(`[Facebook Webhook] No workspace/agent configured for page ${pageId}`);
-      return;
-    }
-
-    // Build input for executor
     const automationInput = {
       workspaceId,
       agentId,
-      commentId: comment.mid || comment.timestamp?.toString(),
-      commentText: comment.text || '',
+      commentId: event.message.mid ?? String(Date.now()),
+      commentText: event.message.text,
       authorId: event.sender?.id,
-      authorName: event.sender?.name,
+      authorName: undefined,
       platform: 'facebook' as const,
     };
 
-    // Execute automation rules
-    console.log(`[Facebook Webhook] Executing automation rules for ${agentId}`);
     const result = await executeAutomationRulesForComment(automationInput);
 
     if (result.ok) {
-      if (result.actionExecuted) {
-        console.log(`[Facebook Webhook] ✓ Automation executed (DM sent: ${result.dmSent})`);
-      } else if (result.ruleMatched) {
-        console.log(`[Facebook Webhook] ✓ Rule matched but action not executed`);
-      } else {
-        console.log(`[Facebook Webhook] ✓ No matching rules`);
-      }
-    } else {
-      console.error(`[Facebook Webhook] ✗ Execution failed: ${result.error}`);
+      console.log('[Facebook Webhook] Automation processed successfully');
     }
   } catch (error: any) {
-    console.error('[Facebook Webhook] Error handling comment event:', error.message);
+    console.error('[Facebook Webhook] Error handling messaging comment:', error.message);
   }
 }
 
 /**
- * Handle a feed comment event from webhook
- * This is for comments on posts (page feed)
+ * Handle feed (page post) comment events
  */
 async function handleFeedCommentEvent(pageId: string, eventData: any) {
   try {
-    console.log(`[Facebook Webhook] Processing feed comment on page ${pageId}`);
+    console.log(`[Facebook Webhook] Feed comment received on page ${pageId}`);
 
-    const commentData = extractCommentData({ comment: eventData });
+    const comment = extractCommentData(eventData);
 
-    // TODO: Query database to find workspace and agent for this pageId
-    const workspaceId = 'ws_' + pageId;
+    // TODO: Replace with real DB lookup
+    const workspaceId = `ws_${pageId}`;
     const agentId = 'agent_001';
-
-    if (!workspaceId || !agentId) {
-      console.log(`[Facebook Webhook] No workspace/agent configured for page ${pageId}`);
-      return;
-    }
 
     const automationInput = {
       workspaceId,
       agentId,
-      commentId: commentData.commentId,
-      commentText: commentData.content,
-      authorId: commentData.authorId,
-      authorName: commentData.authorName,
+      commentId: comment.commentId,
+      commentText: comment.content,
+      authorId: comment.authorId,
+      authorName: comment.authorName,
       platform: 'facebook' as const,
     };
 
-    console.log(`[Facebook Webhook] Executing automation rules for comment ${commentData.commentId}`);
     const result = await executeAutomationRulesForComment(automationInput);
 
-    if (result.ok && result.actionExecuted) {
-      console.log(`[Facebook Webhook] ✓ DM sent for comment ${commentData.commentId}`);
-    } else if (!result.ruleMatched) {
-      console.log(`[Facebook Webhook] No matching automation rules for comment ${commentData.commentId}`);
+    if (result.ok) {
+      console.log('[Facebook Webhook] Automation processed successfully');
     }
   } catch (error: any) {
     console.error('[Facebook Webhook] Error handling feed comment:', error.message);
@@ -209,25 +169,12 @@ async function handleFeedCommentEvent(pageId: string, eventData: any) {
 }
 
 /**
- * INTEGRATION CHECKLIST
- * 
- * To use this webhook handler:
- * 
- * 1. Deploy this file to /app/api/webhooks/facebook/route.ts
- * 
- * 2. Configure Facebook App:
- *    - Set Webhook URL to: https://yourdomain.com/api/webhooks/facebook
- *    - Set Verify Token to: FACEBOOK_WEBHOOK_VERIFY_TOKEN
- *    - Subscribe to: messages, feed (for comments)
- * 
- * 3. Set environment variables:
- *    FACEBOOK_WEBHOOK_VERIFY_TOKEN=your_random_token_here
- *    FACEBOOK_PAGE_ACCESS_TOKEN=your_page_token (for API calls)
- * 
- * 4. Implement DB lookup for workspace/agent by pageId
- *    (Currently hardcoded - needs real implementation)
- * 
- * 5. Add proper error handling and retries
- * 
- * 6. Test with webhook simulator or real comment
+ * NOTES
+ *
+ * - This webhook intentionally does NOT inspect rule execution details.
+ * - The automation executor is the source of truth.
+ * - Usage limits, safety checks, audit logging, and permissions
+ *   are enforced inside the executor.
+ *
+ * This design matches production webhook standards (Stripe, Meta, Shopify).
  */

@@ -4,6 +4,7 @@ import { sessionManager } from '@/lib/session'
 import { db } from '@/lib/db'
 import { env } from '@/lib/env'
 import { ensureWorkspaceForUser } from '@/lib/supabase/ensureWorkspaceForUser'
+import { resolveUserId } from '@/lib/supabase/queries'
 import { cookies } from 'next/headers'
 
 // Use mock mode to avoid calling Supabase in CI or while testing.
@@ -64,10 +65,11 @@ export async function POST(request: Request) {
       // Don't fail login if workspace provisioning fails - user can create/join later
     }
 
-    // create our session record (keeps behavior consistent with local dev)
-    const session = await sessionManager.create(data.user.id)
+    // create our session record using internal users.id (ensure exists)
+    const internalUserId = await resolveUserId(data.user.id, true)
+    const session = await sessionManager.create(internalUserId || data.user.id)
     const maxAge = Math.max(0, Math.floor((new Date(session.expires_at).getTime() - Date.now()) / 1000))
-    const res = NextResponse.json({ success: true, user: { id: data.user.id, email: data.user.email, role: (data.user as any).role || 'user' }, workspaceId: workspaceResult.workspaceId })
+    const res = NextResponse.json({ success: true, user: { id: internalUserId || data.user.id, email: data.user.email, role: (data.user as any).role || 'user' }, workspaceId: workspaceResult.workspaceId })
     const cookieStore = await cookies()
     cookieStore.set('session_id', session.id, { path: '/', httpOnly: true, secure: env.isProduction, sameSite: 'lax', maxAge })
     return res

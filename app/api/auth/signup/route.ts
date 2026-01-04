@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { sessionManager } from '@/lib/session';
 import { ensureWorkspaceForUser } from '@/lib/supabase/ensureWorkspaceForUser';
+import { resolveUserId } from '@/lib/supabase/queries';
 import { env } from '@/lib/env';
 import { createServerClient, createAdminSupabaseClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
@@ -54,8 +55,9 @@ export async function POST(request: Request) {
 
       const admin = await createAdminSupabaseClient()
       const now = new Date().toISOString()
+      // Ensure internal users row exists (create if missing)
+      const internalUserId = await resolveUserId(data.user.id, true)
       const profile = {
-        id: data.user.id,
         email,
         business_name,
         phone,
@@ -63,15 +65,21 @@ export async function POST(request: Request) {
         payment_status: 'unpaid',
         subscription_status: 'pending',
         role: 'user',
+        updated_at: now,
         created_at: now,
-        updated_at: now
       }
-      const { error: insertErr } = await admin.from('users').insert(profile)
-      if (insertErr) {
-        console.error('[SIGNUP] Failed to create profile row:', insertErr.message)
-        // Not fatal for signup; continue
+      if (internalUserId) {
+        const { error: upsertErr } = await admin.from('users').update(profile).eq('id', internalUserId)
+        if (upsertErr) {
+          console.error('[SIGNUP] Failed to update profile row:', upsertErr.message)
+        }
+        user = { id: internalUserId, email, business_name, phone, plan_type: selectedPlan }
+      } else {
+        // Fallback: insert a new profile with auth_uid set
+        const { data: inserted, error: insertErr } = await admin.from('users').insert([{ auth_uid: data.user.id, ...profile }]).select().limit(1).maybeSingle()
+        if (insertErr) console.error('[SIGNUP] Failed to create profile row:', insertErr.message)
+        user = { id: (inserted as any)?.id || data.user.id, email, business_name, phone, plan_type: selectedPlan }
       }
-      user = { id: data.user.id, email, business_name, phone, plan_type: selectedPlan }
     }
     
     if (!user) {
@@ -106,7 +114,7 @@ export async function POST(request: Request) {
       console.warn('[SIGNUP] Failed to record info log (non-fatal):', e?.message || e);
     }
 
-    // Attempt to ensure workspace exists (pass user id explicitly)
+    // Attempt to ensure workspace exists (pass internal user id explicitly)
     try {
       await ensureWorkspaceForUser(user.id);
     } catch (wsErr) {

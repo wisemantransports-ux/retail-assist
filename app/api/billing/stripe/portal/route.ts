@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
 import { createBillingPortalSession } from '@/lib/stripe/billing';
-import { insertSystemLog } from '@/lib/supabase/queries';
+import { insertSystemLog, resolveUserId } from '@/lib/supabase/queries';
 
 export async function POST(req: Request) {
   try {
@@ -15,6 +15,7 @@ export async function POST(req: Request) {
     const supabase = await createServerClient();
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user?.id;
+    const effectiveUserId = (await resolveUserId(userId, false)) || userId
 
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -25,7 +26,7 @@ export async function POST(req: Request) {
       .from('workspace_members')
       .select('*')
       .eq('workspace_id', workspaceId)
-      .eq('user_id', userId)
+      .eq('user_id', effectiveUserId)
       .maybeSingle();
 
     if (!member) {
@@ -51,11 +52,11 @@ export async function POST(req: Request) {
     });
 
     if (!portalRes.success) {
-      await insertSystemLog('error', workspaceId, userId, 'stripe_portal', 'Failed to create portal session', { error: portalRes.error });
+      await insertSystemLog('error', workspaceId, effectiveUserId || null, 'stripe_portal', 'Failed to create portal session', { error: portalRes.error });
       return NextResponse.json({ error: 'Failed to create portal session' }, { status: 500 });
     }
 
-    await insertSystemLog('info', workspaceId, userId, 'stripe_portal', 'Portal session created');
+    await insertSystemLog('info', workspaceId, effectiveUserId || null, 'stripe_portal', 'Portal session created');
 
     return NextResponse.json({ success: true, url: portalRes.url });
   } catch (e) {
