@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { env } from '@/lib/env';
 import { db } from '@/lib/db';
 import { verifyWebhookSignature, fbSendDM } from '@/lib/facebook';
+import { upsertConversation, insertMessage } from '@/lib/inbox/queries';
+import { listAgentsForWorkspace, listWorkspacesForUser } from '@/lib/supabase/queries';
 
 const WEBHOOK_LOG_PREFIX = '[Instagram Webhook]';
 
@@ -145,6 +147,36 @@ async function processInstagramEntry(entry: any) {
 async function handleInstagramMessage(user: any, settings: any, token: any, msg: any) {
   try {
     console.log(`${WEBHOOK_LOG_PREFIX} Processing IG message from:`, msg.sender.id);
+    // Persist incoming message (best-effort)
+    try {
+      const workspacesRes = await listWorkspacesForUser(user.id)
+      const workspace = workspacesRes?.data?.[0]
+      if (workspace) {
+        const agentsRes = await listAgentsForWorkspace(workspace.id)
+        const defaultAgent = agentsRes?.data?.[0]
+        const conv = await upsertConversation(null, {
+          workspaceId: workspace.id,
+          agentId: defaultAgent?.id || null,
+          platform: 'instagram',
+          externalThreadId: msg.threadId || msg.id,
+          customerId: msg.sender.id,
+          customerName: msg.sender.name || null,
+          text: msg.message.text || null,
+        })
+
+        await insertMessage(null, {
+          workspaceId: workspace.id,
+          conversation: { id: conv.id, type: conv.type as 'dm' | 'comment' },
+          sender: 'customer',
+          content: msg.message.text || '',
+          externalMessageId: msg.id,
+          platform: 'instagram',
+        })
+      }
+    } catch (persistErr: any) {
+      console.warn(`${WEBHOOK_LOG_PREFIX} Failed to persist IG incoming message:`, persistErr?.message || persistErr)
+      await db.logs.add({ user_id: user.id, level: 'warn', message: 'Failed to persist IG incoming message', meta: { err: (persistErr||{}).message || persistErr } })
+    }
 
     const replyText = settings.greeting_message || 'Thanks for your message!';
 
@@ -167,6 +199,36 @@ async function handleInstagramMessage(user: any, settings: any, token: any, msg:
 async function handleInstagramComment(user: any, settings: any, token: any, comment: any) {
   try {
     console.log(`${WEBHOOK_LOG_PREFIX} Processing IG comment:`, comment.id);
+    // Persist incoming comment (best-effort)
+    try {
+      const workspacesRes = await listWorkspacesForUser(user.id)
+      const workspace = workspacesRes?.data?.[0]
+      if (workspace) {
+        const agentsRes = await listAgentsForWorkspace(workspace.id)
+        const defaultAgent = agentsRes?.data?.[0]
+        const conv = await upsertConversation(null, {
+          workspaceId: workspace.id,
+          agentId: defaultAgent?.id || null,
+          platform: 'instagram',
+          externalThreadId: comment.id,
+          customerId: comment.from?.id,
+          customerName: comment.from?.name || null,
+          text: comment.text || null,
+        })
+
+        await insertMessage(null, {
+          workspaceId: workspace.id,
+          conversation: { id: conv.id, type: conv.type as 'dm' | 'comment' },
+          sender: 'customer',
+          content: comment.text || '',
+          externalMessageId: comment.id,
+          platform: 'instagram',
+        })
+      }
+    } catch (persistErr: any) {
+      console.warn(`${WEBHOOK_LOG_PREFIX} Failed to persist IG comment:`, persistErr?.message || persistErr)
+      await db.logs.add({ user_id: user.id, level: 'warn', message: 'Failed to persist IG comment', meta: { err: (persistErr||{}).message || persistErr } })
+    }
 
     if (settings.comment_to_dm_enabled && comment.from?.id) {
       const dmText = `Hi! Thanks for commenting on our post. ${settings.greeting_message}`;

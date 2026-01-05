@@ -5,6 +5,7 @@
 
 import { createServerClient } from '../supabase/server';
 import { createDirectMessage } from '../supabase/queries';
+import { upsertConversation, insertMessage } from '@/lib/inbox/queries';
 import { generateAgentResponse } from '../openai/server';
 import { env } from '../env';
 import { sendCommentReply } from '../automation';
@@ -171,13 +172,25 @@ async function executeSendDmAction(
     );
   }
 
-  await createDirectMessage(workspaceId, {
-    agent_id: agent.id,
-    recipient_id: authorId || authorName,
-    recipient_name: authorName || authorId,
+  // Persist bot reply to inbox before sending. Use the inbox helpers so we
+  // consistently map to existing tables. This will throw on failure.
+  const conv = await upsertConversation(supabase, {
+    workspaceId,
+    agentId: agent.id,
+    platform: 'facebook',
+    externalThreadId: undefined,
+    customerId: authorId || authorName,
+    customerName: authorName || authorId,
+    text: null,
+  });
+
+  await insertMessage(supabase, {
+    workspaceId,
+    conversation: { id: conv.id, type: conv.type as 'dm' | 'comment' },
+    sender: 'bot',
     content: message,
-    platform: 'facebook_messenger',
-    status: 'sent',
+    externalMessageId: null,
+    platform: 'facebook',
   });
 }
 
@@ -220,6 +233,16 @@ async function executeSendPublicReplyAction(
 
   // Only send public replies to supported platforms (Meta platforms)
   if (platform === 'facebook' || platform === 'instagram') {
+    // Persist the bot public reply in our inbox before sending the platform reply.
+    await insertMessage(supabase, {
+      workspaceId,
+      conversation: { id: commentId, type: 'comment' },
+      sender: 'bot',
+      content: replyText,
+      externalMessageId: null,
+      platform,
+    });
+
     await sendCommentReply(
       platform,
       postId,
