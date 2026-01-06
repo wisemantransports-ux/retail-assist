@@ -135,13 +135,9 @@ export default function AdminDashboard() {
             <p className="text-gray-400 text-sm">Total Users</p>
             <p className="text-2xl font-bold text-white">{stats.total}</p>
           </div>
-          <div className="bg-yellow-900/30 border border-yellow-600 rounded-lg p-4">
-            <p className="text-yellow-400 text-sm">Pending Payment</p>
-            <p className="text-2xl font-bold text-yellow-400">{stats.pending}</p>
-          </div>
-          <div className="bg-orange-900/30 border border-orange-600 rounded-lg p-4">
-            <p className="text-orange-400 text-sm">Awaiting Approval</p>
-            <p className="text-2xl font-bold text-orange-400">{stats.awaiting_approval}</p>
+          <div className="bg-blue-900/30 border border-blue-600 rounded-lg p-4">
+            <p className="text-blue-400 text-sm">Trial Users</p>
+            <p className="text-2xl font-bold text-blue-400">{stats.pending + stats.awaiting_approval}</p>
           </div>
           <div className="bg-green-900/30 border border-green-600 rounded-lg p-4">
             <p className="text-green-400 text-sm">Active Subscriptions</p>
@@ -151,9 +147,13 @@ export default function AdminDashboard() {
             <p className="text-red-400 text-sm">Suspended</p>
             <p className="text-2xl font-bold text-red-400">{stats.suspended}</p>
           </div>
-          <div className="bg-blue-900/30 border border-blue-600 rounded-lg p-4">
-            <p className="text-blue-400 text-sm">Monthly Revenue</p>
-            <p className="text-2xl font-bold text-blue-400">${totalRevenue}</p>
+          <div className="bg-yellow-900/30 border border-yellow-600 rounded-lg p-4">
+            <p className="text-yellow-400 text-sm">Pending Approvals</p>
+            <p className="text-2xl font-bold text-yellow-400">{stats.awaiting_approval}</p>
+          </div>
+          <div className="bg-purple-900/30 border border-purple-600 rounded-lg p-4">
+            <p className="text-purple-400 text-sm">Monthly Revenue</p>
+            <p className="text-2xl font-bold text-purple-400">${totalRevenue}</p>
           </div>
         </div>
 
@@ -275,6 +275,34 @@ export default function AdminDashboard() {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+
+        <div className="mt-8 bg-gray-800 border border-gray-700 rounded-lg p-6">
+          <h2 className="text-lg font-semibold text-white mb-4">Recent Signups</h2>
+          <div className="space-y-3">
+            {users
+              .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+              .slice(0, 5)
+              .map((user) => (
+                <div key={user.id} className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg">
+                  <div>
+                    <p className="text-white font-medium">{user.business_name}</p>
+                    <p className="text-gray-400 text-sm">{user.email}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-gray-300 text-sm">{new Date(user.created_at).toLocaleDateString()}</p>
+                    <span className={`px-2 py-1 rounded text-xs ${
+                      user.subscription_status === 'active' ? 'bg-green-900/50 text-green-400' :
+                      user.subscription_status === 'pending' ? 'bg-blue-900/50 text-blue-400' :
+                      user.subscription_status === 'awaiting_approval' ? 'bg-yellow-900/50 text-yellow-400' :
+                      'bg-red-900/50 text-red-400'
+                    }`}>
+                      {user.subscription_status === 'awaiting_approval' ? 'Awaiting Approval' : user.subscription_status}
+                    </span>
+                  </div>
+                </div>
+              ))}
           </div>
         </div>
       </main>

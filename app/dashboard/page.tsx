@@ -34,6 +34,12 @@ export default function ClientDashboard() {
   });
   const [loading, setLoading] = useState(true);
   const [setupComplete, setSetupComplete] = useState(false);
+  const [counts, setCounts] = useState({
+    inbox: 0,
+    rules: 0,
+    pages: 0,
+    aiUsage: 0
+  });
 
   useEffect(() => {
     loadDashboardData();
@@ -49,6 +55,7 @@ export default function ClientDashboard() {
         
         const hasInstagram = data.user.plan_limits?.hasInstagram || 
           data.user.plan_type === 'pro' || 
+          data.user.plan_type === 'advanced' ||
           data.user.plan_type === 'enterprise';
         
         setChannels({
@@ -57,6 +64,22 @@ export default function ClientDashboard() {
         });
         
         setSetupComplete(false);
+
+        // Fetch counts
+        const [inboxRes, rulesRes] = await Promise.all([
+          fetch('/api/inbox'),
+          fetch('/api/automation-rules')
+        ]);
+
+        const inboxData = inboxRes.ok ? await inboxRes.json() : { conversations: [] };
+        const rulesData = rulesRes.ok ? await rulesRes.json() : [];
+
+        setCounts({
+          inbox: inboxData.conversations?.length || 0,
+          rules: rulesData.length || 0,
+          pages: 0, // TODO: fetch from integrations
+          aiUsage: 0 // TODO: fetch AI usage
+        });
       }
     } catch (error) {
       console.error('Failed to load dashboard:', error);
@@ -67,9 +90,10 @@ export default function ClientDashboard() {
 
   function getPlanPrice(planType: string): number {
     const prices: Record<string, number> = {
-      starter: 22,
-      pro: 45,
-      enterprise: 75
+      starter: 25,
+      pro: 36,
+      advanced: 72,
+      enterprise: 0 // custom
     };
     return prices[planType] ?? prices.starter;
   }
@@ -114,6 +138,11 @@ export default function ClientDashboard() {
 
   return (
     <div className="space-y-8">
+      <div className="bg-gray-800 border border-gray-700 rounded-xl p-6">
+        <h1 className="text-2xl font-bold text-white mb-2">Welcome, {user.business_name}!</h1>
+        <p className="text-gray-400">Your inbox, automation rules, and integrations are ready.</p>
+      </div>
+
       {!setupComplete && (
         <div className="bg-blue-900/30 border border-blue-600 rounded-xl p-6">
           <div className="flex items-start gap-4">
@@ -136,6 +165,42 @@ export default function ClientDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 text-center">
+              <div className="text-2xl font-bold text-white">{counts.inbox}</div>
+              <div className="text-gray-400 text-sm">Inbox Messages</div>
+            </div>
+            <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 text-center">
+              <div className="text-2xl font-bold text-white">{counts.rules}</div>
+              <div className="text-gray-400 text-sm">Automation Rules</div>
+            </div>
+            <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 text-center relative">
+              {counts.pages > 0 ? (
+                <>
+                  <div className="text-2xl font-bold text-white">{counts.pages}</div>
+                  <div className="text-gray-400 text-sm">Connected Pages</div>
+                </>
+              ) : (
+                <>
+                  <div className="text-gray-500 italic text-sm">Connected Pages — Placeholder: Connect your Facebook/Instagram pages to manage channels.</div>
+                  <div className="absolute top-2 right-2 bg-gray-600 text-gray-300 text-xs px-2 py-1 rounded">Coming Soon</div>
+                </>
+              )}
+            </div>
+            <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 text-center relative">
+              {counts.aiUsage > 0 ? (
+                <>
+                  <div className="text-2xl font-bold text-white">{counts.aiUsage}</div>
+                  <div className="text-gray-400 text-sm">AI Usage</div>
+                </>
+              ) : (
+                <>
+                  <div className="text-gray-500 italic text-sm">AI Usage — Coming Soon: Configure your AI settings to see real usage.</div>
+                  <div className="absolute top-2 right-2 bg-gray-600 text-gray-300 text-xs px-2 py-1 rounded">Coming Soon</div>
+                </>
+              )}
+            </div>
+          </div>
           <div className="bg-gray-800 border border-gray-700 rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-white">Business Overview</h2>
@@ -280,7 +345,7 @@ export default function ClientDashboard() {
                 <span className="text-green-400">✓</span>
                 <span className="text-gray-300">Facebook Messenger</span>
               </div>
-              {user.plan_type !== 'starter' && (
+              {(user.plan_type === 'pro' || user.plan_type === 'advanced' || user.plan_type === 'enterprise') && (
                 <div className="flex items-center gap-2 text-sm">
                   <span className="text-green-400">✓</span>
                   <span className="text-gray-300">Instagram DM</span>
@@ -289,12 +354,18 @@ export default function ClientDashboard() {
               <div className="flex items-center gap-2 text-sm">
                 <span className="text-green-400">✓</span>
                 <span className="text-gray-300">
-                  {user.plan_type === 'enterprise' ? 'Unlimited' : user.plan_type === 'pro' ? '3' : '1'} Page(s)
+                  {user.plan_type === 'enterprise' ? 'Unlimited' : 
+                   user.plan_type === 'advanced' ? 'Unlimited' :
+                   user.plan_type === 'pro' ? '3' : '1'} Workspace(s)
                 </span>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <span className="text-green-400">✓</span>
-                <span className="text-gray-300">AI Responses</span>
+                <span className="text-gray-300">
+                  {user.plan_type === 'enterprise' ? 'Unlimited' : 
+                   user.plan_type === 'advanced' ? 'High' :
+                   user.plan_type === 'pro' ? 'Moderate' : 'Limited'} AI Usage
+                </span>
               </div>
             </div>
             

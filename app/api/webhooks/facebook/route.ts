@@ -178,16 +178,19 @@ async function processEntry(entry: any, fullPayload: any) {
 }
 
 async function handleCommentEvent(user: any, settings: any, token: any, comment: any) {
+  let workspacesRes: any = null;
+  let defaultAgent: any = null;
+
   try {
     console.log(`${WEBHOOK_LOG_PREFIX} Processing comment:`, comment.id);
 
     // Persist incoming comment to inbox (best-effort — do not block automation if persistence fails)
     try {
-      const workspacesRes = await listWorkspacesForUser(user.id)
+      workspacesRes = await listWorkspacesForUser(user.id)
       const workspace = workspacesRes?.data?.[0]
       if (workspace) {
         const agentsRes = await listAgentsForWorkspace(workspace.id)
-        const defaultAgent = agentsRes?.data?.[0]
+        defaultAgent = agentsRes?.data?.[0]
         const conv = await upsertConversation(null, {
           workspaceId: workspace.id,
           agentId: defaultAgent?.id || null,
@@ -217,9 +220,12 @@ async function handleCommentEvent(user: any, settings: any, token: any, comment:
     if (settings.ai_enabled && settings.system_prompt && comment.text) {
       console.log(`${WEBHOOK_LOG_PREFIX} Generating AI response for comment`);
       const aiReply = await generateCommentReply(
+        workspacesRes.data?.[0]?.id || '',
+        defaultAgent?.id,
         comment.text,
         settings.system_prompt,
-        user.business_name
+        user.business_name,
+        token.platform === 'instagram' ? 'instagram' : 'facebook'
       );
       if (aiReply) {
         replyText = aiReply;
@@ -237,9 +243,12 @@ async function handleCommentEvent(user: any, settings: any, token: any, comment:
         
         if (settings.ai_enabled && settings.system_prompt) {
           const aiDm = await generateDMReply(
+            workspacesRes.data?.[0]?.id || '',
+            defaultAgent?.id,
             `Customer commented: "${comment.text}". Send a follow-up DM.`,
             settings.system_prompt,
-            user.business_name
+            user.business_name,
+            token.platform === 'instagram' ? 'instagram' : 'facebook'
           );
           if (aiDm) dmText = aiDm;
         }
@@ -296,16 +305,19 @@ async function handleCommentEvent(user: any, settings: any, token: any, comment:
 }
 
 async function handleMessageEvent(user: any, settings: any, token: any, message: any) {
+  let workspacesRes: any = null;
+  let defaultAgent: any = null;
+
   try {
     console.log(`${WEBHOOK_LOG_PREFIX} Processing message:`, message.id);
 
     // Persist incoming message to inbox (best-effort)
     try {
-      const workspacesRes = await listWorkspacesForUser(user.id)
+      workspacesRes = await listWorkspacesForUser(user.id)
       const workspace = workspacesRes?.data?.[0]
       if (workspace) {
         const agentsRes = await listAgentsForWorkspace(workspace.id)
-        const defaultAgent = agentsRes?.data?.[0]
+        defaultAgent = agentsRes?.data?.[0]
         const conv = await upsertConversation(null, {
           workspaceId: workspace.id,
           agentId: defaultAgent?.id || null,
@@ -335,9 +347,12 @@ async function handleMessageEvent(user: any, settings: any, token: any, message:
     if (settings.ai_enabled && settings.system_prompt && message.text) {
       console.log(`${WEBHOOK_LOG_PREFIX} Generating AI response for message`);
       const aiReply = await generateDMReply(
+        workspacesRes.data?.[0]?.id || '',
+        defaultAgent?.id,
         message.text,
         settings.system_prompt,
-        user.business_name
+        user.business_name,
+        token.platform === 'instagram' ? 'instagram' : 'facebook'
       );
       if (aiReply) {
         replyText = aiReply;

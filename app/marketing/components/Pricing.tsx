@@ -8,72 +8,68 @@ const PLANS: Plan[] = [
   {
     id: "starter",
     name: "Starter",
-    price: "BWP 350",
+    price: "$25 / BWP 350",
     period: "/month",
-    description: "Good for micro businesses and pilot projects",
-    channels: ["Facebook Messenger"],
+    description: "For small businesses getting started",
+    channels: ["1 Social Channel", "Website Chat"],
     features: [
-      "Basic automation triggers & actions",
-      "Comment-to-DM (200/month)",
-      "1 Page / Account",
+      "Unified Inbox",
+      "Automation Rules",
+      "AI Auto-Replies",
     ],
-    aiLimits: "5,000 AI requests / month",
-    support: "Email support",
-    cta: "Get Started",
+    aiLimits: "50,000 AI tokens / month",
+    support: "Community Support",
+    cta: "Start Free",
     popular: false,
   },
   {
     id: "pro",
     name: "Pro",
-    price: "BWP 600",
+    price: "$36 / BWP 600",
     period: "/month",
-    description: "Recommended for growing stores (most popular)",
-    channels: ["Facebook Messenger", "Instagram"],
+    description: "For growing businesses",
+    channels: ["Facebook + Instagram", "Website Chat"],
     features: [
-      "Advanced automation triggers & actions",
-      "Comment-to-DM (1,000/month)",
-      "3 Pages / Accounts",
-      "AI-enhanced responses",
+      "Unified Inbox",
+      "Advanced Automation Rules",
+      "AI Auto-Replies",
     ],
-    aiLimits: "25,000 AI requests / month",
-    support: "Priority support",
-    cta: "Get Started",
-    popular: true, // highlighted as recommended
+    aiLimits: "150,000 AI tokens / month",
+    support: "Priority Support",
+    cta: "Start Free",
+    popular: true,
   },
   {
     id: "advanced",
     name: "Advanced",
-    price: "BWP 900",
+    price: "$72 / BWP 900",
     period: "/month",
-    description: "For high-volume retailers and scaling operations",
-    channels: ["Facebook Messenger", "Instagram"],
+    description: "For high-volume businesses",
+    channels: ["Facebook + Instagram", "Website Chat"],
     features: [
-      "All Pro automations + scheduled workflows",
-      "Comment-to-DM (5,000/month)",
-      "10 Pages / Accounts",
-      "Custom integrations",
+      "Unlimited Workspaces",
+      "Full Automation",
+      "AI Auto-Replies",
     ],
-    aiLimits: "100,000 AI requests / month",
-    support: "Dedicated support",
-    cta: "Get Started",
+    aiLimits: "500,000 AI tokens / month",
+    support: "Priority Support",
+    cta: "Start Free",
     popular: false,
   },
   {
     id: "enterprise",
     name: "Enterprise",
     price: "Custom",
-    description: "Custom enterprise plan with dedicated onboarding",
-    channels: ["Facebook Messenger", "Instagram", "WhatsApp"],
+    description: "Custom limits",
+    channels: ["Facebook + Instagram", "Website Chat"],
     features: [
-      "Unlimited pages/accounts",
-      "Custom automation & SLAs",
-      "Dedicated account manager",
+      "Dedicated support",
+      "Custom integrations",
     ],
     aiLimits: "Custom",
-    support: "Dedicated account manager",
+    support: "Dedicated support",
     cta: "Contact Sales",
     popular: false,
-    note: "WhatsApp automation coming soon",
   },
 ];
 
@@ -96,10 +92,17 @@ export default function Pricing() {
           ))}
         </div>
 
+        {/* WhatsApp Coming Soon Note */}
+        <div className="mt-10 text-center">
+          <h3 className="text-lg font-semibold mb-2">WhatsApp Automation — Coming Soon</h3>
+          <p className="text-sm text-muted max-w-2xl mx-auto">
+            We’re working on WhatsApp automation for businesses that engage customers on WhatsApp. Stay tuned.
+          </p>
+        </div>
+
         <div className="mt-10 text-center">
           <p className="text-sm text-muted max-w-3xl mx-auto">
-            All plans include Facebook and Instagram automation where available. Need a
-            custom quote or pilot? <a className="text-primary font-semibold" href="mailto:samuelhelp80@gmail.com">Contact Sales</a> or <a className="text-primary font-semibold" href="https://wa.me/26775902379" target="_blank" rel="noopener noreferrer">WhatsApp +267 759 02379</a>.
+            All plans include website chat and a unified inbox. Start free, explore your dashboard, and upgrade only when you’re ready.
           </p>
         </div>
       </div>

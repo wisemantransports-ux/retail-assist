@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerClient, createAdminSupabaseClient } from '@/lib/supabase/server';
 import { getAgentById, saveComment, createDirectMessage, markCommentProcessed } from '@/lib/supabase/queries';
+import { upsertConversation, insertMessage } from '@/lib/inbox/queries';
 import { generateAgentResponse, estimateTokens } from '@/lib/openai/server';
 import { generateMockResponse } from '@/lib/openai/mock';
 import { env } from '@/lib/env';
@@ -52,6 +53,35 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
       console.warn('Failed to save comment to database');
     }
 
+    // Persist inbound message to inbox helpers (best-effort, do not block)
+    let conv: any = null;
+    try {
+      conv = await upsertConversation(null, {
+        workspaceId: agent.workspace_id,
+        agentId: agentId,
+        platform: 'website',
+        externalThreadId: comment?.platform_comment_id || null,
+        customerId: author_email || null,
+        customerName: author_email ? author_email.split('@')[0] : null,
+        text: content,
+      });
+
+      try {
+        await insertMessage(null, {
+          workspaceId: agent.workspace_id,
+          conversation: { id: conv.id, type: conv.type as 'dm' | 'comment' },
+          sender: 'customer',
+          content,
+          externalMessageId: comment?.platform_comment_id || null,
+          platform: 'website',
+        });
+      } catch (mErr: any) {
+        console.warn('Failed to insert inbound message into inbox helpers:', mErr?.message || mErr);
+      }
+    } catch (persistErr: any) {
+      console.warn('Failed to persist inbound website conversation (non-blocking):', persistErr?.message || persistErr);
+    }
+
     // Generate bot reply
     let reply: string;
     try {
@@ -70,6 +100,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
     } catch (openaiErr: any) {
       console.error('OpenAI error:', openaiErr);
       reply = agent.fallback || 'Thank you for your comment. We\'ll get back to you soon!';
+    }
+
+    // Persist bot reply to inbox before creating any DM/send actions
+    const conversationId = conv?.id || comment?.id;
+    try {
+      if (conversationId) {
+        await insertMessage(null, {
+          workspaceId: agent.workspace_id,
+          conversation: { id: conversationId, type: 'comment' },
+          sender: 'bot',
+          content: reply,
+          externalMessageId: null,
+          platform: 'website',
+        });
+      }
+    } catch (persistBotErr: any) {
+      console.warn('Failed to persist bot reply to inbox (non-blocking):', persistBotErr?.message || persistBotErr);
     }
 
     // Send DM to commenter (if email provided)

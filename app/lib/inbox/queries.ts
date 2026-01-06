@@ -7,7 +7,7 @@ import { saveComment, createDirectMessage, markCommentProcessed } from '@/lib/su
 export async function upsertConversation(supabase: any, opts: {
   workspaceId: string
   agentId?: string | null
-  platform: 'facebook' | 'instagram' | 'website'
+  platform: 'facebook' | 'instagram' | 'whatsapp' | 'website'
   externalThreadId?: string | null
   customerId?: string | null
   customerName?: string | null
@@ -31,13 +31,13 @@ export async function upsertConversation(supabase: any, opts: {
     return { id: saved.id, type: 'comment', data: saved }
   }
 
-  // Meta platforms (facebook / instagram) - model as direct messages for inbox
+  // Meta platforms (facebook / instagram / whatsapp) - model as direct messages for inbox
   const payload: any = {
     agent_id: agentId || null,
     recipient_id: customerId || customerName || null,
     recipient_name: customerName || customerId || null,
     content: text || null,
-    platform: platform === 'facebook' ? 'facebook_messenger' : 'instagram',
+    platform: platform === 'facebook' ? 'facebook_messenger' : platform === 'instagram' ? 'instagram' : platform === 'whatsapp' ? 'whatsapp' : 'unknown',
     external_thread_id: externalThreadId || null,
     status: 'received',
   }
@@ -53,7 +53,7 @@ export async function insertMessage(supabase: any, opts: {
   sender: 'customer' | 'agent' | 'bot'
   content: string
   externalMessageId?: string | null
-  platform?: 'facebook' | 'instagram' | 'website'
+  platform?: 'facebook' | 'instagram' | 'whatsapp' | 'website'
 }) {
   const { workspaceId, conversation, sender, content, externalMessageId, platform } = opts
 
@@ -76,7 +76,7 @@ export async function insertMessage(supabase: any, opts: {
     recipient_id: null,
     recipient_name: null,
     content,
-    platform: platform === 'facebook' ? 'facebook_messenger' : platform === 'instagram' ? 'instagram' : 'unknown',
+    platform: platform === 'facebook' ? 'facebook_messenger' : platform === 'instagram' ? 'instagram' : platform === 'whatsapp' ? 'whatsapp' : 'unknown',
     external_message_id: externalMessageId || null,
     status: sender === 'bot' || sender === 'agent' ? 'sent' : 'received',
   }

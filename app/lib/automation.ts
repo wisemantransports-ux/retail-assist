@@ -6,6 +6,8 @@
 import { generateAgentResponse } from './openai/server';
 import { generateMockResponse } from './openai/mock';
 import { env } from './env';
+import { fbReplyToComment } from './facebook';
+import { igReplyToComment } from './instagram';
 import type { Agent, AutomationRule } from './types/database';
 
 /**
@@ -58,8 +60,7 @@ export async function buildAIResponse(
 }
 
 /**
- * Send a public reply to a comment (placeholder for Meta API integration)
- * In production, this will call the Facebook Graph API
+ * Send a public reply to a comment via Meta Graph API
  *
  * @param platform - 'facebook' | 'instagram'
  * @param postId - ID of the post being commented on
@@ -75,27 +76,16 @@ export async function sendCommentReply(
   accessToken?: string
 ): Promise<{ success: boolean; replyId?: string; error?: string }> {
   try {
-    console.log(`[Automation] Placeholder: Would send ${platform} comment reply to ${commentId}`);
-    console.log(`[Automation] Reply text: "${text}"`);
-
-    // In production, this would be:
-    // const response = await fetch(`https://graph.instagram.com/v18.0/${commentId}/replies`, {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({
-    //     message: text,
-    //     access_token: accessToken,
-    //   }),
-    // });
-
-    // For now, simulate success
-    const simulatedReplyId = `reply_${Date.now()}`;
-    console.log(`[Automation] Simulated reply ID: ${simulatedReplyId}`);
-
-    return {
-      success: true,
-      replyId: simulatedReplyId,
-    };
+    if (platform === 'facebook') {
+      return await fbReplyToComment(commentId, text, accessToken);
+    } else if (platform === 'instagram') {
+      return await igReplyToComment(commentId, text, accessToken);
+    } else {
+      return {
+        success: false,
+        error: `Unsupported platform for comment replies: ${platform}`,
+      };
+    }
   } catch (err: any) {
     console.error('[Automation] Error sending comment reply:', err.message);
     return {
