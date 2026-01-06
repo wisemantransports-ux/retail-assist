@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { verifyWebhookSignature, fbSendDM } from '@/lib/facebook';
 import { upsertConversation, insertMessage } from '@/lib/inbox/queries';
 import { listAgentsForWorkspace, listWorkspacesForUser } from '@/lib/supabase/queries';
+import { generateDMReply } from '@/lib/ai';
 
 const WEBHOOK_LOG_PREFIX = '[Instagram Webhook]';
 
@@ -145,15 +146,18 @@ async function processInstagramEntry(entry: any) {
 }
 
 async function handleInstagramMessage(user: any, settings: any, token: any, msg: any) {
+  let workspacesRes: any = null;
+  let defaultAgent: any = null;
+
   try {
     console.log(`${WEBHOOK_LOG_PREFIX} Processing IG message from:`, msg.sender.id);
     // Persist incoming message (best-effort)
     try {
-      const workspacesRes = await listWorkspacesForUser(user.id)
+      workspacesRes = await listWorkspacesForUser(user.id)
       const workspace = workspacesRes?.data?.[0]
       if (workspace) {
         const agentsRes = await listAgentsForWorkspace(workspace.id)
-        const defaultAgent = agentsRes?.data?.[0]
+        defaultAgent = agentsRes?.data?.[0]
         const conv = await upsertConversation(null, {
           workspaceId: workspace.id,
           agentId: defaultAgent?.id || null,
@@ -178,7 +182,23 @@ async function handleInstagramMessage(user: any, settings: any, token: any, msg:
       await db.logs.add({ user_id: user.id, level: 'warn', message: 'Failed to persist IG incoming message', meta: { err: (persistErr||{}).message || persistErr } })
     }
 
-    const replyText = settings.greeting_message || 'Thanks for your message!';
+    let replyText = settings.greeting_message || 'Thanks for your message!';
+
+    if (settings.ai_enabled && settings.system_prompt && msg.message.text) {
+      console.log(`${WEBHOOK_LOG_PREFIX} Generating AI response for IG message`);
+      const aiReply = await generateDMReply(
+        workspacesRes?.data?.[0]?.id || '',
+        defaultAgent?.id,
+        msg.message.text,
+        settings.system_prompt,
+        user.business_name,
+        'instagram'
+      );
+      if (aiReply) {
+        replyText = aiReply;
+        console.log(`${WEBHOOK_LOG_PREFIX} Using AI-generated reply for IG message`);
+      }
+    }
 
     const result = await fbSendDM(msg.sender.id, replyText, token.access_token);
 
@@ -197,15 +217,18 @@ async function handleInstagramMessage(user: any, settings: any, token: any, msg:
 }
 
 async function handleInstagramComment(user: any, settings: any, token: any, comment: any) {
+  let workspacesRes: any = null;
+  let defaultAgent: any = null;
+
   try {
     console.log(`${WEBHOOK_LOG_PREFIX} Processing IG comment:`, comment.id);
     // Persist incoming comment (best-effort)
     try {
-      const workspacesRes = await listWorkspacesForUser(user.id)
+      workspacesRes = await listWorkspacesForUser(user.id)
       const workspace = workspacesRes?.data?.[0]
       if (workspace) {
         const agentsRes = await listAgentsForWorkspace(workspace.id)
-        const defaultAgent = agentsRes?.data?.[0]
+        defaultAgent = agentsRes?.data?.[0]
         const conv = await upsertConversation(null, {
           workspaceId: workspace.id,
           agentId: defaultAgent?.id || null,
@@ -231,8 +254,24 @@ async function handleInstagramComment(user: any, settings: any, token: any, comm
     }
 
     if (settings.comment_to_dm_enabled && comment.from?.id) {
-      const dmText = `Hi! Thanks for commenting on our post. ${settings.greeting_message}`;
-      
+      let dmText = `Hi! Thanks for commenting on our post. ${settings.greeting_message}`;
+
+      if (settings.ai_enabled && settings.system_prompt && comment.text) {
+        console.log(`${WEBHOOK_LOG_PREFIX} Generating AI response for IG comment-to-DM`);
+        const aiReply = await generateDMReply(
+          workspacesRes?.data?.[0]?.id || '',
+          defaultAgent?.id,
+          `Customer commented: "${comment.text}". Send a follow-up DM.`,
+          settings.system_prompt,
+          user.business_name,
+          'instagram'
+        );
+        if (aiReply) {
+          dmText = aiReply;
+          console.log(`${WEBHOOK_LOG_PREFIX} Using AI-generated reply for IG comment-to-DM`);
+        }
+      }
+
       const result = await fbSendDM(comment.from.id, dmText, token.access_token);
 
       if (result.success) {

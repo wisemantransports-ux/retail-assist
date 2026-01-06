@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { env } from '@/lib/env';
+import { createServerClient } from '@/lib/supabase/server';
 
 // Initialize OpenAI client
 const openaiClient = new OpenAI({
@@ -7,7 +8,7 @@ const openaiClient = new OpenAI({
 });
 
 /**
- * Call OpenAI Chat API
+ * Call OpenAI Chat API with usage tracking
  * Used for agent conversations
  */
 export async function callOpenAIChat(
@@ -17,7 +18,7 @@ export async function callOpenAIChat(
     temperature?: number;
     max_tokens?: number;
   }
-): Promise<string> {
+): Promise<{ content: string; usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number } }> {
   if (!env.openai.apiKey) {
     throw new Error('OPENAI_API_KEY not configured');
   }
@@ -35,7 +36,14 @@ export async function callOpenAIChat(
       throw new Error('No response from OpenAI');
     }
 
-    return content;
+    return {
+      content,
+      usage: {
+        prompt_tokens: response.usage?.prompt_tokens || 0,
+        completion_tokens: response.usage?.completion_tokens || 0,
+        total_tokens: response.usage?.total_tokens || 0,
+      }
+    };
   } catch (err: any) {
     console.error('OpenAI API error:', err.message);
     throw err;
@@ -43,7 +51,7 @@ export async function callOpenAIChat(
 }
 
 /**
- * Call OpenAI for agent completion
+ * Call OpenAI for agent completion with usage tracking
  */
 export async function generateAgentResponse(
   systemPrompt: string,
@@ -59,10 +67,68 @@ export async function generateAgentResponse(
     { role: 'user' as const, content: userMessage },
   ];
 
-  return callOpenAIChat(messages, options?.model || 'gpt-4o-mini', {
+  const result = await callOpenAIChat(messages, options?.model || 'gpt-4o-mini', {
     temperature: options?.temperature,
     max_tokens: options?.max_tokens,
   });
+
+  return result.content;
+}
+
+/**
+ * Call OpenAI for agent completion with usage tracking and recording
+ */
+export async function generateAgentResponseWithTracking(
+  workspaceId: string,
+  agentId: string | null,
+  sessionId: string | null,
+  systemPrompt: string,
+  userMessage: string,
+  platform: string | null = null,
+  options?: {
+    temperature?: number;
+    max_tokens?: number;
+    model?: string;
+  }
+): Promise<{ content: string; tokensUsed: number; costCents: number }> {
+  const messages = [
+    { role: 'system' as const, content: systemPrompt },
+    { role: 'user' as const, content: userMessage },
+  ];
+
+  const model = options?.model || 'gpt-4o-mini';
+  const result = await callOpenAIChat(messages, model, {
+    temperature: options?.temperature,
+    max_tokens: options?.max_tokens,
+  });
+
+  // Calculate cost
+  const costCents = Math.round(calculateOpenAICost(
+    result.usage.prompt_tokens,
+    result.usage.completion_tokens,
+    model
+  ) * 100); // Convert to cents
+
+  // Record usage (async, don't block response)
+  recordAIUsage({
+    workspaceId,
+    agentId,
+    sessionId,
+    userMessage,
+    assistantMessage: result.content,
+    tokensUsed: result.usage.total_tokens,
+    costCents,
+    model,
+    platform
+  }).catch(err => {
+    console.error('[AI Usage] Failed to record usage:', err);
+  });
+
+  return {
+    content: result.content,
+    tokensUsed: result.usage.total_tokens,
+    costCents
+  };
 }
 
 /**
@@ -110,4 +176,44 @@ export function calculateOpenAICost(
   }
 
   return inputCost + outputCost;
+}
+
+/**
+ * Record AI usage in database
+ */
+export async function recordAIUsage(params: {
+  workspaceId: string;
+  agentId: string | null;
+  sessionId: string | null;
+  userMessage: string;
+  assistantMessage: string;
+  tokensUsed: number;
+  costCents: number;
+  model: string;
+  platform: string | null;
+}): Promise<void> {
+  try {
+    const supabase = await createServerClient();
+
+    // Call the database function to record usage
+    const { error } = await supabase.rpc('record_ai_usage', {
+      p_workspace_id: params.workspaceId,
+      p_tokens_used: params.tokensUsed,
+      p_cost_cents: params.costCents,
+      p_model: params.model,
+      p_agent_id: params.agentId,
+      p_session_id: params.sessionId,
+      p_user_message: params.userMessage,
+      p_assistant_message: params.assistantMessage,
+      p_platform: params.platform
+    });
+
+    if (error) {
+      console.error('[AI Usage] Failed to record usage:', error);
+      throw error;
+    }
+  } catch (err: any) {
+    console.error('[AI Usage] Database error:', err.message);
+    // Don't throw - we don't want usage tracking to break the main flow
+  }
 }

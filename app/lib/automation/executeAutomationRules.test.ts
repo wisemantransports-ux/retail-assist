@@ -10,13 +10,14 @@
 
 import { executeAutomationRulesForComment, executeAutomationRulesForMessage } from '@/lib/automation/executeAutomationRules';
 
-import { 
-  executeTimeTriggerRules, 
-  executeManualTrigger,
-  TimeTriggerConfig,
-  EmailActionConfig,
-  WebhookActionConfig
-} from '@/lib/automation/executeAutomationRules';
+// Note: Time trigger and manual trigger functions removed in refactor
+// import { 
+//   executeTimeTriggerRules, 
+//   executeManualTrigger,
+//   TimeTriggerConfig,
+//   EmailActionConfig,
+//   WebhookActionConfig
+// } from '@/lib/automation/executeAutomationRules';
 /**
  * Mock test data
  */

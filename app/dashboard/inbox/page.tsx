@@ -1,120 +1,148 @@
 'use client';
 
-import { useState } from 'react';
-
-interface Message {
-  id: string;
-  sender: string;
-  content: string;
-  platform: 'facebook' | 'instagram';
-  created_at: string;
-  read: boolean;
-}
+import { useState, useEffect } from 'react';
+import ConversationsList from '@/components/inbox/ConversationsList';
+import ConversationDetail from '@/components/inbox/ConversationDetail';
 
 export default function InboxPage() {
-  const [messages] = useState<Message[]>([
-    {
-      id: '1',
-      sender: 'John Doe',
-      content: 'Hi, I saw your product on Facebook. Is it still available?',
-      platform: 'facebook',
-      created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-      read: false,
-    },
-    {
-      id: '2',
-      sender: 'Jane Smith',
-      content: 'What are the shipping costs to Accra?',
-      platform: 'facebook',
-      created_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-      read: true,
-    },
-    {
-      id: '3',
-      sender: 'Mike Johnson',
-      content: 'Do you have this in blue color?',
-      platform: 'instagram',
-      created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-      read: true,
-    },
-  ]);
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0); // For triggering refreshes
 
-  const [filter, setFilter] = useState<'all' | 'unread'>('all');
+  // Fetch workspace ID for the current user
+  useEffect(() => {
+    async function fetchWorkspaceId() {
+      try {
+        // Try to get workspace from agents API (which determines workspace by owner)
+        const agentsRes = await fetch('/api/agents');
+        if (agentsRes.ok) {
+          const agentsData = await agentsRes.json();
+          // If we can fetch agents, assume workspace exists
+          // For now, we'll use a placeholder. In production, you'd want an endpoint to get workspace ID
+          // Let's try to infer from the user session
+          const authRes = await fetch('/api/auth/me');
+          if (authRes.ok) {
+            const authData = await authRes.json();
+            // Use user ID as workspace ID for simplicity (assuming 1:1 relationship)
+            setWorkspaceId(authData.user.id);
+          } else {
+            throw new Error('Unable to authenticate');
+          }
+        } else {
+          throw new Error('Unable to access workspace');
+        }
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
 
-  const filteredMessages = filter === 'unread' 
-    ? messages.filter(m => !m.read) 
-    : messages;
+    fetchWorkspaceId();
+  }, []);
+
+  const handleReply = async (content: string) => {
+    if (!selectedConversationId) return;
+
+    try {
+      const res = await fetch(`/api/inbox/${encodeURIComponent(selectedConversationId)}/reply`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ content }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to send reply');
+      }
+
+      // Trigger refresh of conversations and conversation detail
+      setRefreshKey(prev => prev + 1);
+
+    } catch (err: any) {
+      alert(`Failed to send reply: ${err.message}`);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-white">Inbox</h1>
+        </div>
+        <div className="bg-gray-800 border border-gray-700 rounded-xl p-12 text-center">
+          <p className="text-gray-400">Loading inbox...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-white">Inbox</h1>
+        </div>
+        <div className="bg-red-900/20 border border-red-700 rounded-xl p-6">
+          <p className="text-red-400">Error: {error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!workspaceId) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-white">Inbox</h1>
+        </div>
+        <div className="bg-gray-800 border border-gray-700 rounded-xl p-12 text-center">
+          <p className="text-gray-400">No workspace found. Please set up your account first.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white">Inbox</h1>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium ${
-              filter === 'all' 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-gray-700 text-gray-300'
-            }`}
-          >
-            All
-          </button>
-          <button
-            onClick={() => setFilter('unread')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium ${
-              filter === 'unread' 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-gray-700 text-gray-300'
-            }`}
-          >
-            Unread
-          </button>
-        </div>
       </div>
 
-      {filteredMessages.length === 0 ? (
-        <div className="bg-gray-800 border border-gray-700 rounded-xl p-12 text-center">
-          <p className="text-gray-400">No messages yet.</p>
-          <p className="text-gray-500 text-sm mt-2">
-            Connect your Facebook page to start receiving messages.
-          </p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Conversations List */}
+        <div>
+          <h2 className="text-lg font-semibold text-white mb-4">Conversations</h2>
+          <ConversationsList
+            key={`conversations-${refreshKey}`}
+            workspaceId={workspaceId}
+            onSelectConversation={setSelectedConversationId}
+            selectedConversationId={selectedConversationId || undefined}
+          />
         </div>
-      ) : (
-        <div className="space-y-3">
-          {filteredMessages.map((message) => (
-            <div
-              key={message.id}
-              className={`bg-gray-800 border rounded-xl p-4 ${
-                message.read ? 'border-gray-700' : 'border-blue-500'
-              }`}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white ${
-                    message.platform === 'facebook' ? 'bg-blue-600' : 'bg-gradient-to-br from-purple-600 to-pink-500'
-                  }`}>
-                    {message.platform === 'facebook' ? 'f' : '📷'}
-                  </div>
-                  <div>
-                    <p className="text-white font-medium">{message.sender}</p>
-                    <p className="text-gray-400 text-sm capitalize">{message.platform}</p>
-                  </div>
-                </div>
-                <span className="text-gray-500 text-xs">
-                  {new Date(message.created_at).toLocaleString()}
-                </span>
-              </div>
-              <p className="text-gray-300 mt-3">{message.content}</p>
-              {!message.read && (
-                <span className="inline-block mt-2 px-2 py-1 bg-blue-900/50 text-blue-400 text-xs rounded">
-                  New
-                </span>
-              )}
+
+        {/* Conversation Detail */}
+        <div>
+          {selectedConversationId ? (
+            <>
+              <h2 className="text-lg font-semibold text-white mb-4">Messages</h2>
+              <ConversationDetail
+                key={`conversation-${selectedConversationId}-${refreshKey}`}
+                conversationId={selectedConversationId}
+                onReply={handleReply}
+              />
+            </>
+          ) : (
+            <div className="bg-gray-800 border border-gray-700 rounded-xl p-12 text-center">
+              <p className="text-gray-400">Select a conversation to view messages</p>
             </div>
-          ))}
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -76,10 +76,7 @@ const mockCreateDirectMessage = async (workspaceId: string, payload: any) => {
 // ============================================================================
 
 // For testing, we'll manually import and test key functions
-import {
-  AutomationCommentInput,
-  ExecuteAutomationResult,
-} from '../executeAutomationRules.js';
+import { AutomationInput } from '../executeAutomationRules';
 
 // ============================================================================
 // Test Data
@@ -88,7 +85,7 @@ import {
 const mockWorkspaceId = 'ws_test_001';
 const mockAgentId = 'agent_test_001';
 
-const mockCommentInput: AutomationCommentInput = {
+const mockCommentInput: AutomationInput = {
   workspaceId: mockWorkspaceId,
   agentId: mockAgentId,
   commentId: 'comment_001',
@@ -178,7 +175,7 @@ test('Comment with matching keywords should trigger DM action', async () => {
 test('Comment without matching keywords should not trigger rule', async () => {
   console.log('\n[Test 2] Comment without matching keywords → No action');
   
-  const input: AutomationCommentInput = {
+  const input: AutomationInput = {
     ...mockCommentInput,
     commentText: 'Just a regular comment with no keywords',
   };
@@ -201,7 +198,7 @@ test('Comment without matching keywords should not trigger rule', async () => {
 test('Platform mismatch should not trigger rule', async () => {
   console.log('\n[Test 3] Platform mismatch → No action');
   
-  const input: AutomationCommentInput = {
+  const input: AutomationInput = {
     ...mockCommentInput,
     platform: 'website',
   };
@@ -226,7 +223,7 @@ test('Platform mismatch should not trigger rule', async () => {
 test('Keyword trigger should match any message with keywords', async () => {
   console.log('\n[Test 4] Keyword trigger → Match on keywords');
   
-  const input: AutomationCommentInput = {
+  const input: AutomationInput = {
     ...mockCommentInput,
     commentText: 'I need help with my order',
     platform: 'facebook',

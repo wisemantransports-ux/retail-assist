@@ -38,6 +38,21 @@ function SignupForm() {
   const [success, setSuccess] = useState(false);
   const router = useRouter();
 
+  const getPasswordStrength = (pwd: string) => {
+    if (pwd.length < 8 || /^[a-zA-Z]*$/.test(pwd)) {
+      return "Weak";
+    }
+    if (pwd.length >= 8 && /[a-zA-Z]/.test(pwd) && /\d/.test(pwd)) {
+      if (pwd.length >= 10 && /[^a-zA-Z\d]/.test(pwd)) {
+        return "Strong";
+      }
+      return "Medium";
+    }
+    return "Weak";
+  };
+
+  const passwordStrength = getPasswordStrength(password);
+
   useEffect(() => {
     const planFromUrl = searchParams.get('plan');
     if (planFromUrl && ['starter', 'pro', 'enterprise'].includes(planFromUrl)) {
@@ -89,32 +104,13 @@ function SignupForm() {
     }
   }
 
-  if (success) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-gray-900 to-gray-800">
-        <div className="w-full max-w-md text-center">
-          <div className="bg-gray-800 border border-gray-700 rounded-xl p-8">
-            <div className="text-6xl mb-4 text-green-400">&#10003;</div>
-            <h1 className="text-2xl font-bold text-white mb-4">Thanks — We received your info</h1>
-            <p className="text-gray-400 mb-4">
-              This signup is a lead capture. Products are locked until you subscribe — our team will follow up via email or phone to help you get started.
-            </p>
-            <div className="space-y-3">
-              <Link href="/dashboard" className="block w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg">Go to Dashboard (View only)</Link>
-              <Link href="/pricing" className="block w-full text-gray-400 hover:text-white text-sm">View Plans & Upgrade</Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-8 bg-gradient-to-br from-gray-900 to-gray-800">
       <div className="w-full max-w-2xl">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-extrabold text-white mb-2">Create your account — View dashboard</h1>
-          <p className="text-gray-400">Sign up to view and navigate the dashboard. Products and actions require a paid plan — we’ll follow up by email or phone.</p>
+          <h1 className="text-4xl font-extrabold text-white mb-2">Get Started Free — Explore Your Dashboard Today</h1>
+          <p className="text-gray-400">Sign up in seconds and start seeing how Retail Assist automates your customer conversations. No credit card required. Experience your inbox, automation rules, and integrations immediately. Upgrade anytime to unlock full AI-powered features.</p>
+          <p className="text-gray-400 mt-2">Providing your email and phone number helps us keep you connected and send tips to make the most of your dashboard.</p>
         </div>
 
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-6 space-y-6">
@@ -174,6 +170,14 @@ function SignupForm() {
                   className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
                   required
                 />
+                {password && (
+                  <p 
+                    className={`text-sm mt-1 ${passwordStrength === 'Weak' ? 'text-red-400' : passwordStrength === 'Medium' ? 'text-yellow-400' : 'text-green-400'}`}
+                    title="Use at least 1 uppercase letter, 1 number, and 1 symbol for stronger password."
+                  >
+                    Strength: {passwordStrength}
+                  </p>
+                )}
               </div>
 
 
@@ -193,9 +197,13 @@ function SignupForm() {
           </form>
 
           <div className="text-center text-gray-400 text-sm">
+            By signing up, you agree to our <a href="/terms" className="text-blue-400 hover:underline">Terms of Service</a> and <a href="/privacy" className="text-blue-400 hover:underline">Privacy Policy</a>.
+          </div>
+
+          <div className="text-center text-gray-400 text-sm">
             Already have an account?{" "}
             <Link href="/auth/login" className="text-blue-400 hover:underline font-semibold">
-              Sign in
+              Log In
             </Link>
           </div>
         </div>

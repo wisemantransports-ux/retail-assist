@@ -1,14 +1,34 @@
 /**
- * Automation Rules Execution Engine
- * Enforced with AI usage limits (grace cut-off)
+ * 🔒 CORE AUTOMATION ENGINE — LOCKED (MVP v1)
+ *
+ * This file is the single source of truth for automation execution across platforms:
+ * - facebook
+ * - instagram
+ * - website
+ * - whatsapp (future)
+ *
+ * ARCHITECTURAL RULES (DO NOT BREAK):
+ * 1. Workspace rules ALWAYS run before AI fallback.
+ * 2. Website platform MUST return replies directly (no external send).
+ * 3. Facebook / Instagram / WhatsApp MUST send externally and return no reply.
+ * 4. All messages MUST be persisted before sending.
+ *
+ * ⚠️ WARNING:
+ * This file MUST NOT be modified casually.
+ * Any change requires a deliberate, isolated refactor with owner approval.
+ *
+ * Status: LOCKED for MVP launch.
  */
 
 import { createServerClient } from '../supabase/server';
 import { createDirectMessage } from '../supabase/queries';
 import { upsertConversation, insertMessage } from '@/lib/inbox/queries';
-import { generateAgentResponse } from '../openai/server';
+import { generateAgentResponseWithTracking } from '../openai/server';
 import { env } from '../env';
 import { sendCommentReply } from '../automation';
+import { fbSendDM } from '../facebook';
+import { igSendDM } from '../instagram';
+import { waSendMessage } from '../whatsapp';
 
 /* ============================================================================
    AI USAGE ENFORCEMENT (80% WARN, 100% HARD CUT)
@@ -61,27 +81,24 @@ export interface AutomationInput {
 export async function executeAutomationRulesForComment(
   input: AutomationInput
 ) {
-  return executeAutomation(input);
+  return executeAutomationRules(input);
 }
 
 export async function executeAutomationRulesForMessage(
   input: AutomationInput
 ) {
-  return executeAutomation(input);
+  return executeAutomationRules(input);
 }
 
 /* ============================================================================
    CORE EXECUTOR
 ============================================================================ */
 
-async function executeAutomation(input: AutomationInput) {
-  const supabase = await createServerClient();
-
-  if (env.useMockMode) {
-    return { ok: true };
-  }
-
-  const { workspaceId, agentId, commentText, platform } = input;
+async function executeWorkspaceRules(
+  supabase: any,
+  input: AutomationInput
+): Promise<{ matched: boolean; reply?: string }> {
+  const { workspaceId, agentId, commentText } = input;
 
   const { data: rules } = await supabase
     .from('automation_rules')
@@ -91,7 +108,7 @@ async function executeAutomation(input: AutomationInput) {
     .eq('enabled', true);
 
   if (!rules?.length) {
-    return { ok: true };
+    return { matched: false };
   }
 
   for (const rule of rules) {
@@ -104,10 +121,130 @@ async function executeAutomation(input: AutomationInput) {
       continue;
     }
 
-    await executeRuleActionFull(supabase, rule, input);
+    const result = await executeRuleActionFull(supabase, rule, input);
+    if (result.reply) {
+      return { matched: true, reply: result.reply };
+    }
   }
 
-  return { ok: true };
+  return { matched: false };
+}
+
+async function executeDefaultFallback(
+  supabase: any,
+  input: AutomationInput
+): Promise<{ reply: string }> {
+  const { workspaceId, agentId, commentText, authorId, authorName, platform, pageAccessToken } = input;
+
+  const { data: agent } = await supabase
+    .from('agents')
+    .select('*')
+    .eq('id', agentId)
+    .single();
+
+  if (!agent) {
+    throw new Error(`Agent not found: ${agentId}`);
+  }
+
+  // Generate AI response
+  const result = await generateAgentResponseWithTracking(
+    workspaceId,
+    agent.id,
+    undefined, // sessionId
+    agent.system_prompt,
+    `Customer message: "${commentText}"`,
+    platform,
+    {
+      model: agent.model,
+      temperature: agent.temperature,
+      max_tokens: 200,
+    }
+  );
+
+  const reply = result.content;
+
+  // Persist bot reply to inbox
+  const conv = await upsertConversation(supabase, {
+    workspaceId,
+    agentId: agent.id,
+    platform: platform as 'facebook' | 'instagram' | 'whatsapp' | 'website',
+    externalThreadId: undefined,
+    customerId: authorId || authorName,
+    customerName: authorName || authorId,
+    text: null,
+  });
+
+  await insertMessage(supabase, {
+    workspaceId,
+    conversation: { id: conv.id, type: conv.type as 'dm' | 'comment' },
+    sender: 'bot',
+    content: `[Default AI] ${reply}`,
+    externalMessageId: null,
+    platform: platform as 'facebook' | 'instagram' | 'whatsapp' | 'website',
+  });
+
+  // For website, return the reply
+  if (platform === 'website') {
+    return { reply };
+  }
+
+  // 🔒 Platform dispatch boundary — behavior must remain deterministic
+
+  // For other platforms, dispatch the message
+  await dispatchPlatformMessage(supabase, platform, {
+    authorId: authorId || authorName,
+    message: reply,
+    pageAccessToken,
+  });
+
+  return { reply };
+}
+
+async function dispatchPlatformMessage(
+  supabase: any,
+  platform: string,
+  payload: { authorId: string; message: string; pageAccessToken: string }
+): Promise<void> {
+  const { authorId, message, pageAccessToken } = payload;
+
+  if (platform === 'facebook') {
+    const result = await fbSendDM(authorId, message, pageAccessToken);
+    if (!result.success) {
+      console.error(`[Automation] Failed to send Facebook DM:`, result.error);
+    }
+  } else if (platform === 'instagram') {
+    const result = await igSendDM(authorId, message, pageAccessToken);
+    if (!result.success) {
+      console.error(`[Automation] Failed to send Instagram DM:`, result.error);
+    }
+  } else if (platform === 'whatsapp') {
+    const result = await waSendMessage(authorId, message, pageAccessToken);
+    if (!result.success) {
+      console.error(`[Automation] Failed to send WhatsApp message:`, result.error);
+    }
+  }
+}
+
+export async function executeAutomationRules(
+  input: AutomationInput
+): Promise<{ ok: boolean; reply?: string }> {
+  const supabase = await createServerClient();
+
+  if (env.useMockMode) {
+    return { ok: true };
+  }
+
+  const { workspaceId, agentId, commentText, platform } = input;
+
+  // Try workspace rules first
+  const workspaceResult = await executeWorkspaceRules(supabase, input);
+  if (workspaceResult.matched) {
+    return { ok: true, reply: workspaceResult.reply };
+  }
+
+  // Fall back to default AI
+  const defaultResult = await executeDefaultFallback(supabase, input);
+  return { ok: true, reply: defaultResult.reply };
 }
 
 /* ============================================================================
@@ -118,7 +255,7 @@ async function executeRuleActionFull(
   supabase: any,
   rule: any,
   input: AutomationInput
-): Promise<void> {
+): Promise<{ reply?: string }> {
   const { agentId } = input;
 
   const { data: agent } = await supabase
@@ -133,12 +270,13 @@ async function executeRuleActionFull(
 
   switch (rule.action_type) {
     case 'send_dm':
-      await executeSendDmAction(supabase, rule, input, agent);
-      break;
+      return await executeSendDmAction(supabase, rule, input, agent);
 
     case 'send_public_reply':
-      await executeSendPublicReplyAction(supabase, rule, input, agent);
-      break;
+      return await executeSendPublicReplyAction(supabase, rule, input, agent);
+
+    default:
+      return {};
   }
 }
 
@@ -151,33 +289,38 @@ async function executeSendDmAction(
   rule: any,
   input: AutomationInput,
   agent: any
-) {
-  const { workspaceId, commentText, authorId, authorName } = input;
+): Promise<{ reply?: string }> {
+  const { workspaceId, commentText, authorId, authorName, platform, pageAccessToken } = input;
 
-  if (!authorId && !authorName) return;
+  if (!authorId && !authorName) return {};
 
   let message = rule.private_reply_template || 'Thank you for reaching out.';
 
   if (rule.use_ai) {
     await enforceAiUsageOrThrow(supabase, workspaceId);
 
-    message = await generateAgentResponse(
+    const result = await generateAgentResponseWithTracking(
+      workspaceId,
+      agent.id,
+      undefined, // sessionId
       agent.system_prompt,
       `Customer message: "${commentText}"`,
+      platform,
       {
         model: agent.model,
         temperature: agent.temperature,
         max_tokens: 200,
       }
     );
+
+    message = result.content;
   }
 
-  // Persist bot reply to inbox before sending. Use the inbox helpers so we
-  // consistently map to existing tables. This will throw on failure.
+  // Persist bot reply to inbox
   const conv = await upsertConversation(supabase, {
     workspaceId,
     agentId: agent.id,
-    platform: 'facebook',
+    platform: platform as 'facebook' | 'instagram' | 'whatsapp' | 'website',
     externalThreadId: undefined,
     customerId: authorId || authorName,
     customerName: authorName || authorId,
@@ -190,8 +333,24 @@ async function executeSendDmAction(
     sender: 'bot',
     content: message,
     externalMessageId: null,
-    platform: 'facebook',
+    platform: platform as 'facebook' | 'instagram' | 'whatsapp' | 'website',
   });
+
+  // For website, return the reply
+  if (platform === 'website') {
+    return { reply: message };
+  }
+
+  // 🔒 Platform dispatch boundary — behavior must remain deterministic
+
+  // For other platforms, dispatch the message
+  await dispatchPlatformMessage(supabase, platform, {
+    authorId: authorId || authorName,
+    message,
+    pageAccessToken,
+  });
+
+  return {};
 }
 
 /* ============================================================================
@@ -203,7 +362,7 @@ async function executeSendPublicReplyAction(
   rule: any,
   input: AutomationInput,
   agent: any
-) {
+): Promise<{ reply?: string }> {
   const {
     workspaceId,
     commentText,
@@ -213,27 +372,45 @@ async function executeSendPublicReplyAction(
     pageAccessToken,
   } = input;
 
-  if (!commentId || !postId) return;
+  if (!commentId || !postId) return {};
 
   let replyText = rule.public_reply_template || 'Thank you for your comment.';
 
   if (rule.use_ai) {
     await enforceAiUsageOrThrow(supabase, workspaceId);
 
-    replyText = await generateAgentResponse(
+    const result = await generateAgentResponseWithTracking(
+      workspaceId,
+      agent.id,
+      undefined, // sessionId
       agent.system_prompt,
       `Reply publicly to: "${commentText}"`,
+      platform,
       {
         model: agent.model,
         temperature: agent.temperature,
         max_tokens: 200,
       }
     );
+
+    replyText = result.content;
   }
 
-  // Only send public replies to supported platforms (Meta platforms)
+  // For website, persist and return reply
+  if (platform === 'website') {
+    await insertMessage(supabase, {
+      workspaceId,
+      conversation: { id: commentId, type: 'comment' },
+      sender: 'bot',
+      content: replyText,
+      externalMessageId: null,
+      platform,
+    });
+    return { reply: replyText };
+  }
+
+  // For Meta platforms, send public reply
   if (platform === 'facebook' || platform === 'instagram') {
-    // Persist the bot public reply in our inbox before sending the platform reply.
     await insertMessage(supabase, {
       workspaceId,
       conversation: { id: commentId, type: 'comment' },
@@ -253,4 +430,6 @@ async function executeSendPublicReplyAction(
   } else {
     console.log(`[Automation] Skipping public reply for unsupported platform: ${platform}`);
   }
+
+  return {};
 }

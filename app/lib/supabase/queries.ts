@@ -1,5 +1,6 @@
 
 import { createServerClient, createAdminSupabaseClient } from '@/lib/supabase/server'
+import { upsertConversation, insertMessage } from '@/lib/inbox/queries'
 import type {
 	User,
 	Workspace,
@@ -251,6 +252,212 @@ export async function listDirectMessages(workspace_id: string, agent_id?: string
 	if (agent_id) q = q.eq('agent_id', agent_id)
 	const { data, error } = await q
 	return { data: data as DirectMessage[] | null, error }
+}
+
+// -----------------------------
+// Inbox / Conversation helpers (canonical inbox API)
+// -----------------------------
+
+export async function listInboxConversations(supabaseClient: any, workspaceId: string) {
+	// supabaseClient should be created via createServerClient() so RLS applies
+	if (!supabaseClient) throw new Error('Supabase client required')
+
+	// Verify requestor membership in workspace
+	// Resolve current user from session (auth.uid) via server client
+	const { data: userData } = await supabaseClient.auth.getUser()
+	const authUser = (userData as any)?.user
+	if (!authUser) throw new Error('Not authenticated')
+
+	// Confirm membership or ownership
+	const { data: member } = await anon().from('workspace_members').select('id').eq('workspace_id', workspaceId).eq('user_id', await resolveUserId(authUser.id, false)).limit(1).maybeSingle()
+	const { data: owner } = await anon().from('workspaces').select('id').eq('id', workspaceId).eq('owner_id', await resolveUserId(authUser.id, false)).limit(1).maybeSingle()
+	if (!member && !owner) throw new Error('Forbidden')
+
+	// Pull messages for workspace and group in-memory by conversation key
+	const db = supabaseClient
+	const { data, error } = await db.from('direct_messages').select('*').eq('workspace_id', workspaceId).order('created_at', { ascending: false })
+	if (error) throw error
+	const rows = data || []
+
+	// Group by derived conversation id: `${platform}:${external_user_id}:${workspace_id}`
+	const groups: Record<string, any> = {}
+	for (const r of rows) {
+		// normalize platform mapping
+		let p = (r.platform || '').toLowerCase()
+		if (p === 'facebook_messenger') p = 'facebook'
+		if (p === 'instagram') p = 'instagram'
+		if (p === 'website') p = 'website'
+
+		const externalUserId = r.recipient_id || r.recipient_name || 'anon'
+		const key = `${p}:${externalUserId}:${workspaceId}`
+		if (!groups[key]) groups[key] = { platform: p, externalUserId, workspaceId, lastMessage: r.content || '', lastMessageAt: r.created_at, unreadCount: 0 }
+		// update last message/time if this row is newer
+		if (!groups[key].lastMessageAt || new Date(r.created_at) > new Date(groups[key].lastMessageAt)) {
+			groups[key].lastMessage = r.content || ''
+			groups[key].lastMessageAt = r.created_at
+		}
+		if (r.status === 'received') groups[key].unreadCount = (groups[key].unreadCount || 0) + 1
+	}
+
+	// Convert groups to array and order by lastMessageAt desc
+	const out = Object.keys(groups).map((k) => ({ conversationId: k, platform: groups[k].platform, externalUserId: groups[k].externalUserId, lastMessage: groups[k].lastMessage, lastMessageAt: groups[k].lastMessageAt, unreadCount: groups[k].unreadCount }))
+	out.sort((a: any, b: any) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime())
+	return out
+}
+
+export async function listConversationMessages(supabaseClient: any, conversationId: string) {
+	if (!supabaseClient) throw new Error('Supabase client required')
+	if (!conversationId) throw new Error('conversationId required')
+
+	// conversationId format: `${platform}:${external_user_id}:${workspace_id}`
+	const parts = conversationId.split(':')
+	if (parts.length < 3) throw new Error('Invalid conversationId')
+	const platform = parts[0]
+	const externalUserId = parts[1]
+	const workspaceId = parts.slice(2).join(':')
+
+	// Verify membership
+	const { data: userData } = await supabaseClient.auth.getUser()
+	const authUser = (userData as any)?.user
+	if (!authUser) throw new Error('Not authenticated')
+	const internalId = await resolveUserId(authUser.id, false)
+	const { data: member } = await anon().from('workspace_members').select('id').eq('workspace_id', workspaceId).eq('user_id', internalId).limit(1).maybeSingle()
+	const { data: owner } = await anon().from('workspaces').select('id').eq('id', workspaceId).eq('owner_id', internalId).limit(1).maybeSingle()
+	if (!member && !owner) throw new Error('Forbidden')
+
+	const db = supabaseClient
+	const messages: any[] = []
+
+	// Fetch direct_messages for this workspace + recipient
+	let dmPlatform = platform
+	if (platform === 'facebook') dmPlatform = 'facebook_messenger'
+	if (platform === 'instagram') dmPlatform = 'instagram'
+	const { data: dms, error: dmErr } = await db.from('direct_messages').select('*').eq('workspace_id', workspaceId).eq('recipient_id', externalUserId).eq('platform', dmPlatform).order('created_at', { ascending: true })
+	if (dmErr) throw dmErr
+	for (const d of (dms || [])) {
+		let sender: 'customer' | 'bot' | 'agent' = 'customer'
+		if (d.status === 'sent') {
+			if (d.agent_id) sender = 'agent'
+			else sender = 'bot'
+		}
+		messages.push({ id: d.id, sender, content: d.content || d.message || '', platform: platform, createdAt: d.created_at })
+	}
+
+	// If platform is facebook/instagram, also include comment threads authored by this externalUserId
+	if (platform === 'facebook' || platform === 'instagram') {
+		const { data: comments, error: cErr } = await db.from('comments').select('*').eq('workspace_id', workspaceId).eq('author_id', externalUserId).eq('platform', platform).order('created_at', { ascending: true })
+		if (cErr) throw cErr
+		for (const c of (comments || [])) {
+			const content = c.text || c.content || c.message || ''
+			messages.push({ id: c.id, sender: 'customer', content, platform: platform, createdAt: c.created_at })
+			if (c.bot_reply) {
+				messages.push({ id: `${c.id}:bot`, sender: 'bot', content: c.bot_reply, platform: platform, createdAt: c.processed_at || c.updated_at || new Date().toISOString() })
+			}
+		}
+	}
+
+	// Sort by createdAt ascending to return chronological
+	messages.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+	return messages
+}
+
+// -----------------------------
+// Agent Replies & Read Receipts
+// -----------------------------
+
+export async function sendAgentReply(supabaseClient: any, conversationId: string, content: string) {
+	if (!supabaseClient) throw new Error('Supabase client required')
+	if (!conversationId || !content) throw new Error('conversationId and content required')
+
+	// Parse conversationId: ${platform}:${externalUserId}:${workspaceId}
+	const parts = conversationId.split(':')
+	if (parts.length < 3) throw new Error('Invalid conversationId')
+	const platform = parts[0]
+	const externalUserId = parts[1]
+	const workspaceId = parts.slice(2).join(':')
+
+	// Verify membership (already done in endpoint, but double-check)
+	const { data: userData } = await supabaseClient.auth.getUser()
+	const authUser = (userData as any)?.user
+	if (!authUser) throw new Error('Not authenticated')
+	const internalId = await resolveUserId(authUser.id, false)
+	const { data: member } = await anon().from('workspace_members').select('id').eq('workspace_id', workspaceId).eq('user_id', internalId).limit(1).maybeSingle()
+	const { data: owner } = await anon().from('workspaces').select('id').eq('id', workspaceId).eq('owner_id', internalId).limit(1).maybeSingle()
+	if (!member && !owner) throw new Error('Forbidden')
+
+	// Persist agent message using inbox helpers
+	const conv = await upsertConversation(supabaseClient, {
+		workspaceId,
+		agentId: null, // agent replies don't need specific agent_id here
+		platform: platform as 'facebook' | 'instagram' | 'website',
+		externalThreadId: null,
+		customerId: externalUserId,
+		customerName: null,
+		text: null,
+	})
+
+	await insertMessage(supabaseClient, {
+		workspaceId,
+		conversation: { id: conv.id, type: conv.type as 'dm' | 'comment' },
+		sender: 'agent',
+		content,
+		externalMessageId: null,
+		platform: platform as 'facebook' | 'instagram' | 'website',
+	})
+
+	// Send externally if Meta platform
+	if (platform === 'facebook' || platform === 'instagram') {
+		// Get access token from integrations
+		const { data: integration } = await anon().from('integrations').select('access_token').eq('workspace_id', workspaceId).eq('platform', platform).limit(1).maybeSingle()
+		if (!integration?.access_token) throw new Error(`No access token for ${platform}`)
+
+		// Reuse existing Meta helper (same API for Facebook and Instagram)
+		const { fbSendDM } = await import('@/lib/facebook')
+		const sendResult = await fbSendDM(externalUserId, content, integration.access_token)
+		if (!sendResult.success) throw new Error(`Failed to send ${platform} message: ${sendResult.error}`)
+	}
+	// For website, no external send
+
+	// Log message usage
+	await logMessage(workspaceId, {
+		direction: 'outbound',
+		platform,
+		recipient_id: externalUserId,
+		content,
+		user_id: internalId,
+	})
+
+	return { ok: true }
+}
+
+export async function markConversationMessagesAsRead(supabaseClient: any, conversationId: string) {
+	if (!supabaseClient) throw new Error('Supabase client required')
+	if (!conversationId) throw new Error('conversationId required')
+
+	// Parse conversationId
+	const parts = conversationId.split(':')
+	if (parts.length < 3) throw new Error('Invalid conversationId')
+	const platform = parts[0]
+	const externalUserId = parts[1]
+	const workspaceId = parts.slice(2).join(':')
+
+	// Verify membership
+	const { data: userData } = await supabaseClient.auth.getUser()
+	const authUser = (userData as any)?.user
+	if (!authUser) throw new Error('Not authenticated')
+	const internalId = await resolveUserId(authUser.id, false)
+	const { data: member } = await anon().from('workspace_members').select('id').eq('workspace_id', workspaceId).eq('user_id', internalId).limit(1).maybeSingle()
+	const { data: owner } = await anon().from('workspaces').select('id').eq('id', workspaceId).eq('owner_id', internalId).limit(1).maybeSingle()
+	if (!member && !owner) throw new Error('Forbidden')
+
+	// Update direct_messages: set status='read' where workspace_id, recipient_id, status='received'
+	let dmPlatform = platform
+	if (platform === 'facebook') dmPlatform = 'facebook_messenger'
+	if (platform === 'instagram') dmPlatform = 'instagram'
+	const { error } = await supabaseClient.from('direct_messages').update({ status: 'read' }).eq('workspace_id', workspaceId).eq('recipient_id', externalUserId).eq('platform', dmPlatform).eq('status', 'received')
+	if (error) throw error
+
+	return { ok: true }
 }
 
 // -----------------------------
