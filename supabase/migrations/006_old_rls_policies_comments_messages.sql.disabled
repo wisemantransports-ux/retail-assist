@@ -1,0 +1,155 @@
+-- ============================================================================
+-- Migration 006 (FIXED): RLS policies for comments, direct_messages, message_logs
+-- Compatible with canonical schema in 002_complete_schema.sql
+-- Assumes: public.users.id = auth.users.id
+-- ============================================================================
+
+-- ============================================================================
+-- COMMENTS
+-- ============================================================================
+
+ALTER TABLE IF EXISTS comments ENABLE ROW LEVEL SECURITY;
+
+-- SELECT
+DROP POLICY IF EXISTS comments_select_members ON comments;
+CREATE POLICY comments_select_members
+ON comments
+FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1
+    FROM agents a
+    JOIN workspace_members wm ON wm.workspace_id = a.workspace_id
+    WHERE a.id = comments.agent_id
+      AND wm.user_id = auth.uid()
+  )
+);
+
+-- INSERT
+DROP POLICY IF EXISTS comments_insert_members ON comments;
+CREATE POLICY comments_insert_members
+ON comments
+FOR INSERT
+WITH CHECK (
+  EXISTS (
+    SELECT 1
+    FROM agents a
+    JOIN workspace_members wm ON wm.workspace_id = a.workspace_id
+    WHERE a.id = comments.agent_id
+      AND wm.user_id = auth.uid()
+  )
+);
+
+-- UPDATE
+DROP POLICY IF EXISTS comments_update_members ON comments;
+CREATE POLICY comments_update_members
+ON comments
+FOR UPDATE
+USING (
+  EXISTS (
+    SELECT 1
+    FROM agents a
+    JOIN workspace_members wm ON wm.workspace_id = a.workspace_id
+    WHERE a.id = comments.agent_id
+      AND wm.user_id = auth.uid()
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1
+    FROM agents a
+    JOIN workspace_members wm ON wm.workspace_id = a.workspace_id
+    WHERE a.id = comments.agent_id
+      AND wm.user_id = auth.uid()
+  )
+);
+
+-- ============================================================================
+-- DIRECT MESSAGES
+-- ============================================================================
+
+ALTER TABLE IF EXISTS direct_messages ENABLE ROW LEVEL SECURITY;
+
+-- SELECT
+DROP POLICY IF EXISTS direct_messages_select_members ON direct_messages;
+CREATE POLICY direct_messages_select_members
+ON direct_messages
+FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1
+    FROM workspace_members wm
+    WHERE wm.workspace_id = direct_messages.workspace_id
+      AND wm.user_id = auth.uid()
+  )
+);
+
+-- INSERT
+DROP POLICY IF EXISTS direct_messages_insert_members ON direct_messages;
+CREATE POLICY direct_messages_insert_members
+ON direct_messages
+FOR INSERT
+WITH CHECK (
+  EXISTS (
+    SELECT 1
+    FROM workspace_members wm
+    WHERE wm.workspace_id = direct_messages.workspace_id
+      AND wm.user_id = auth.uid()
+  )
+);
+
+-- UPDATE
+DROP POLICY IF EXISTS direct_messages_update_members ON direct_messages;
+CREATE POLICY direct_messages_update_members
+ON direct_messages
+FOR UPDATE
+USING (
+  EXISTS (
+    SELECT 1
+    FROM workspace_members wm
+    WHERE wm.workspace_id = direct_messages.workspace_id
+      AND wm.user_id = auth.uid()
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1
+    FROM workspace_members wm
+    WHERE wm.workspace_id = direct_messages.workspace_id
+      AND wm.user_id = auth.uid()
+  )
+);
+
+-- ============================================================================
+-- MESSAGE LOGS
+-- ============================================================================
+
+ALTER TABLE IF EXISTS message_logs ENABLE ROW LEVEL SECURITY;
+
+-- SELECT (read-only for members)
+DROP POLICY IF EXISTS message_logs_select_members ON message_logs;
+CREATE POLICY message_logs_select_members
+ON message_logs
+FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1
+    FROM workspace_members wm
+    WHERE wm.workspace_id = message_logs.workspace_id
+      AND wm.user_id = auth.uid()
+  )
+);
+
+-- INSERT (server-side logging allowed)
+DROP POLICY IF EXISTS message_logs_insert_members ON message_logs;
+CREATE POLICY message_logs_insert_members
+ON message_logs
+FOR INSERT
+WITH CHECK (
+  EXISTS (
+    SELECT 1
+    FROM workspace_members wm
+    WHERE wm.workspace_id = message_logs.workspace_id
+      AND wm.user_id = auth.uid()
+  )
+);

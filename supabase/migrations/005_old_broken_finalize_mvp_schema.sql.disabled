@@ -1,3 +1,8 @@
+-- DEPRECATED
+-- This migration is intentionally skipped.
+-- Final production schema and RLS are defined in 002_complete_schema.sql.
+-- Do not apply this migration.
+
 -- Finalized MVP schema and RLS policies
 -- Designed for: public.users (profile) + auth.users for authentication
 -- Read-only free dashboard model: client can SELECT required data but writes require workspace subscription_status = 'active'

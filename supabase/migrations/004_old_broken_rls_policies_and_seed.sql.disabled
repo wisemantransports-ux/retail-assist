@@ -1,3 +1,8 @@
+-- DEPRECATED
+-- This migration is intentionally empty.
+-- RLS policies are fully defined in 002_complete_schema.sql.
+-- Do not apply this migration.
+
 -- RLS policies and seed for minimal MVP
 -- Depends on migration 003 which defines users, workspaces, workspace_members, is_read_only(), can_use_feature()
 

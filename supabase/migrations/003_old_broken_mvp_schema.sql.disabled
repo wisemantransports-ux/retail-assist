@@ -1,3 +1,7 @@
+-- DEPRECATED
+-- This migration is intentionally empty.
+-- The MVP schema is fully implemented in 002_complete_schema.sql.
+-- Do not apply.
 -- Minimal Supabase schema for Retail Pro MVP
 -- Purpose: allow signup/login, workspaces, roles, subscription gating, and read-only dashboards
 
