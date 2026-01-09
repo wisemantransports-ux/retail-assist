@@ -1,158 +1,121 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { sessionManager } from '@/lib/session';
-import { ensureWorkspaceForUser } from '@/lib/supabase/ensureWorkspaceForUser';
-import { resolveUserId } from '@/lib/supabase/queries';
-import { env } from '@/lib/env';
-import { createServerClient, createAdminSupabaseClient } from '@/lib/supabase/server'
-import { cookies } from 'next/headers'
+import { supabaseAdmin } from '../../../lib/supabaseAdmin';
+import { sessionManager } from '../../../lib/session';
 
-export async function POST(request: Request) {
+export async function POST(req: Request) {
   try {
-    const body = await request.json();
-    const { email, password, business_name, phone, plan_type } = body;
-    
+    const body = await req.json()
+    const {
+      email,
+      password,
+      business_name,
+      phone,
+      plan_type = 'starter',
+      full_name = null,
+    } = body
+
+    // Validate required fields
     if (!email || !password || !business_name || !phone) {
-      return NextResponse.json(
-        { error: 'All fields are required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Missing required fields: email, password, business_name, phone' }, { status: 400 })
     }
-    
-    if (password.length < 6) {
-      return NextResponse.json(
-        { error: 'Password must be at least 6 characters' },
-        { status: 400 }
-      );
+
+    const emailRegex = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+    if (!emailRegex.test(String(email).toLowerCase())) {
+      return NextResponse.json({ error: 'Invalid email format' }, { status: 400 });
     }
-    
-    const validPlans = ['starter', 'pro', 'enterprise'];
-    const selectedPlan = validPlans.includes(plan_type) ? plan_type : 'starter';
-    
-    let user: any = null
-    if (env.useMockMode) {
-      user = await db.users.create({
+
+    if (String(password).length < 6) {
+      return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 });
+    }
+
+    // 1) Create auth user using service-role client
+    const { data: authData, error: authError } =
+      await supabaseAdmin.auth.admin.createUser({
         email,
         password,
-        business_name,
-        phone,
-        plan_type: selectedPlan
-      })
-    } else {
-      // Production: create auth user via Supabase, then create profile row without storing passwords
-      const supabase = createServerClient()
-      const { data, error } = await supabase.auth.signUp({ email, password })
-      if (error) {
-        console.error('[SIGNUP] Supabase signUp error:', error.message)
-        if ((error as any)?.status === 409) {
-          return NextResponse.json({ error: 'An account with this email already exists' }, { status: 409 })
-        }
-        return NextResponse.json({ error: 'Failed to create user' }, { status: 500 })
-      }
-      if (!data || !data.user) {
-        return NextResponse.json({ error: 'Failed to create user' }, { status: 500 })
-      }
-
-      const admin = await createAdminSupabaseClient()
-      const now = new Date().toISOString()
-      // Ensure internal users row exists (create if missing)
-      const internalUserId = await resolveUserId(data.user.id, true)
-      const profile = {
-        email,
-        business_name,
-        phone,
-        plan_type: selectedPlan,
-        payment_status: 'unpaid',
-        subscription_status: 'pending',
-        role: 'user',
-        updated_at: now,
-        created_at: now,
-      }
-      if (internalUserId) {
-        const { error: upsertErr } = await admin.from('users').update(profile).eq('id', internalUserId)
-        if (upsertErr) {
-          console.error('[SIGNUP] Failed to update profile row:', upsertErr.message)
-        }
-        user = { id: internalUserId, email, business_name, phone, plan_type: selectedPlan }
-      } else {
-        // Fallback: insert a new profile with auth_uid set
-        const { data: inserted, error: insertErr } = await admin.from('users').insert([{ auth_uid: data.user.id, ...profile }]).select().limit(1).maybeSingle()
-        if (insertErr) console.error('[SIGNUP] Failed to create profile row:', insertErr.message)
-        user = { id: (inserted as any)?.id || data.user.id, email, business_name, phone, plan_type: selectedPlan }
-      }
-    }
-    
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Failed to create user' },
-        { status: 500 }
-      );
-    }
-    
-    // record signup as a lead for follow-up (business + phone + email)
-    try {
-      await db.logs.add({
-        user_id: user.id,
-        level: 'lead',
-        message: `Lead captured: ${business_name} (${email})`,
-        meta: { plan_type: selectedPlan, phone, business_name }
+        email_confirm: true,
       });
-    } catch (e: any) {
-      // Non-fatal: logging should not prevent signup (e.g., mock mode without Supabase)
-      console.warn('[SIGNUP] Failed to record lead log (non-fatal):', e?.message || e);
+
+    if (authError || !authData?.user) {
+      console.error('[SIGNUP] Auth error:', authError);
+      return NextResponse.json({ error: authError?.message || 'Failed to create auth user' }, { status: 500 });
     }
 
-    // keep an info log as well
+    const newUser = authData.user;
+
+    // 2) Create profile via RPC (atomic DB-side behavior)
     try {
-      await db.logs.add({
-        user_id: user.id,
-        level: 'info',
-        message: `New user signup: ${business_name} (${email})`,
-        meta: { plan_type: selectedPlan }
+      const rpcCall: any = supabaseAdmin.rpc('rpc_create_user_profile', {
+        p_auth_uid: newUser.id,
+        p_business_name: business_name,
+        p_email: email,
+        p_phone: phone,
+        p_full_name: full_name || null,
+        p_plan_type: plan_type || 'starter',
       });
-    } catch (e: any) {
-      console.warn('[SIGNUP] Failed to record info log (non-fatal):', e?.message || e);
-    }
 
-    // Attempt to ensure workspace exists (pass internal user id explicitly)
-    try {
-      await ensureWorkspaceForUser(user.id);
-    } catch (wsErr) {
-      console.warn('[SIGNUP] Workspace provisioning deferred to first login:', wsErr);
-      // Workspace will be created on first login if not created here
-    }
+      console.info('[SIGNUP] RPC raw response:', rpcCall);
 
-    // create a session so the user can immediately access the dashboard (free/limited)
-    const session = await sessionManager.create(user.id);
-    const maxAge = Math.max(0, Math.floor((new Date(session.expires_at).getTime() - Date.now()) / 1000))
-    const res = NextResponse.json({
-      success: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        business_name: user.business_name,
-        subscription_status: user.subscription_status,
-        plan_type: user.plan_type
-      },
-      message: 'Account created successfully. You can access the dashboard — upgrade to unlock premium features.'
-    });
-    const cookieStore = await cookies();
-    cookieStore.set('session_id', session.id, { path: '/', httpOnly: true, secure: env.isProduction, sameSite: 'lax', maxAge });
-    return res;
-  } catch (error: any) {
-    console.error('[Auth Signup] Error:', error.message);
-    
-    if (error.message === 'Email already exists') {
-      return NextResponse.json(
-        { error: 'An account with this email already exists' },
-        { status: 409 }
-      );
+      const { data: profile, error: profileErr } = await rpcCall.single();
 
+      console.info('[SIGNUP] Profile RPC error after single():', profileErr);
+
+      if (profileErr || !profile) {
+        console.error('[SIGNUP] Profile RPC error:', profileErr);
+
+        // Rollback: delete created auth user to avoid orphaned accounts
+        try {
+          const { error: deleteErr } = await supabaseAdmin.auth.admin.deleteUser(newUser.id);
+          if (deleteErr) console.error('[SIGNUP] Failed to delete auth user during rollback:', deleteErr);
+          else console.info('[SIGNUP] Rolled back auth user after profile RPC failure:', newUser.id);
+        } catch (delErr) {
+          console.error('[SIGNUP] Rollback delete threw error:', delErr);
+        }
+
+        return NextResponse.json({ error: profileErr?.message || 'Failed to create user profile' }, { status: 500 });
+      }
+
+      // 3) Create server session so user can access dashboard immediately
+      let session: any = null;
+      try {
+        session = await sessionManager.create(newUser.id, 24 * 7);
+        console.info('[SIGNUP] Session created for user:', newUser.id);
+      } catch (sessionErr) {
+        console.error('[SIGNUP] Failed to create session:', sessionErr);
+      }
+
+      const response = NextResponse.json({
+        success: true,
+        user: profile,
+        message: 'Account created successfully.',
+      });
+
+      if (session?.id) {
+        response.cookies.set('session_id', session.id, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 7 * 24 * 60 * 60,
+          path: '/',
+        });
+      }
+
+      return response;
+    } catch (rpcException) {
+      console.error('[SIGNUP] RPC threw error:', rpcException)
+      // Rollback auth user
+      try {
+        const { error: deleteErr } = await supabaseAdmin.auth.admin.deleteUser(newUser.id)
+        if (deleteErr) console.error('[SIGNUP] Failed to delete auth user during rollback:', deleteErr)
+        else console.info('[SIGNUP] Rolled back auth user after RPC exception:', newUser.id)
+      } catch (delErr) {
+        console.error('[SIGNUP] Rollback delete threw error:', delErr)
+      }
+
+      return NextResponse.json({ error: 'Failed to create user profile' }, { status: 500 })
     }
-    
-    return NextResponse.json(
-      { error: 'Failed to create account' },
-      { status: 500 }
-    );
+  } catch (err) {
+    console.error('[SIGNUP] Unexpected error:', err)
+    return NextResponse.json({ error: 'Unexpected signup error' }, { status: 500 })
   }
 }

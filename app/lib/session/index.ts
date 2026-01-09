@@ -1,9 +1,10 @@
-import { createServerClient } from '@/lib/supabase/server'
+import { createServerClient, createAdminSupabaseClient } from '@/lib/supabase/server'
+import { ensureInternalUser } from '@/lib/supabase/queries'
 import { env } from '@/lib/env'
 import * as fs from 'fs'
 import * as path from 'path'
 
-const supabase = () => createServerClient()
+const supabase = () => createAdminSupabaseClient()
 const DEV_SESSIONS = path.join(process.cwd(), 'tmp', 'dev-seed', 'sessions.json')
 
 function generateSessionId(): string {
@@ -35,9 +36,13 @@ export const sessionManager = {
       const now = new Date()
       const expiresAt = new Date(now.getTime() + expiresInHours * 60 * 60 * 1000)
 
+      // Ensure an internal users.id exists for the provided userId (auth UID or internal id)
+      const ensured = await ensureInternalUser(userId)
+      const effectiveUserId = ensured.id || userId
+
       const session = {
         id,
-        user_id: userId,
+        user_id: effectiveUserId,
         created_at: now.toISOString(),
         expires_at: expiresAt.toISOString()
       }

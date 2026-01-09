@@ -1,4 +1,4 @@
-import { createServerClient } from '@/lib/supabase/server'
+import { createServerClient, createAdminSupabaseClient } from '@/lib/supabase/server'
 import { resolveUserId } from '@/lib/supabase/queries'
 import { env } from '@/lib/env'
 
@@ -97,10 +97,12 @@ function migrateUser(user: any) {
 export const db = {
   users: {
     async create(data: { email: string; password: string; business_name: string; phone: string; plan_type: 'starter' | 'pro' | 'enterprise' }) {
-      // When `env.useMockMode` is true we use the local dev JSON seed (tmp/dev-seed/database.json)
+      // This helper performs privileged writes to the `users` table.
+      // Use the service-role/admin Supabase client so writes bypass RLS
+      // and avoid `permission denied` errors in production.
       const useLocal = env.useMockMode
       if (!useLocal) {
-        const s = supabase()
+        const s = createAdminSupabaseClient()
         const salt = generateSalt()
         const password_hash = await hashPasswordWithSalt(data.password, salt)
         const now = new Date().toISOString()
@@ -126,7 +128,9 @@ export const db = {
           throw error
         }
 
-        // create default settings
+        // create default settings (we use the admin client here as well because
+        // this operation runs during user provisioning and may require elevated
+        // permissions depending on RLS policies)
         const defaultSettings = {
           id: generateId(),
           user_id: id,
@@ -235,7 +239,9 @@ export const db = {
     },
 
     async update(id: string, data: any) {
-      const s = supabase()
+      // This update performs a privileged write to `users` and must use the
+      // service-role/admin client to bypass RLS and avoid permission errors.
+      const s = createAdminSupabaseClient()
       const { error } = await s.from('users').update({ ...data, updated_at: new Date().toISOString() }).eq('id', id)
       if (error) throw error
       const { data: user } = await s.from('users').select('*').eq('id', id).maybeSingle()
@@ -255,7 +261,8 @@ export const db = {
     },
 
     async delete(id: string) {
-      const s = supabase()
+      // Deleting a user is a privileged operation; use the admin service-role client.
+      const s = createAdminSupabaseClient()
       const { error } = await s.from('users').delete().eq('id', id)
       if (error) throw error
       return true

@@ -29,11 +29,9 @@ export default function LoginPage() {
         throw new Error(data.error || 'Login failed');
       }
 
-      if (data.user.role === 'admin') {
-        router.push('/admin');
-      } else {
-        router.push('/dashboard');
-      }
+      // Redirect to dashboard after successful login (server session created)
+      router.replace('/dashboard');
+      router.refresh();
     } catch (err: any) {
       setError(err.message || "Failed to log in");
     } finally {

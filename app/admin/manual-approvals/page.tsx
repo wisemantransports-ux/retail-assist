@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createBrowserSupabaseClient } from '@/lib/supabase/client';
+import { supabase } from 'app/lib/supabase';
 import type { ManualPayment } from '@/lib/types/database';
 
 /**
@@ -18,7 +18,6 @@ export default function AdminManualApprovalsPage() {
   useEffect(() => {
     async function loadPendingPayments() {
       try {
-        const supabase = createBrowserSupabaseClient();
         const { data, error } = await supabase
           .from('manual_payments')
           .select('*')

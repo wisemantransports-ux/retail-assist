@@ -96,7 +96,8 @@ function SignupForm() {
       }
 
       // automatically go to dashboard (session created server-side)
-      router.push('/dashboard');
+      router.replace('/dashboard');
+      router.refresh();
     } catch (err: any) {
       setError(err.message || "Failed to sign up");
     } finally {

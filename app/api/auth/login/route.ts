@@ -27,13 +27,16 @@ export async function POST(request: Request) {
     // Dev fallback (local seed)
     if (useDev) {
       const user = await db.users.authenticate(email, password)
-      if (!user) return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
+      if (!user) {
+        console.warn('[LOGIN] Dev auth failed for:', email)
+        return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
+      }
 
-      const session = await sessionManager.create(user.id)
-      const maxAge = Math.max(0, Math.floor((new Date(session.expires_at).getTime() - Date.now()) / 1000))
+      const session = await sessionManager.create(user.id, 24 * 7)
+      const maxAge = 7 * 24 * 60 * 60
       const res = NextResponse.json({ success: true, user: { id: user.id, email: user.email, role: user.role } })
       const cookieStore = await cookies()
-      cookieStore.set('session_id', session.id, { path: '/', httpOnly: true, secure: env.isProduction, sameSite: 'lax', maxAge })
+      cookieStore.set('session_id', session.id, { path: '/', httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge })
       return res
     }
 
@@ -45,17 +48,13 @@ export async function POST(request: Request) {
     })
 
     if (error || !data.user) {
-      // Temporary debug logging to help diagnose auth failures without printing secrets
       try {
         console.error('[LOGIN] Supabase signIn error:', { message: error?.message, status: (error as any)?.status, data: data ? { user: !!data.user } : null })
       } catch (logErr) {
         console.error('[LOGIN] Supabase signIn error (failed to log details)', logErr)
       }
 
-      return NextResponse.json(
-        { error: 'Invalid email or password' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
     }
 
     // Ensure user has a workspace (safe to call multiple times) — pass user id
@@ -67,11 +66,11 @@ export async function POST(request: Request) {
 
     // create our session record using internal users.id (ensure exists)
     const internalUserId = await resolveUserId(data.user.id, true)
-    const session = await sessionManager.create(internalUserId || data.user.id)
-    const maxAge = Math.max(0, Math.floor((new Date(session.expires_at).getTime() - Date.now()) / 1000))
+    const session = await sessionManager.create(internalUserId || data.user.id, 24 * 7)
+    const maxAge = 7 * 24 * 60 * 60
     const res = NextResponse.json({ success: true, user: { id: internalUserId || data.user.id, email: data.user.email, role: (data.user as any).role || 'user' }, workspaceId: workspaceResult.workspaceId })
     const cookieStore = await cookies()
-    cookieStore.set('session_id', session.id, { path: '/', httpOnly: true, secure: env.isProduction, sameSite: 'lax', maxAge })
+    cookieStore.set('session_id', session.id, { path: '/', httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge })
     return res
   } catch (err) {
     console.error('[LOGIN_ERROR]', err)

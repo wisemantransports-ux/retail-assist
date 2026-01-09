@@ -7,7 +7,7 @@
  */
 
 import { createServerClient } from './server';
-import { resolveUserId } from './queries';
+import { ensureInternalUser } from './queries';
 
 export interface EnsureWorkspaceResult {
   workspaceId: string;
@@ -35,7 +35,8 @@ export async function ensureWorkspaceForUser(userId: string): Promise<EnsureWork
     const supabase = await createServerClient();
 
     // Ensure there is an internal users.id for this auth UID (create if missing)
-    const internalUserId = await resolveUserId(userId, true)
+    const ensured = await ensureInternalUser(userId)
+    const internalUserId = ensured.id
     if (!internalUserId) {
       return { workspaceId: '', created: false, error: 'Failed to ensure internal user record' }
     }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { createBrowserSupabaseClient } from '@/lib/supabase/client';
+import { supabase } from 'app/lib/supabase';
 import ChatWidget from '@/components/ChatWidget';
 
 export default function Page() {
@@ -10,7 +10,6 @@ export default function Page() {
 
   useEffect(() => {
     const loadAgents = async () => {
-      const supabase = createBrowserSupabaseClient();
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) return;
 

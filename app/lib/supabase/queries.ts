@@ -41,11 +41,59 @@ export async function resolveUserId(candidateId: string | null | undefined, crea
 
 	if (!createIfMissing) return null
 
-	// 3) Create a lightweight users row linking auth_uid -> internal id
-	const now = new Date().toISOString()
-	const { data: created } = await db.from('users').insert({ auth_uid: candidateId, email: '', created_at: now, updated_at: now }).select('id').limit(1).maybeSingle()
-	if (created && (created as any).id) return (created as any).id
-	return null
+	// Delegate to centralized ensure function that creates/upserts a full users row
+	try {
+		const { id } = await ensureInternalUser(candidateId)
+		return id || null
+	} catch (e: any) {
+		console.error('[resolveUserId] failed to ensure internal user:', e)
+		return null
+	}
+}
+
+// Ensure there's a full internal `users` row for the given candidate id.
+// Accepts either an internal users.id or a Supabase auth UID. Returns
+// an object containing the internal `id` when successful or `{ id: null }`.
+export async function ensureInternalUser(candidateId: string | null | undefined): Promise<{ id: string | null }> {
+    if (!candidateId) return { id: null }
+    const db = admin()
+
+    // If candidateId already matches an internal id, return it
+    const { data: byId } = await db.from('users').select('id').eq('id', candidateId).maybeSingle()
+    if (byId && (byId as any).id) return { id: (byId as any).id }
+
+    // If there's already a user with auth_uid, return it
+    const { data: byAuth } = await db.from('users').select('id').eq('auth_uid', candidateId).maybeSingle()
+    if (byAuth && (byAuth as any).id) return { id: (byAuth as any).id }
+
+    // Create/upsert a full user record with sensible defaults
+    const now = new Date().toISOString()
+    const record: any = {
+        auth_uid: candidateId,
+        email: '',
+        role: 'user',
+        plan_type: 'starter',
+        payment_status: 'unpaid',
+        subscription_status: 'pending',
+        created_at: now,
+        updated_at: now,
+    }
+
+    try {
+        const { data, error } = await db.from('users').upsert(record, { onConflict: 'auth_uid' }).select('id').maybeSingle()
+        if (error) {
+            console.error('[ensureInternalUser] upsert error:', error)
+        }
+        if (data && (data as any).id) return { id: (data as any).id }
+
+        // Final fallback: select by auth_uid
+        const { data: sel } = await db.from('users').select('id').eq('auth_uid', candidateId).maybeSingle()
+        if (sel && (sel as any).id) return { id: (sel as any).id }
+    } catch (e: any) {
+        console.error('[ensureInternalUser] unexpected error:', e)
+    }
+
+    return { id: null }
 }
 
 // -----------------------------
