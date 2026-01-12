@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
-import { approveMobileMoneyPayment } from '@/lib/supabase/queries';
+import { approveMobileMoneyPayment, ensureInternalUser } from '@/lib/supabase/queries';
 
 /**
  * POST /api/payments/mobile-money/admin/approve
@@ -39,20 +39,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Payment not found' }, { status: 404 });
     }
 
-    // Check if user is workspace owner/admin
+    // Resolve internal user id and check if user is workspace owner/admin
+    const ensured = await ensureInternalUser(user.id)
+    const internalUserId = ensured?.id || user.id
     const { data: member } = await supabase
       .from('workspace_members')
       .select('role')
       .eq('workspace_id', payment.workspace_id)
-      .eq('user_id', user.id)
+      .eq('user_id', internalUserId)
       .single();
 
     if (!member || (member.role !== 'owner' && member.role !== 'admin')) {
       return NextResponse.json({ error: 'Not authorized to approve payments' }, { status: 403 });
     }
 
-    // Approve the payment
-    const result = await approveMobileMoneyPayment(paymentId, user.id, notes);
+    // Approve the payment using internal user id
+    const result = await approveMobileMoneyPayment(paymentId, internalUserId, notes);
 
     if (result.error) {
       return NextResponse.json({ error: 'Failed to approve payment' }, { status: 500 });

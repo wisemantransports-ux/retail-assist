@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { supabaseAdmin } from '../../../lib/supabaseAdmin';
 import { sessionManager } from '../../../lib/session';
+import { ensureInternalUser } from '@/lib/supabase/queries';
 
 export async function POST(req: Request) {
   try {
@@ -43,7 +45,11 @@ export async function POST(req: Request) {
 
     const newUser = authData.user;
 
-    // 2) Create profile via RPC (atomic DB-side behavior)
+    // 2) Best-effort: attempt to create profile via RPC but do NOT fail the
+    // entire signup flow if the RPC fails. We always create a session and
+    // return success when the auth user is created.
+    let profile: any = null
+    let rpcError: any = null
     try {
       const rpcCall: any = supabaseAdmin.rpc('rpc_create_user_profile', {
         p_auth_uid: newUser.id,
@@ -55,65 +61,67 @@ export async function POST(req: Request) {
       });
 
       console.info('[SIGNUP] RPC raw response:', rpcCall);
-
-      const { data: profile, error: profileErr } = await rpcCall.single();
-
-      console.info('[SIGNUP] Profile RPC error after single():', profileErr);
-
-      if (profileErr || !profile) {
-        console.error('[SIGNUP] Profile RPC error:', profileErr);
-
-        // Rollback: delete created auth user to avoid orphaned accounts
-        try {
-          const { error: deleteErr } = await supabaseAdmin.auth.admin.deleteUser(newUser.id);
-          if (deleteErr) console.error('[SIGNUP] Failed to delete auth user during rollback:', deleteErr);
-          else console.info('[SIGNUP] Rolled back auth user after profile RPC failure:', newUser.id);
-        } catch (delErr) {
-          console.error('[SIGNUP] Rollback delete threw error:', delErr);
-        }
-
-        return NextResponse.json({ error: profileErr?.message || 'Failed to create user profile' }, { status: 500 });
-      }
-
-      // 3) Create server session so user can access dashboard immediately
-      let session: any = null;
-      try {
-        session = await sessionManager.create(newUser.id, 24 * 7);
-        console.info('[SIGNUP] Session created for user:', newUser.id);
-      } catch (sessionErr) {
-        console.error('[SIGNUP] Failed to create session:', sessionErr);
-      }
-
-      const response = NextResponse.json({
-        success: true,
-        user: profile,
-        message: 'Account created successfully.',
-      });
-
-      if (session?.id) {
-        response.cookies.set('session_id', session.id, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 7 * 24 * 60 * 60,
-          path: '/',
-        });
-      }
-
-      return response;
-    } catch (rpcException) {
-      console.error('[SIGNUP] RPC threw error:', rpcException)
-      // Rollback auth user
-      try {
-        const { error: deleteErr } = await supabaseAdmin.auth.admin.deleteUser(newUser.id)
-        if (deleteErr) console.error('[SIGNUP] Failed to delete auth user during rollback:', deleteErr)
-        else console.info('[SIGNUP] Rolled back auth user after RPC exception:', newUser.id)
-      } catch (delErr) {
-        console.error('[SIGNUP] Rollback delete threw error:', delErr)
-      }
-
-      return NextResponse.json({ error: 'Failed to create user profile' }, { status: 500 })
+      const rpcRes = await rpcCall.single();
+      profile = rpcRes?.data || null
+      rpcError = rpcRes?.error || null
+      if (rpcError) console.warn('[SIGNUP] Profile RPC returned error (non-fatal):', rpcError)
+    } catch (e) {
+      rpcError = e
+      console.error('[SIGNUP] RPC threw exception (non-fatal):', e)
     }
+
+    // 3) Ensure internal users row exists and create server session so user can access dashboard immediately
+    let session: any = null;
+    let internalUserId: string | null = null
+    try {
+      const ensured = await ensureInternalUser(newUser.id)
+      internalUserId = (ensured && ensured.id) || (profile && profile.id) || null
+      if (!internalUserId) {
+        console.error('[SIGNUP] Could not resolve internal user id for:', newUser.id)
+      } else {
+        session = await sessionManager.create(internalUserId, 24 * 7);
+        console.info('[SIGNUP] Session created for user:', internalUserId);
+      }
+    } catch (sessionErr) {
+      console.error('[SIGNUP] Failed to create session (non-fatal):', sessionErr);
+    }
+
+    // Build the JSON response and attach the session cookie so the client
+    // receives the cookie in the same response that indicates success.
+    const response = NextResponse.json({
+      success: true,
+      user: profile,
+      internalUserId: internalUserId,
+      message: 'Account created successfully.',
+      rpcWarning: rpcError ? (rpcError.message || String(rpcError)) : null,
+    });
+
+    if (session?.id) {
+      try {
+        const cookieStore = await cookies();
+        cookieStore.set('session_id', session.id, { path: '/', httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 })
+      } catch (e) {
+        console.warn('[SIGNUP] Could not set cookie via cookies():', e)
+      }
+
+      // Also set `Set-Cookie` header directly as a fallback for environments
+      // where the cookie store does not attach headers to the response object.
+      try {
+        const maxAge = 7 * 24 * 60 * 60
+        const secureFlag = process.env.NODE_ENV === 'production' ? '; Secure' : ''
+        const cookieValue = `session_id=${session.id}; Path=/; HttpOnly; Max-Age=${maxAge}; SameSite=Lax${secureFlag}`
+        try {
+          response.headers.set('Set-Cookie', cookieValue)
+        } catch (e) {
+          // Some runtimes may not allow mutating headers this way; ignore silently.
+          console.warn('[SIGNUP] Could not set Set-Cookie header directly:', e)
+        }
+      } catch (e) {
+        console.warn('[SIGNUP] Failed to build/set fallback Set-Cookie header:', e)
+      }
+    }
+
+    return response;
   } catch (err) {
     console.error('[SIGNUP] Unexpected error:', err)
     return NextResponse.json({ error: 'Unexpected signup error' }, { status: 500 })

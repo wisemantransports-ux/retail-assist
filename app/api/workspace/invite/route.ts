@@ -1,5 +1,5 @@
 import { createServerClient } from '@/lib/supabase/server';
-import { inviteMember } from '@/lib/supabase/queries';
+import { inviteMember, ensureInternalUser } from '@/lib/supabase/queries';
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
@@ -53,8 +53,10 @@ export async function POST(request: NextRequest) {
 
     console.log(`[team-api] Inviting ${email} to workspace ${workspace_id} as ${role}`);
 
-    // Invite member
-    const result = await inviteMember(workspace_id, email, role as any, user.id);
+    // Resolve internal id for inviter and invite member
+    const ensured = await ensureInternalUser(user.id)
+    const internalUserId = ensured?.id || user.id
+    const result = await inviteMember(workspace_id, email, role as any, internalUserId);
 
     if (result.error) {
       console.error('[team-api] Error inviting member:', result.error);

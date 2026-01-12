@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
 import { createPayPalOrder } from '@/lib/paypal/server';
-import { createPayment } from '@/lib/supabase/queries';
+import { createPayment, ensureInternalUser } from '@/lib/supabase/queries';
 
 /**
  * POST /api/payments/paypal/create
@@ -29,12 +29,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify user is in workspace
+    // Resolve internal user id and verify membership in workspace
+    const ensured = await ensureInternalUser(user.id)
+    const internalUserId = ensured?.id || user.id
     const { data: member } = await supabase
       .from('workspace_members')
       .select('id')
       .eq('workspace_id', workspaceId)
-      .eq('user_id', user.id)
+      .eq('user_id', internalUserId)
       .single();
 
     if (!member) {
@@ -56,7 +58,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Save to database
-    const dbResult = await createPayment(workspaceId, user.id, amount, 'paypal', {
+    const dbResult = await createPayment(workspaceId, internalUserId, amount, 'paypal', {
       paypal_order_id: paypalResult.id,
       currency,
     });

@@ -21,9 +21,20 @@ export async function POST(req: Request) {
   const user = await db.users.authenticate(email, password)
   if (!user) return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
 
-  const session = await sessionManager.create(user.id)
+  // Resolve internal id to ensure deterministic sessions even in dev mode
+  let internalUserId = user.id
+  try {
+    const { ensureInternalUser } = await import('@/lib/supabase/queries')
+    const ensured = await ensureInternalUser(user.id)
+    if (ensured && ensured.id) internalUserId = ensured.id
+  } catch (e: any) {
+    // In dev mode we may not have Supabase credentials — fall back to provided id
+    console.warn('[DEV_LOGIN] ensureInternalUser failed, using provided id:', (e && e.message) || e)
+  }
+
+  const session = await sessionManager.create(internalUserId)
   const maxAge = Math.max(0, Math.floor((new Date(session.expires_at).getTime() - Date.now()) / 1000))
-  const res = NextResponse.json({ success: true, user: { id: user.id, email: user.email, role: user.role } })
+  const res = NextResponse.json({ success: true, user: { id: internalUserId, email: user.email, role: user.role } })
   const cookieStore = await cookies()
   cookieStore.set('session_id', session.id, { path: '/', httpOnly: true, secure: env.isProduction, sameSite: 'lax', maxAge })
   return res

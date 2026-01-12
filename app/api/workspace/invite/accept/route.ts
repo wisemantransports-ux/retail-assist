@@ -23,6 +23,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Resolve internal user id to ensure deterministic behavior
+    const { ensureInternalUser } = await import('@/lib/supabase/queries')
+    const ensured = await ensureInternalUser(user.id)
+    const internalUserId = ensured?.id || user.id
+
     const { token } = await request.json();
 
     // Validation
@@ -35,8 +40,8 @@ export async function POST(request: NextRequest) {
 
     console.log(`[team-api] Accepting invite with token: ${token.substring(0, 8)}...`);
 
-    // Accept invite
-    const result = await acceptInvite(token, user.id);
+    // Accept invite (pass resolved internal user id)
+    const result = await acceptInvite(token, internalUserId);
 
     if (result.error) {
       console.error('[team-api] Error accepting invite:', result.error);
@@ -47,7 +52,7 @@ export async function POST(request: NextRequest) {
     }
 
     // TODO: Send invite accepted email
-    console.log('[team-api] Invite accepted by user:', user.id);
+    console.log('[team-api] Invite accepted by user:', internalUserId);
 
     return NextResponse.json({
       success: true,

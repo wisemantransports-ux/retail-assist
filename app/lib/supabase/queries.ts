@@ -54,6 +54,12 @@ export async function resolveUserId(candidateId: string | null | undefined, crea
 // Ensure there's a full internal `users` row for the given candidate id.
 // Accepts either an internal users.id or a Supabase auth UID. Returns
 // an object containing the internal `id` when successful or `{ id: null }`.
+//
+// NOTE: This helper enforces the project's canonical ID contract:
+// - `public.users.id` is the canonical internal user id used across application tables.
+// - Supabase Auth UIDs (auth.users.id) must be resolved to the internal id before
+//   persisting into FK columns like `sessions.user_id`, `workspace_members.user_id`, etc.
+// See: INTERNAL_USER_ID_CONTRACT.md for details and guidance.
 export async function ensureInternalUser(candidateId: string | null | undefined): Promise<{ id: string | null }> {
     if (!candidateId) return { id: null }
     const db = admin()
@@ -80,15 +86,25 @@ export async function ensureInternalUser(candidateId: string | null | undefined)
     }
 
     try {
-        const { data, error } = await db.from('users').upsert(record, { onConflict: 'auth_uid' }).select('id').maybeSingle()
-        if (error) {
-            console.error('[ensureInternalUser] upsert error:', error)
-        }
-        if (data && (data as any).id) return { id: (data as any).id }
+		// Insert a deterministic internal user row so that `public.users.id` == auth UID
+		// This ensures sessions.user_id (FK) can reference the internal users.id deterministically.
+		// We attempt to insert with `id = candidateId`. If the DB already contains a row
+		// with that id or auth_uid, the subsequent select will return it.
+		const insertRecord = { id: candidateId, ...record }
+		const { data, error } = await db.from('users').insert(insertRecord).select('id').maybeSingle()
+		if (error) {
+			// If direct insert fails (conflict, constraint), fall back to upsert by auth_uid
+			console.warn('[ensureInternalUser] insert with deterministic id failed, attempting upsert by auth_uid:', (error as any)?.message || error)
+			const { data: upsertData, error: upsertErr } = await db.from('users').upsert(record, { onConflict: 'auth_uid' }).select('id').maybeSingle()
+			if (upsertErr) console.error('[ensureInternalUser] upsert error:', upsertErr)
+			if (upsertData && (upsertData as any).id) return { id: (upsertData as any).id }
+			// continue to final fallback
+		}
+		if (data && (data as any).id) return { id: (data as any).id }
 
-        // Final fallback: select by auth_uid
-        const { data: sel } = await db.from('users').select('id').eq('auth_uid', candidateId).maybeSingle()
-        if (sel && (sel as any).id) return { id: (sel as any).id }
+		// Final fallback: select by auth_uid
+		const { data: sel } = await db.from('users').select('id').eq('auth_uid', candidateId).maybeSingle()
+		if (sel && (sel as any).id) return { id: (sel as any).id }
     } catch (e: any) {
         console.error('[ensureInternalUser] unexpected error:', e)
     }

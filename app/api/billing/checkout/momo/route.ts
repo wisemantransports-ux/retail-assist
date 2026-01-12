@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
 import { generateMobileMoneyReference, validatePhoneNumber, detectProvider } from '@/lib/mobile-money/billing';
-import { createMobileMoneyPaymentBilling, getPlanById } from '@/lib/supabase/queries';
+import { createMobileMoneyPaymentBilling, getPlanById, ensureInternalUser } from '@/lib/supabase/queries';
 import { recordBillingEvent } from '@/lib/supabase/queries';
 
 /**
@@ -39,12 +39,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify user is member of workspace
+    // Resolve internal user id and verify membership in workspace
+    const ensured = await ensureInternalUser(user.id)
+    const internalUserId = ensured?.id || user.id
     const { data: member } = await supabase
       .from('workspace_members')
       .select('role')
       .eq('workspace_id', workspaceId)
-      .eq('user_id', user.id)
+      .eq('user_id', internalUserId)
       .single();
 
     if (!member) {

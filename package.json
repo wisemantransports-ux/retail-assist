@@ -30,6 +30,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "^16.0.7",
+    "playwright": "^1.37.0",
     "tailwindcss": "^4",
     "ts-node": "^10.9.1",
     "tsconfig-paths": "^4.1.0",

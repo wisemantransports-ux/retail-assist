@@ -10,31 +10,49 @@ CREATE OR REPLACE FUNCTION public.rpc_create_user_profile(
     p_phone text,
     p_plan_type text default 'starter'
 )
-RETURNS public.users
+RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 declare
-    inserted_user users%rowtype;
+    v_user_id uuid;
+    v_workspace_id uuid;
 begin
-    insert into public.users (
-        auth_uid, email, full_name, business_name, phone, plan_type,
-        role, payment_status, subscription_status, created_at, updated_at
-    )
-    values (
-        p_auth_uid, p_email, p_full_name, p_business_name, p_phone, p_plan_type,
-        'user', 'unpaid', 'pending', now(), now()
-    )
-    returning * into inserted_user;
+    -- Resolve the internal user created by the auth trigger (must not insert)
+    select id into v_user_id
+    from public.users
+    where auth_uid = p_auth_uid;
 
-    return inserted_user;
+    if v_user_id is null then
+        raise exception 'internal user not found for auth_uid %', p_auth_uid;
+    end if;
+
+    -- Reuse existing workspace for this owner if present, otherwise create one
+    select id into v_workspace_id from public.workspaces where owner_id = v_user_id;
+
+    if v_workspace_id is null then
+      insert into public.workspaces (name, owner_id)
+      values (p_business_name, v_user_id)
+      returning id into v_workspace_id;
+    end if;
+
+    -- Ensure workspace_members row exists (no duplicate)
+    insert into public.workspace_members (workspace_id, user_id, role)
+    select v_workspace_id, v_user_id, 'member'
+    where not exists (
+      select 1 from public.workspace_members where workspace_id = v_workspace_id and user_id = v_user_id
+    );
+
+    -- Ensure admin_access row exists (no duplicate)
+    insert into public.admin_access (workspace_id, user_id, role)
+    select v_workspace_id, v_user_id, 'admin'
+    where not exists (
+      select 1 from public.admin_access where workspace_id = v_workspace_id and user_id = v_user_id
+    );
 end;
 $$;
 
--- Grant execute to anon (if desired), but service-role should be used by server code.
--- GRANT EXECUTE ON FUNCTION public.rpc_create_user_profile(uuid,text,text,text,text,text) TO anon;
-
--- Ensure service-role can operate on users and sessions tables (adjust role name if different in your Postgres setup)
--- These grants are for guidance; apply them in your Supabase SQL editor if needed.
--- GRANT insert, update, select ON TABLE public.users TO service_role;
--- GRANT insert, update, select ON TABLE public.sessions TO service_role;
+-- Lock down permissions and allow execution via PostgREST roles
+revoke all on function public.rpc_create_user_profile from public;
+grant execute on function public.rpc_create_user_profile to anon;
+grant execute on function public.rpc_create_user_profile to authenticated;

@@ -44,8 +44,11 @@ export async function POST(request: NextRequest) {
 
     console.log(`[team-api] Updating member ${member_id} to role ${role}`);
 
-    // Update member role
-    const result = await updateMemberRole(workspace_id, member_id, role as any, user.id);
+    // Resolve internal actor id and update member role
+    const { ensureInternalUser } = await import('@/lib/supabase/queries')
+    const ensured = await ensureInternalUser(user.id)
+    const internalUserId = ensured?.id || user.id
+    const result = await updateMemberRole(workspace_id, member_id, role as any, internalUserId);
 
     if (result.error) {
       console.error('[team-api] Error updating member role:', result.error);

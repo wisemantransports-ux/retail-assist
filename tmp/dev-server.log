@@ -1,0 +1,326 @@
+
+> retail-assist-app@0.1.0 dev
+> next dev -H 0.0.0.0 -p 5000
+
+   ▲ Next.js 16.0.7 (Turbopack)
+   - Local:         http://localhost:5000
+   - Network:       http://0.0.0.0:5000
+   - Environments: .env.local
+   - Experiments (use with caution):
+     · serverActions
+
+ ✓ Starting...
+ ✓ Ready in 830ms
+ ○ Compiling /auth/signup ...
+ GET /auth/signup 200 in 4.0s (compile: 3.8s, render: 200ms)
+[SIGNUP] RPC raw response: PostgrestFilterBuilder {
+  shouldThrowOnError: false,
+  method: 'POST',
+  url: URL {
+    href: 'https://dzrwxdjzgwvdmfbbfotn.supabase.co/rest/v1/rpc/rpc_create_user_profile',
+    origin: 'https://dzrwxdjzgwvdmfbbfotn.supabase.co',
+    protocol: 'https:',
+    username: '',
+    password: '',
+    host: 'dzrwxdjzgwvdmfbbfotn.supabase.co',
+    hostname: 'dzrwxdjzgwvdmfbbfotn.supabase.co',
+    port: '',
+    pathname: '/rest/v1/rpc/rpc_create_user_profile',
+    search: '',
+    searchParams: URLSearchParams {},
+    hash: ''
+  },
+  headers: Headers { 'X-Client-Info': 'supabase-js-node/2.86.2' },
+  schema: 'public',
+  body: {
+    p_auth_uid: 'c89f7a86-6d2b-4295-a302-447586fecce0',
+    p_business_name: 'E2E Test Biz',
+    p_email: 'frontendverify1@test.dev',
+    p_phone: '+1 555-000-0000',
+    p_full_name: null,
+    p_plan_type: 'starter'
+  },
+  signal: undefined,
+  isMaybeSingle: false,
+  fetch: [AsyncFunction (anonymous)]
+}
+[SIGNUP] Profile RPC error after single(): {
+  code: 'PGRST202',
+  details: 'Searched for the function public.rpc_create_user_profile with parameters p_auth_uid, p_business_name, p_email, p_full_name, p_phone, p_plan_type or with a single unnamed json/jsonb parameter, but no matches were found in the schema cache.',
+  hint: null,
+  message: 'Could not find the function public.rpc_create_user_profile(p_auth_uid, p_business_name, p_email, p_full_name, p_phone, p_plan_type) in the schema cache'
+}
+[SIGNUP] Profile RPC error: {
+  code: 'PGRST202',
+  details: 'Searched for the function public.rpc_create_user_profile with parameters p_auth_uid, p_business_name, p_email, p_full_name, p_phone, p_plan_type or with a single unnamed json/jsonb parameter, but no matches were found in the schema cache.',
+  hint: null,
+  message: 'Could not find the function public.rpc_create_user_profile(p_auth_uid, p_business_name, p_email, p_full_name, p_phone, p_plan_type) in the schema cache'
+}
+[SIGNUP] Rolled back auth user after profile RPC failure: c89f7a86-6d2b-4295-a302-447586fecce0
+ POST /api/auth/signup 500 in 3.0s (compile: 1131ms, render: 1912ms)
+ GET /auth/signup 200 in 51ms (compile: 3ms, render: 47ms)
+[SIGNUP] RPC raw response: PostgrestFilterBuilder {
+  shouldThrowOnError: false,
+  method: 'POST',
+  url: URL {
+    href: 'https://dzrwxdjzgwvdmfbbfotn.supabase.co/rest/v1/rpc/rpc_create_user_profile',
+    origin: 'https://dzrwxdjzgwvdmfbbfotn.supabase.co',
+    protocol: 'https:',
+    username: '',
+    password: '',
+    host: 'dzrwxdjzgwvdmfbbfotn.supabase.co',
+    hostname: 'dzrwxdjzgwvdmfbbfotn.supabase.co',
+    port: '',
+    pathname: '/rest/v1/rpc/rpc_create_user_profile',
+    search: '',
+    searchParams: URLSearchParams {},
+    hash: ''
+  },
+  headers: Headers { 'X-Client-Info': 'supabase-js-node/2.86.2' },
+  schema: 'public',
+  body: {
+    p_auth_uid: '836b65b2-0259-4788-874e-c331f6e1e51b',
+    p_business_name: 'Frontend Verify Store',
+    p_email: 'frontendverify2@test.dev',
+    p_phone: '+26770000001',
+    p_full_name: null,
+    p_plan_type: 'starter'
+  },
+  signal: undefined,
+  isMaybeSingle: false,
+  fetch: [AsyncFunction (anonymous)]
+}
+[SIGNUP] Profile RPC error after single(): {
+  code: '23505',
+  details: 'Key (email)=(frontendverify2@test.dev) already exists.',
+  hint: null,
+  message: 'duplicate key value violates unique constraint "users_email_key"'
+}
+[SIGNUP] Profile RPC error: {
+  code: '23505',
+  details: 'Key (email)=(frontendverify2@test.dev) already exists.',
+  hint: null,
+  message: 'duplicate key value violates unique constraint "users_email_key"'
+}
+[SIGNUP] Rolled back auth user after profile RPC failure: 836b65b2-0259-4788-874e-c331f6e1e51b
+ POST /api/auth/signup 500 in 2.0s (compile: 10ms, render: 2.0s)
+ GET /auth/signup 200 in 54ms (compile: 2ms, render: 51ms)
+[SIGNUP] RPC raw response: PostgrestFilterBuilder {
+  shouldThrowOnError: false,
+  method: 'POST',
+  url: URL {
+    href: 'https://dzrwxdjzgwvdmfbbfotn.supabase.co/rest/v1/rpc/rpc_create_user_profile',
+    origin: 'https://dzrwxdjzgwvdmfbbfotn.supabase.co',
+    protocol: 'https:',
+    username: '',
+    password: '',
+    host: 'dzrwxdjzgwvdmfbbfotn.supabase.co',
+    hostname: 'dzrwxdjzgwvdmfbbfotn.supabase.co',
+    port: '',
+    pathname: '/rest/v1/rpc/rpc_create_user_profile',
+    search: '',
+    searchParams: URLSearchParams {},
+    hash: ''
+  },
+  headers: Headers { 'X-Client-Info': 'supabase-js-node/2.86.2' },
+  schema: 'public',
+  body: {
+    p_auth_uid: 'aa6370a6-9175-479a-96ea-15a2040337ad',
+    p_business_name: 'Frontend Verify Store',
+    p_email: 'frontendverify2@test.dev',
+    p_phone: '+26770000001',
+    p_full_name: null,
+    p_plan_type: 'starter'
+  },
+  signal: undefined,
+  isMaybeSingle: false,
+  fetch: [AsyncFunction (anonymous)]
+}
+[SIGNUP] Profile RPC error after single(): {
+  code: '23505',
+  details: 'Key (email)=(frontendverify2@test.dev) already exists.',
+  hint: null,
+  message: 'duplicate key value violates unique constraint "users_email_key"'
+}
+[SIGNUP] Profile RPC error: {
+  code: '23505',
+  details: 'Key (email)=(frontendverify2@test.dev) already exists.',
+  hint: null,
+  message: 'duplicate key value violates unique constraint "users_email_key"'
+}
+[SIGNUP] Rolled back auth user after profile RPC failure: aa6370a6-9175-479a-96ea-15a2040337ad
+ POST /api/auth/signup 500 in 1965ms (compile: 7ms, render: 1958ms)
+ GET /auth/signup 200 in 74ms (compile: 4ms, render: 70ms)
+[SIGNUP] RPC raw response: PostgrestFilterBuilder {
+  shouldThrowOnError: false,
+  method: 'POST',
+  url: URL {
+    href: 'https://dzrwxdjzgwvdmfbbfotn.supabase.co/rest/v1/rpc/rpc_create_user_profile',
+    origin: 'https://dzrwxdjzgwvdmfbbfotn.supabase.co',
+    protocol: 'https:',
+    username: '',
+    password: '',
+    host: 'dzrwxdjzgwvdmfbbfotn.supabase.co',
+    hostname: 'dzrwxdjzgwvdmfbbfotn.supabase.co',
+    port: '',
+    pathname: '/rest/v1/rpc/rpc_create_user_profile',
+    search: '',
+    searchParams: URLSearchParams {},
+    hash: ''
+  },
+  headers: Headers { 'X-Client-Info': 'supabase-js-node/2.86.2' },
+  schema: 'public',
+  body: {
+    p_auth_uid: '65fee278-48a5-45a4-bf03-0a3613617929',
+    p_business_name: 'Frontend Verify Store',
+    p_email: 'frontendverify3@test.dev',
+    p_phone: '+26770000002',
+    p_full_name: null,
+    p_plan_type: 'starter'
+  },
+  signal: undefined,
+  isMaybeSingle: false,
+  fetch: [AsyncFunction (anonymous)]
+}
+[SIGNUP] Profile RPC error after single(): {
+  code: '23505',
+  details: 'Key (email)=(frontendverify3@test.dev) already exists.',
+  hint: null,
+  message: 'duplicate key value violates unique constraint "users_email_key"'
+}
+[SIGNUP] Profile RPC error: {
+  code: '23505',
+  details: 'Key (email)=(frontendverify3@test.dev) already exists.',
+  hint: null,
+  message: 'duplicate key value violates unique constraint "users_email_key"'
+}
+[SIGNUP] Rolled back auth user after profile RPC failure: 65fee278-48a5-45a4-bf03-0a3613617929
+ POST /api/auth/signup 500 in 1761ms (compile: 3ms, render: 1758ms)
+ GET /auth/signup 200 in 67ms (compile: 3ms, render: 63ms)
+[SIGNUP] RPC raw response: PostgrestFilterBuilder {
+  shouldThrowOnError: false,
+  method: 'POST',
+  url: URL {
+    href: 'https://dzrwxdjzgwvdmfbbfotn.supabase.co/rest/v1/rpc/rpc_create_user_profile',
+    origin: 'https://dzrwxdjzgwvdmfbbfotn.supabase.co',
+    protocol: 'https:',
+    username: '',
+    password: '',
+    host: 'dzrwxdjzgwvdmfbbfotn.supabase.co',
+    hostname: 'dzrwxdjzgwvdmfbbfotn.supabase.co',
+    port: '',
+    pathname: '/rest/v1/rpc/rpc_create_user_profile',
+    search: '',
+    searchParams: URLSearchParams {},
+    hash: ''
+  },
+  headers: Headers { 'X-Client-Info': 'supabase-js-node/2.86.2' },
+  schema: 'public',
+  body: {
+    p_auth_uid: '3a66a18d-0a91-4016-aafc-a28ae40e2459',
+    p_business_name: 'Frontend Verify Store',
+    p_email: 'frontendverify3@test.dev',
+    p_phone: '+26770000002',
+    p_full_name: null,
+    p_plan_type: 'starter'
+  },
+  signal: undefined,
+  isMaybeSingle: false,
+  fetch: [AsyncFunction (anonymous)]
+}
+[SIGNUP] Profile RPC error after single(): {
+  code: 'P0001',
+  details: null,
+  hint: null,
+  message: 'internal user not found for auth_uid 3a66a18d-0a91-4016-aafc-a28ae40e2459'
+}
+[SIGNUP] Profile RPC error: {
+  code: 'P0001',
+  details: null,
+  hint: null,
+  message: 'internal user not found for auth_uid 3a66a18d-0a91-4016-aafc-a28ae40e2459'
+}
+[SIGNUP] Rolled back auth user after profile RPC failure: 3a66a18d-0a91-4016-aafc-a28ae40e2459
+ POST /api/auth/signup 500 in 1300ms (compile: 8ms, render: 1292ms)
+ POST /api/auth/signup 400 in 7ms (compile: 3ms, render: 4ms)
+ POST /api/auth/signup 400 in 5ms (compile: 1707µs, render: 3ms)
+[SIGNUP] RPC raw response: PostgrestFilterBuilder {
+  shouldThrowOnError: false,
+  method: 'POST',
+  url: URL {
+    href: 'https://dzrwxdjzgwvdmfbbfotn.supabase.co/rest/v1/rpc/rpc_create_user_profile',
+    origin: 'https://dzrwxdjzgwvdmfbbfotn.supabase.co',
+    protocol: 'https:',
+    username: '',
+    password: '',
+    host: 'dzrwxdjzgwvdmfbbfotn.supabase.co',
+    hostname: 'dzrwxdjzgwvdmfbbfotn.supabase.co',
+    port: '',
+    pathname: '/rest/v1/rpc/rpc_create_user_profile',
+    search: '',
+    searchParams: URLSearchParams {},
+    hash: ''
+  },
+  headers: Headers { 'X-Client-Info': 'supabase-js-node/2.86.2' },
+  schema: 'public',
+  body: {
+    p_auth_uid: 'a743a051-eeea-4246-a3d0-c2ca9a217eee',
+    p_business_name: 'F4 Single Test Store',
+    p_email: 'frontend-f4-1768183881930@test.dev',
+    p_phone: '+10000000000',
+    p_full_name: null,
+    p_plan_type: 'starter'
+  },
+  signal: undefined,
+  isMaybeSingle: false,
+  fetch: [AsyncFunction (anonymous)]
+}
+[SIGNUP] Profile RPC error after single(): {
+  code: '23505',
+  details: 'Key (owner_id)=(2c92c330-b5f3-4875-a00c-5fd7c5dd814d) already exists.',
+  hint: null,
+  message: 'duplicate key value violates unique constraint "unique_workspaces_owner"'
+}
+[SIGNUP] Profile RPC error: {
+  code: '23505',
+  details: 'Key (owner_id)=(2c92c330-b5f3-4875-a00c-5fd7c5dd814d) already exists.',
+  hint: null,
+  message: 'duplicate key value violates unique constraint "unique_workspaces_owner"'
+}
+[SIGNUP] Rolled back auth user after profile RPC failure: a743a051-eeea-4246-a3d0-c2ca9a217eee
+ POST /api/auth/signup 500 in 1830ms (compile: 1923µs, render: 1828ms)
+[SIGNUP] RPC raw response: PostgrestFilterBuilder {
+  shouldThrowOnError: false,
+  method: 'POST',
+  url: URL {
+    href: 'https://dzrwxdjzgwvdmfbbfotn.supabase.co/rest/v1/rpc/rpc_create_user_profile',
+    origin: 'https://dzrwxdjzgwvdmfbbfotn.supabase.co',
+    protocol: 'https:',
+    username: '',
+    password: '',
+    host: 'dzrwxdjzgwvdmfbbfotn.supabase.co',
+    hostname: 'dzrwxdjzgwvdmfbbfotn.supabase.co',
+    port: '',
+    pathname: '/rest/v1/rpc/rpc_create_user_profile',
+    search: '',
+    searchParams: URLSearchParams {},
+    hash: ''
+  },
+  headers: Headers { 'X-Client-Info': 'supabase-js-node/2.86.2' },
+  schema: 'public',
+  body: {
+    p_auth_uid: '34da5bbb-4147-413c-b871-c3e8a0c8f201',
+    p_business_name: 'F4 Single Test Store',
+    p_email: 'frontend-f4-1768186959311@test.dev',
+    p_phone: '+10000000000',
+    p_full_name: null,
+    p_plan_type: 'starter'
+  },
+  signal: undefined,
+  isMaybeSingle: false,
+  fetch: [AsyncFunction (anonymous)]
+}
+[SIGNUP] Profile RPC error after single(): null
+[SIGNUP] Profile RPC error: null
+[SIGNUP] Rolled back auth user after profile RPC failure: 34da5bbb-4147-413c-b871-c3e8a0c8f201
+ POST /api/auth/signup 500 in 2.8s (compile: 3ms, render: 2.8s)

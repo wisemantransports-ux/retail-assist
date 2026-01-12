@@ -8,7 +8,7 @@ const supabase = () => createAdminSupabaseClient()
 const DEV_SESSIONS = path.join(process.cwd(), 'tmp', 'dev-seed', 'sessions.json')
 
 function generateSessionId(): string {
-  return crypto.randomUUID() + '-' + crypto.randomUUID()
+  return crypto.randomUUID()
 }
 
 function readDevSessions() {
@@ -30,34 +30,37 @@ const useDev = env.useMockMode
 
 export const sessionManager = {
   async create(userId: string, expiresInHours: number = 24 * 7) {
+    // Ensure we always reference the canonical internal `users.id` in sessions.user_id.
+    // Accepts either an internal id or an auth UID; `ensureInternalUser` will
+    // deterministically create or resolve the internal id (attempting id = auth UID).
+    let effectiveUserId = userId
+    try {
+      const ensured = await ensureInternalUser(userId)
+      if (ensured && ensured.id) effectiveUserId = ensured.id
+    } catch (e: any) {
+      console.error('[sessionManager.create] failed to ensure internal user:', e)
+      // fall back to provided userId to avoid blocking dev flows
+    }
+
+    const id = generateSessionId()
+    const now = new Date()
+    const expiresAt = new Date(now.getTime() + expiresInHours * 60 * 60 * 1000)
+
+    const session = {
+      id,
+      user_id: effectiveUserId,
+      created_at: now.toISOString(),
+      expires_at: expiresAt.toISOString(),
+    }
+
     if (!useDev) {
       const s = supabase()
-      const id = generateSessionId()
-      const now = new Date()
-      const expiresAt = new Date(now.getTime() + expiresInHours * 60 * 60 * 1000)
-
-      // Ensure an internal users.id exists for the provided userId (auth UID or internal id)
-      const ensured = await ensureInternalUser(userId)
-      const effectiveUserId = ensured.id || userId
-
-      const session = {
-        id,
-        user_id: effectiveUserId,
-        created_at: now.toISOString(),
-        expires_at: expiresAt.toISOString()
-      }
-
       const { error } = await s.from('sessions').insert(session)
       if (error) throw error
       return session
     }
 
     const sessions = readDevSessions()
-    const id = generateSessionId()
-    const now = new Date()
-    const expiresAt = new Date(now.getTime() + expiresInHours * 60 * 60 * 1000)
-
-    const session = { id, user_id: userId, created_at: now.toISOString(), expires_at: expiresAt.toISOString() }
     sessions[id] = session
     writeDevSessions(sessions)
     return session

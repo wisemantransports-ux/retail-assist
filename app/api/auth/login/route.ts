@@ -4,7 +4,7 @@ import { sessionManager } from '@/lib/session'
 import { db } from '@/lib/db'
 import { env } from '@/lib/env'
 import { ensureWorkspaceForUser } from '@/lib/supabase/ensureWorkspaceForUser'
-import { resolveUserId } from '@/lib/supabase/queries'
+import { resolveUserId, ensureInternalUser } from '@/lib/supabase/queries'
 import { cookies } from 'next/headers'
 
 // Use mock mode to avoid calling Supabase in CI or while testing.
@@ -57,18 +57,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
     }
 
-    // Ensure user has a workspace (safe to call multiple times) — pass user id
-    const workspaceResult = await ensureWorkspaceForUser(data.user.id)
+    // Ensure there is a deterministic internal users row for this auth UID
+    const ensured = await ensureInternalUser(data.user.id)
+    if (!ensured || !ensured.id) {
+      console.error('[LOGIN] Failed to ensure internal user for auth UID:', data.user.id)
+      return NextResponse.json({ error: 'User profile creation failed' }, { status: 500 })
+    }
+    const internalUserId = ensured.id
+
+    // Ensure user has a workspace (safe to call multiple times) — pass internal id
+    const workspaceResult = await ensureWorkspaceForUser(internalUserId)
     if (workspaceResult.error) {
       console.warn('[LOGIN] Workspace provisioning warning:', workspaceResult.error)
       // Don't fail login if workspace provisioning fails - user can create/join later
     }
 
-    // create our session record using internal users.id (ensure exists)
-    const internalUserId = await resolveUserId(data.user.id, true)
-    const session = await sessionManager.create(internalUserId || data.user.id, 24 * 7)
+    // create our session record using the deterministic internal users.id
+    const session = await sessionManager.create(internalUserId, 24 * 7)
     const maxAge = 7 * 24 * 60 * 60
-    const res = NextResponse.json({ success: true, user: { id: internalUserId || data.user.id, email: data.user.email, role: (data.user as any).role || 'user' }, workspaceId: workspaceResult.workspaceId })
+    const res = NextResponse.json({ success: true, user: { id: internalUserId, email: data.user.email, role: (data.user as any).role || 'user' }, workspaceId: workspaceResult.workspaceId })
     const cookieStore = await cookies()
     cookieStore.set('session_id', session.id, { path: '/', httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge })
     return res

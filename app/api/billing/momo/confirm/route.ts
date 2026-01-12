@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
-import { confirmMobileMoneyPaymentBilling, updateSubscriptionBilling, recordBillingEvent } from '@/lib/supabase/queries';
+import { confirmMobileMoneyPaymentBilling, updateSubscriptionBilling, recordBillingEvent, ensureInternalUser } from '@/lib/supabase/queries';
 
 /**
  * POST /api/billing/momo/confirm
@@ -47,12 +47,14 @@ export async function POST(req: NextRequest) {
 
     const workspaceId = payment.workspace_id;
 
-    // Check if user is workspace owner/admin
+    // Resolve internal user id and check workspace membership/role
+    const ensured = await ensureInternalUser(user.id)
+    const internalUserId = ensured?.id || user.id
     const { data: member } = await supabase
       .from('workspace_members')
       .select('role')
       .eq('workspace_id', workspaceId)
-      .eq('user_id', user.id)
+      .eq('user_id', internalUserId)
       .single();
 
     if (!member || (member.role !== 'owner' && member.role !== 'admin')) {
@@ -60,7 +62,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Confirm the payment
-    const confirmResult = await confirmMobileMoneyPaymentBilling(paymentId, user.id, notes);
+    const confirmResult = await confirmMobileMoneyPaymentBilling(paymentId, internalUserId, notes);
 
     if (confirmResult.error) {
       return NextResponse.json({ error: 'Failed to confirm payment' }, { status: 500 });
@@ -79,10 +81,10 @@ export async function POST(req: NextRequest) {
       }
 
       // Record billing event
-      await recordBillingEvent(workspaceId, 'payment_confirmed', subscription.id, paymentId, {
+        await recordBillingEvent(workspaceId, 'payment_confirmed', subscription.id, internalUserId, {
         payment_method: 'momo',
         reference_code: payment.reference_code,
-        confirmed_by: user.id,
+          confirmed_by: internalUserId,
         notes,
       });
     }

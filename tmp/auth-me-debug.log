@@ -1,0 +1,14 @@
+2026-01-12T11:46:37.451Z [Auth Me] Cookie header present: YES
+2026-01-12T11:46:37.467Z [Auth Me] session_id cookie present: YES
+2026-01-12T11:46:37.696Z [Auth Me] session lookup: FOUND
+2026-01-12T11:46:38.137Z [Auth Me] user lookup: NOT_FOUND
+2026-01-12T11:46:38.149Z [Auth Me] Cookie header present: YES
+2026-01-12T11:46:38.150Z [Auth Me] session_id cookie present: YES
+2026-01-12T11:46:38.357Z [Auth Me] session lookup: FOUND
+2026-01-12T11:46:38.785Z [Auth Me] user lookup: NOT_FOUND
+2026-01-12T11:52:23.522Z [Auth Me] Cookie header present: YES
+2026-01-12T11:52:23.529Z [Auth Me] session_id cookie present: YES
+2026-01-12T11:52:23.746Z [Auth Me] session lookup: FOUND
+2026-01-12T11:52:24.212Z [Auth Me] user lookup: NOT_FOUND
+2026-01-12T11:52:24.213Z [Auth Me] attempting ensureInternalUser for 42839083-a756-4ade-ae20-4a9154040060
+2026-01-12T11:52:24.878Z [Auth Me] user lookup after ensureInternalUser: NOT_FOUND

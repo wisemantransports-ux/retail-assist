@@ -1,5 +1,5 @@
 import { createServerClient } from '@/lib/supabase/server';
-import { removeMember } from '@/lib/supabase/queries';
+import { removeMember, ensureInternalUser } from '@/lib/supabase/queries';
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
@@ -36,8 +36,12 @@ export async function POST(request: NextRequest) {
 
     console.log(`[team-api] Removing member ${member_id} from workspace ${workspace_id}`);
 
+    // Resolve internal actor id and remove member
+    const ensured = await ensureInternalUser(user.id)
+    const internalUserId = ensured?.id || user.id
+
     // Remove member
-    const result = await removeMember(workspace_id, member_id, user.id);
+    const result = await removeMember(workspace_id, member_id, internalUserId);
 
     if (result.error) {
       console.error('[team-api] Error removing member:', result.error);

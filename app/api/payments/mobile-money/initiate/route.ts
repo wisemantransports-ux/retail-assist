@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
-import { saveMobileMoneyPayment, createPayment } from '@/lib/supabase/queries';
+import { saveMobileMoneyPayment, createPayment, ensureInternalUser } from '@/lib/supabase/queries';
 import { generateReferenceCode, sendAdminNotificationEmail } from '@/lib/mobile-money/server';
 
 /**
@@ -29,12 +29,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify user is in workspace
+    // Resolve internal user id and verify user is in workspace
+    const ensured = await ensureInternalUser(user.id)
+    const internalUserId = ensured?.id || user.id
     const { data: member } = await supabase
       .from('workspace_members')
       .select('id')
       .eq('workspace_id', workspaceId)
-      .eq('user_id', user.id)
+      .eq('user_id', internalUserId)
       .single();
 
     if (!member) {
@@ -47,7 +49,7 @@ export async function POST(req: NextRequest) {
     // Save mobile money payment
     const result = await saveMobileMoneyPayment(
       workspaceId,
-      user.id,
+      internalUserId,
       phoneNumber,
       amount,
       referenceCode

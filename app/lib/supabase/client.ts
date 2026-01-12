@@ -52,13 +52,25 @@ export function createBrowserSupabaseClient() {
   // Ensure required client-side env vars exist
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+  // Temporary runtime check for F-1: log presence of public Supabase env vars
+  try {
+    console.debug('F-1 check: NEXT_PUBLIC_SUPABASE_URL present?', Boolean(url));
+    console.debug('F-1 check: NEXT_PUBLIC_SUPABASE_ANON_KEY present?', Boolean(key));
+  } catch (e) {
+    // swallowing logging errors should never block auth
+  }
+  // If we're not in a browser environment, return the stub client to avoid
+  // creating a real browser client during server-side rendering.
+  if (typeof window === 'undefined') return stubClient as unknown as SupabaseClient;
+
   if (!url || !key) {
     console.warn('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY; falling back to stub client');
     return stubClient as unknown as SupabaseClient;
   }
 
   if (client) return client;
-  client = createClient(url, key, { auth: { persistSession: false } });
+  // Enable client-side session persistence and automatic token refresh
+  client = createClient(url, key, { auth: { persistSession: true, storage: undefined, autoRefreshToken: true } });
   return client;
 }
 

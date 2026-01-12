@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { supabase } from '@/lib/supabase/client';
 
 const PLANS = [
   {
@@ -95,9 +96,20 @@ function SignupForm() {
         throw new Error(data.error || 'Signup failed');
       }
 
-      // automatically go to dashboard (session created server-side)
-      router.replace('/dashboard');
-      router.refresh();
+      // After successful signup, perform client-side sign-in with Supabase
+      try {
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+        if (signInError || !signInData?.user) {
+          throw new Error(signInError?.message || 'Sign in after signup failed');
+        }
+
+        // Redirect to dashboard on successful sign-in
+        router.replace('/dashboard');
+        router.refresh();
+      } catch (signErr: any) {
+        // If client-side sign-in fails, surface an error but do not modify backend
+        setError(signErr?.message || 'Failed to sign in after signup');
+      }
     } catch (err: any) {
       setError(err.message || "Failed to sign up");
     } finally {

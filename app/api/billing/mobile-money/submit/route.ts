@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
-import { saveMobileMoneyPayment } from '@/lib/supabase/queries';
+import { saveMobileMoneyPayment, ensureInternalUser } from '@/lib/supabase/queries';
 
 export async function POST(request: Request) {
   try {
@@ -19,9 +19,12 @@ export async function POST(request: Request) {
 
     const workspaceId = (user.user_metadata?.workspace_id as string) || '';
 
+    const ensured = await ensureInternalUser(user.id)
+    const internalUserId = ensured?.id || user.id
+
     const saved = await saveMobileMoneyPayment({
       workspace_id: workspaceId,
-      user_id: user.id,
+      user_id: internalUserId,
       phone_number: phoneNumber,
       receipt_url: receiptUrl,
       amount: amount ? Number(amount) : undefined,
