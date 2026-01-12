@@ -4,6 +4,7 @@ import { ensureInternalUser } from '@/lib/supabase/queries';
 import { sessionManager } from '@/lib/session';
 import { cookies } from 'next/headers';
 import { env } from '@/lib/env';
+import { createServerClient } from '@/lib/supabase/server';
 
 // Minimal file-backed logger (temporary, reversible)
 function debugLog(msg: string) {
@@ -91,6 +92,28 @@ export async function GET(request: Request) {
     
     const planLimits = PLAN_LIMITS[user.plan_type] || PLAN_LIMITS['starter'];
     
+    // TASK B1: Fetch user's workspace ID for proper scoping
+    // Query workspace by owner_id (assumes 1:1 relationship for now)
+    let workspaceId = user.id; // fallback to user.id
+    try {
+      const supabase = await createServerClient();
+      const { data: workspace } = await supabase
+        .from('workspaces')
+        .select('id')
+        .eq('owner_id', user.id)
+        .limit(1)
+        .single();
+      
+      if (workspace?.id) {
+        workspaceId = workspace.id;
+        console.info('[Auth Me] Workspace found:', workspaceId);
+      }
+    } catch (err: any) {
+      console.warn('[Auth Me] Workspace fetch failed, falling back to user.id:', err.message);
+      // Fallback to user.id if workspace lookup fails
+      workspaceId = user.id;
+    }
+    
     return NextResponse.json({
       user: {
         id: user.id,
@@ -103,7 +126,8 @@ export async function GET(request: Request) {
         plan_name: planLimits?.name || 'Starter',
         plan_limits: planLimits,
         billing_end_date: user.billing_end_date,
-        role: user.role
+        role: user.role,
+        workspace_id: workspaceId  // NEW: Added for dashboard workspace scoping
       }
     });
   } catch (error: any) {

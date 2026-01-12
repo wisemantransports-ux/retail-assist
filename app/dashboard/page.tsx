@@ -65,24 +65,28 @@ export default function ClientDashboard() {
         
         setSetupComplete(false);
 
-        // Fetch counts
-        const [inboxRes, rulesRes] = await Promise.all([
+        // Fetch counts in parallel
+        const [inboxRes, rulesRes, pagesRes, aiUsageRes] = await Promise.all([
           fetch('/api/inbox'),
-          fetch('/api/automation-rules')
+          fetch('/api/automation-rules'),
+          fetch('/api/meta/pages'),
+          fetch('/api/ai/usage')
         ]);
 
         const inboxData = inboxRes.ok ? await inboxRes.json() : { conversations: [] };
         const rulesData = rulesRes.ok ? await rulesRes.json() : [];
+        const pagesData = pagesRes.ok ? await pagesRes.json() : { pages: [] };
+        const aiUsageData = aiUsageRes.ok ? await aiUsageRes.json() : { count: 0 };
 
         setCounts({
           inbox: inboxData.conversations?.length || 0,
           rules: rulesData.length || 0,
-          pages: 0, // TODO: fetch from integrations
-          aiUsage: 0 // TODO: fetch AI usage
+          pages: pagesData.pages?.length || 0,
+          aiUsage: aiUsageData.count || 0
         });
       }
     } catch (error) {
-      console.error('Failed to load dashboard:', error);
+      console.error('[Dashboard] Failed to load dashboard:', error);
     } finally {
       setLoading(false);
     }
@@ -174,31 +178,13 @@ export default function ClientDashboard() {
               <div className="text-2xl font-bold text-white">{counts.rules}</div>
               <div className="text-gray-400 text-sm">Automation Rules</div>
             </div>
-            <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 text-center relative">
-              {counts.pages > 0 ? (
-                <>
-                  <div className="text-2xl font-bold text-white">{counts.pages}</div>
-                  <div className="text-gray-400 text-sm">Connected Pages</div>
-                </>
-              ) : (
-                <>
-                  <div className="text-gray-500 italic text-sm">Connected Pages — Placeholder: Connect your Facebook/Instagram pages to manage channels.</div>
-                  <div className="absolute top-2 right-2 bg-gray-600 text-gray-300 text-xs px-2 py-1 rounded">Coming Soon</div>
-                </>
-              )}
+            <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 text-center">
+              <div className="text-2xl font-bold text-white">{counts.pages}</div>
+              <div className="text-gray-400 text-sm">Connected Pages</div>
             </div>
-            <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 text-center relative">
-              {counts.aiUsage > 0 ? (
-                <>
-                  <div className="text-2xl font-bold text-white">{counts.aiUsage}</div>
-                  <div className="text-gray-400 text-sm">AI Usage</div>
-                </>
-              ) : (
-                <>
-                  <div className="text-gray-500 italic text-sm">AI Usage — Coming Soon: Configure your AI settings to see real usage.</div>
-                  <div className="absolute top-2 right-2 bg-gray-600 text-gray-300 text-xs px-2 py-1 rounded">Coming Soon</div>
-                </>
-              )}
+            <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 text-center">
+              <div className="text-2xl font-bold text-white">{counts.aiUsage}</div>
+              <div className="text-gray-400 text-sm">AI Messages</div>
             </div>
           </div>
           <div className="bg-gray-800 border border-gray-700 rounded-xl p-6">

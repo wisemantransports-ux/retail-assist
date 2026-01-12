@@ -1,34 +1,81 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface Agent {
   id: string;
-  agent_name: string;
+  agent_name?: string;
+  name?: string;  // Some API responses use 'name'
   system_prompt?: string;
   created_at?: string;
 }
 
-export default function AgentsPage() {
-  const [agents, setAgents] = useState<Agent[]>([
-    {
-      id: '1',
-      agent_name: 'Sales Assistant',
-      system_prompt: 'You are a friendly sales representative who helps customers find the perfect product...',
-      created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: '2',
-      agent_name: 'Support Bot',
-      system_prompt: 'You are a helpful customer support agent who resolves issues quickly...',
-      created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-  ]);
+interface User {
+  plan_limits?: {
+    enabledAiAgents?: boolean;
+  };
+}
 
-  const handleDelete = (id: string) => {
-    if (confirm('Are you sure you want to delete this agent?')) {
+export default function AgentsPage() {
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+
+  // TASK P0.1: Fetch agents from live API on mount
+  useEffect(() => {
+    loadUserAndAgents();
+  }, []);
+
+  const loadUserAndAgents = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // First, get user info for plan gating
+      const userRes = await fetch('/api/auth/me');
+      if (userRes.ok) {
+        const userData = await userRes.json();
+        setUser(userData.user);
+      }
+
+      // Fetch agents from API (replaces hardcoded mock data)
+      const agentsRes = await fetch('/api/agents');
+      if (!agentsRes.ok) {
+        throw new Error(`Failed to fetch agents: ${agentsRes.statusText}`);
+      }
+
+      const data = await agentsRes.json();
+      // Handle both 'agents' and 'data' response formats
+      const agentsList = data.agents || data.data || [];
+      setAgents(agentsList);
+    } catch (err: any) {
+      console.error('[Agents Page] Load error:', err.message);
+      setError(err.message || 'Failed to load agents');
+      setAgents([]); // Reset to empty on error
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this agent?')) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/agents/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to delete agent');
+      }
+
+      // Remove from local state after successful API call
       setAgents(agents.filter((a) => a.id !== id));
+    } catch (err: any) {
+      console.error('[Agents Page] Delete error:', err.message);
+      setError(err.message || 'Failed to delete agent');
     }
   };
 
@@ -47,7 +94,28 @@ export default function AgentsPage() {
         </Link>
       </div>
 
-      {agents.length === 0 ? (
+      {/* Loading State */}
+      {loading ? (
+        <div className="bg-gray-800 border border-gray-700 rounded-xl p-12">
+          <div className="flex flex-col items-center justify-center gap-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+            <p className="text-gray-400">Loading agents...</p>
+          </div>
+        </div>
+      ) : error ? (
+        /* Error State */
+        <div className="bg-red-900/20 border border-red-700 rounded-xl p-6">
+          <p className="text-red-400 font-semibold mb-2">Error loading agents</p>
+          <p className="text-red-300 text-sm mb-4">{error}</p>
+          <button
+            onClick={loadUserAndAgents}
+            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+          >
+            Try Again
+          </button>
+        </div>
+      ) : agents.length === 0 ? (
+        /* Empty State */
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-12 text-center">
           <p className="text-gray-400 mb-4">No agents created yet.</p>
           <Link
@@ -58,11 +126,12 @@ export default function AgentsPage() {
           </Link>
         </div>
       ) : (
+        /* Agents Grid */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {agents.map((agent) => (
             <div key={agent.id} className="bg-gray-800 border border-gray-700 rounded-xl p-6">
               <div className="flex items-start justify-between mb-4">
-                <h3 className="text-lg font-bold text-white">{agent.agent_name}</h3>
+                <h3 className="text-lg font-bold text-white">{agent.agent_name || agent.name || 'Unnamed'}</h3>
                 <span className="px-2 py-1 bg-green-900/50 text-green-400 text-xs rounded">
                   Active
                 </span>

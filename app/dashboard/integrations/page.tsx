@@ -298,6 +298,26 @@ export default function IntegrationsPage() {
         </p>
       </div>
 
+      <div className="bg-gray-800 border border-gray-700 rounded-xl p-6 opacity-60">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center text-white text-xl">
+              WA
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-white">WhatsApp</h2>
+              <p className="text-gray-400 text-sm">Connect WhatsApp for automated responses</p>
+            </div>
+          </div>
+          <span className="px-3 py-1 bg-yellow-600 text-yellow-200 text-sm rounded-lg font-semibold">
+            Coming Soon
+          </span>
+        </div>
+        <p className="text-gray-500 text-sm mt-4">
+          WhatsApp integration is coming soon. We're working to bring secure, compliant WhatsApp automation to your dashboard.
+        </p>
+      </div>
+
       <div className="bg-gray-800 border border-gray-700 rounded-xl p-6">
         <h2 className="text-lg font-semibold text-white mb-4">Webhook Information</h2>
         <div className="space-y-4">

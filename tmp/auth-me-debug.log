@@ -33,3 +33,43 @@
 2026-01-12T17:02:56.195Z [Auth Me] session lookup: FOUND
 2026-01-12T17:02:56.196Z [Auth Me] session.user_id: c485e177-6fea-4deb-8e2a-f097d2f4a31d
 2026-01-12T17:02:56.445Z [Auth Me] user lookup by ID: FOUND
+2026-01-12T17:59:08.070Z [Auth Me] Cookie header present: YES
+2026-01-12T17:59:08.071Z [Auth Me] session_id cookie present: YES
+2026-01-12T17:59:08.328Z [Auth Me] session lookup: FOUND
+2026-01-12T17:59:08.329Z [Auth Me] session.user_id: c485e177-6fea-4deb-8e2a-f097d2f4a31d
+2026-01-12T17:59:08.568Z [Auth Me] user lookup by ID: FOUND
+2026-01-12T17:59:09.048Z [Auth Me] Cookie header present: YES
+2026-01-12T17:59:09.049Z [Auth Me] session_id cookie present: YES
+2026-01-12T17:59:09.302Z [Auth Me] session lookup: FOUND
+2026-01-12T17:59:09.302Z [Auth Me] session.user_id: c485e177-6fea-4deb-8e2a-f097d2f4a31d
+2026-01-12T17:59:09.540Z [Auth Me] user lookup by ID: FOUND
+2026-01-12T17:59:10.043Z [Auth Me] Cookie header present: YES
+2026-01-12T17:59:10.045Z [Auth Me] session_id cookie present: YES
+2026-01-12T17:59:10.276Z [Auth Me] session lookup: FOUND
+2026-01-12T17:59:10.276Z [Auth Me] session.user_id: c485e177-6fea-4deb-8e2a-f097d2f4a31d
+2026-01-12T17:59:10.506Z [Auth Me] user lookup by ID: FOUND
+2026-01-12T17:59:10.990Z [Auth Me] Cookie header present: YES
+2026-01-12T17:59:10.991Z [Auth Me] session_id cookie present: YES
+2026-01-12T17:59:11.223Z [Auth Me] session lookup: FOUND
+2026-01-12T17:59:11.224Z [Auth Me] session.user_id: c485e177-6fea-4deb-8e2a-f097d2f4a31d
+2026-01-12T17:59:11.462Z [Auth Me] user lookup by ID: FOUND
+2026-01-12T18:00:46.421Z [Auth Me] Cookie header present: YES
+2026-01-12T18:00:46.423Z [Auth Me] session_id cookie present: YES
+2026-01-12T18:00:46.674Z [Auth Me] session lookup: FOUND
+2026-01-12T18:00:46.674Z [Auth Me] session.user_id: c485e177-6fea-4deb-8e2a-f097d2f4a31d
+2026-01-12T18:00:46.908Z [Auth Me] user lookup by ID: FOUND
+2026-01-12T18:00:47.342Z [Auth Me] Cookie header present: YES
+2026-01-12T18:00:47.344Z [Auth Me] session_id cookie present: YES
+2026-01-12T18:00:47.578Z [Auth Me] session lookup: FOUND
+2026-01-12T18:00:47.578Z [Auth Me] session.user_id: c485e177-6fea-4deb-8e2a-f097d2f4a31d
+2026-01-12T18:00:47.812Z [Auth Me] user lookup by ID: FOUND
+2026-01-12T18:01:00.009Z [Auth Me] Cookie header present: YES
+2026-01-12T18:01:00.015Z [Auth Me] session_id cookie present: YES
+2026-01-12T18:01:00.622Z [Auth Me] session lookup: FOUND
+2026-01-12T18:01:00.622Z [Auth Me] session.user_id: c485e177-6fea-4deb-8e2a-f097d2f4a31d
+2026-01-12T18:01:00.840Z [Auth Me] user lookup by ID: FOUND
+2026-01-12T18:01:01.346Z [Auth Me] Cookie header present: YES
+2026-01-12T18:01:01.348Z [Auth Me] session_id cookie present: YES
+2026-01-12T18:01:01.573Z [Auth Me] session lookup: FOUND
+2026-01-12T18:01:01.574Z [Auth Me] session.user_id: c485e177-6fea-4deb-8e2a-f097d2f4a31d
+2026-01-12T18:01:01.795Z [Auth Me] user lookup by ID: FOUND
