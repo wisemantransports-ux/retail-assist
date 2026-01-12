@@ -1,6 +1,7 @@
 
 import { createServerClient, createAdminSupabaseClient } from '@/lib/supabase/server'
 import { upsertConversation, insertMessage } from '@/lib/inbox/queries'
+import { env } from '@/lib/env'
 import type {
 	User,
 	Workspace,
@@ -62,15 +63,98 @@ export async function resolveUserId(candidateId: string | null | undefined, crea
 // See: INTERNAL_USER_ID_CONTRACT.md for details and guidance.
 export async function ensureInternalUser(candidateId: string | null | undefined): Promise<{ id: string | null }> {
     if (!candidateId) return { id: null }
+    
+    // In mock mode, use local file-based database
+    if (env.useMockMode) {
+        try {
+            const fs = await import('fs')
+            const path = await import('path')
+            const P = path.join(process.cwd(), 'tmp', 'dev-seed', 'database.json')
+            
+            // Read current database
+            let dbRaw: any = {}
+            if (fs.existsSync(P)) {
+                try {
+                    dbRaw = JSON.parse(fs.readFileSync(P, 'utf-8'))
+                } catch (e) {
+                    console.error('[ensureInternalUser] Failed to parse dev-seed database:', e)
+                }
+            }
+            
+            // Ensure users object exists
+            if (!dbRaw.users) dbRaw.users = {}
+            
+            // Check if user already exists by id
+            if (dbRaw.users[candidateId]) {
+                return { id: candidateId }
+            }
+            
+            // Check if user exists by auth_uid (shouldn't happen in dev but check anyway)
+            for (const [id, user] of Object.entries(dbRaw.users)) {
+                if ((user as any).auth_uid === candidateId) {
+                    return { id }
+                }
+            }
+            
+            // Create new user record
+            const now = new Date().toISOString()
+            const newUser = {
+                id: candidateId,
+                auth_uid: candidateId,
+                email: '',
+                role: 'user',
+                plan_type: 'starter',
+                payment_status: 'unpaid',
+                subscription_status: 'pending',
+                business_name: '',
+                phone: '',
+                created_at: now,
+                updated_at: now,
+            }
+            
+            dbRaw.users[candidateId] = newUser
+            
+            // Write back to file
+            fs.mkdirSync(path.dirname(P), { recursive: true })
+            fs.writeFileSync(P, JSON.stringify(dbRaw, null, 2))
+            
+            console.info('[ensureInternalUser] Created dev-seed user:', candidateId)
+            return { id: candidateId }
+        } catch (e: any) {
+            console.error('[ensureInternalUser] mock mode error:', e)
+            return { id: null }
+        }
+    }
+    
+    // In Supabase mode, use database queries
     const db = admin()
 
     // If candidateId already matches an internal id, return it
     const { data: byId } = await db.from('users').select('id').eq('id', candidateId).maybeSingle()
-    if (byId && (byId as any).id) return { id: (byId as any).id }
+    if (byId && (byId as any).id) {
+        console.info('[ensureInternalUser] Found by id:', candidateId)
+        return { id: (byId as any).id }
+    }
 
     // If there's already a user with auth_uid, return it
     const { data: byAuth } = await db.from('users').select('id').eq('auth_uid', candidateId).maybeSingle()
-    if (byAuth && (byAuth as any).id) return { id: (byAuth as any).id }
+    if (byAuth && (byAuth as any).id) {
+        console.info('[ensureInternalUser] Found by auth_uid:', candidateId, '-> id:', (byAuth as any).id)
+        return { id: (byAuth as any).id }
+    }
+
+    // The auth trigger should have created a user row by now. If not, wait briefly and retry.
+    // This handles race conditions where the trigger hasn't fired yet.
+    console.warn('[ensureInternalUser] Auth trigger did not create row for auth_uid:', candidateId, '. Retrying after 500ms...')
+    await new Promise(resolve => setTimeout(resolve, 500))
+    
+    const { data: byAuthRetry } = await db.from('users').select('id').eq('auth_uid', candidateId).maybeSingle()
+    if (byAuthRetry && (byAuthRetry as any).id) {
+        console.info('[ensureInternalUser] Found by auth_uid after retry:', candidateId, '-> id:', (byAuthRetry as any).id)
+        return { id: (byAuthRetry as any).id }
+    }
+    
+    console.warn('[ensureInternalUser] Still no row after retry. Attempting to create one...')
 
     // Create/upsert a full user record with sensible defaults
     const now = new Date().toISOString()
@@ -93,18 +177,29 @@ export async function ensureInternalUser(candidateId: string | null | undefined)
 		const insertRecord = { id: candidateId, ...record }
 		const { data, error } = await db.from('users').insert(insertRecord).select('id').maybeSingle()
 		if (error) {
+			console.warn('[ensureInternalUser] insert with deterministic id failed:', (error as any)?.message || error)
 			// If direct insert fails (conflict, constraint), fall back to upsert by auth_uid
-			console.warn('[ensureInternalUser] insert with deterministic id failed, attempting upsert by auth_uid:', (error as any)?.message || error)
 			const { data: upsertData, error: upsertErr } = await db.from('users').upsert(record, { onConflict: 'auth_uid' }).select('id').maybeSingle()
 			if (upsertErr) console.error('[ensureInternalUser] upsert error:', upsertErr)
-			if (upsertData && (upsertData as any).id) return { id: (upsertData as any).id }
+			if (upsertData && (upsertData as any).id) {
+				console.info('[ensureInternalUser] Created via upsert:', (upsertData as any).id)
+				return { id: (upsertData as any).id }
+			}
 			// continue to final fallback
 		}
-		if (data && (data as any).id) return { id: (data as any).id }
+		if (data && (data as any).id) {
+			console.info('[ensureInternalUser] Created via insert:', (data as any).id)
+			return { id: (data as any).id }
+		}
 
-		// Final fallback: select by auth_uid
+		// Final fallback: select by auth_uid again
 		const { data: sel } = await db.from('users').select('id').eq('auth_uid', candidateId).maybeSingle()
-		if (sel && (sel as any).id) return { id: (sel as any).id }
+		if (sel && (sel as any).id) {
+			console.info('[ensureInternalUser] Found after insert/upsert fallback:', (sel as any).id)
+			return { id: (sel as any).id }
+		}
+		
+		console.error('[ensureInternalUser] Could not create or find user for auth_uid:', candidateId)
     } catch (e: any) {
         console.error('[ensureInternalUser] unexpected error:', e)
     }

@@ -179,7 +179,8 @@ export const db = {
     async findByEmail(email: string) {
       const useLocal = env.useMockMode
       if (!useLocal) {
-        const s = supabase()
+        // Use admin client to bypass RLS
+        const s = createAdminSupabaseClient()
         const { data, error } = await s.from('users').select('*').eq('email', email).maybeSingle()
         if (error) throw error
         return data ? migrateUser(data) : null
@@ -197,7 +198,10 @@ export const db = {
     async findById(id: string) {
       const useLocal = env.useMockMode
       if (!useLocal) {
-        const s = supabase()
+        // Use admin client to bypass RLS - we're reading user data in API routes
+        // where the user is authenticated. The admin client ensures we can always
+        // read the user's own record even if RLS policies are restrictive.
+        const s = createAdminSupabaseClient()
         const { data, error } = await s.from('users').select('*').eq('id', id).maybeSingle()
         if (error) throw error
         if (data) return migrateUser(data)
@@ -213,7 +217,39 @@ export const db = {
       if (!fs.existsSync(P)) return null
       const dbRaw = JSON.parse(fs.readFileSync(P, 'utf-8'))
       const u = dbRaw.users ? dbRaw.users[id] : null
-      return u ? migrateUser(u) : null
+      if (u) return migrateUser(u)
+      
+      // Fallback: try to find by auth_uid
+      if (dbRaw.users) {
+        for (const user of Object.values(dbRaw.users)) {
+          if ((user as any).auth_uid === id) return migrateUser(user)
+        }
+      }
+      return null
+    },
+
+    async findByAuthUid(authUid: string) {
+      const useLocal = env.useMockMode
+      if (!useLocal) {
+        // Use admin client to bypass RLS
+        const s = createAdminSupabaseClient()
+        const { data, error } = await s.from('users').select('*').eq('auth_uid', authUid).maybeSingle()
+        if (error) throw error
+        return data ? migrateUser(data) : null
+      }
+
+      const fs = await import('fs')
+      const path = await import('path')
+      const P = path.join(process.cwd(), 'tmp', 'dev-seed', 'database.json')
+      if (!fs.existsSync(P)) return null
+      const dbRaw = JSON.parse(fs.readFileSync(P, 'utf-8'))
+      
+      if (dbRaw.users) {
+        for (const user of Object.values(dbRaw.users)) {
+          if ((user as any).auth_uid === authUid) return migrateUser(user)
+        }
+      }
+      return null
     },
 
     async authenticate(email: string, password: string) {

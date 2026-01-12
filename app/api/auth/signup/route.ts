@@ -74,13 +74,16 @@ export async function POST(req: Request) {
     let session: any = null;
     let internalUserId: string | null = null
     try {
+      console.info('[SIGNUP] Calling ensureInternalUser with auth UID:', newUser.id)
       const ensured = await ensureInternalUser(newUser.id)
+      console.info('[SIGNUP] ensureInternalUser returned:', ensured)
       internalUserId = (ensured && ensured.id) || (profile && profile.id) || null
       if (!internalUserId) {
         console.error('[SIGNUP] Could not resolve internal user id for:', newUser.id)
       } else {
+        // Create session with the internal user ID (the canonical ID)
         session = await sessionManager.create(internalUserId, 24 * 7);
-        console.info('[SIGNUP] Session created for user:', internalUserId);
+        console.info('[SIGNUP] Session created for internal user:', internalUserId);
       }
     } catch (sessionErr) {
       console.error('[SIGNUP] Failed to create session (non-fatal):', sessionErr);

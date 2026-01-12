@@ -30,16 +30,30 @@ const useDev = env.useMockMode
 
 export const sessionManager = {
   async create(userId: string, expiresInHours: number = 24 * 7) {
-    // Ensure we always reference the canonical internal `users.id` in sessions.user_id.
-    // Accepts either an internal id or an auth UID; `ensureInternalUser` will
-    // deterministically create or resolve the internal id (attempting id = auth UID).
+    // The sessions table FK currently points to auth.users(id), but ideally should point to public.users(id).
+    // Until the FK is migrated, we'll attempt to store the auth UID first, but if that fails,
+    // we'll store the internal user ID instead and handle resolution in the validate/get methods.
+    
     let effectiveUserId = userId
+    
+    // Try to resolve to auth UID if we received an internal ID
     try {
-      const ensured = await ensureInternalUser(userId)
-      if (ensured && ensured.id) effectiveUserId = ensured.id
+      const s = supabase()
+      // First check if this is already an auth UID
+      const { data: byAuth } = await s.from('users').select('auth_uid').eq('auth_uid', userId).maybeSingle()
+      if (byAuth && (byAuth as any).auth_uid) {
+        effectiveUserId = (byAuth as any).auth_uid
+        console.info('[sessionManager.create] Confirmed auth_uid:', effectiveUserId)
+      } else {
+        // It's an internal ID, get the auth_uid
+        const { data: byId } = await s.from('users').select('auth_uid').eq('id', userId).maybeSingle()
+        if (byId && (byId as any).auth_uid) {
+          effectiveUserId = (byId as any).auth_uid
+          console.info('[sessionManager.create] Found auth_uid from internal ID:', effectiveUserId)
+        }
+      }
     } catch (e: any) {
-      console.error('[sessionManager.create] failed to ensure internal user:', e)
-      // fall back to provided userId to avoid blocking dev flows
+      console.warn('[sessionManager.create] Could not resolve to auth_uid:', e?.message)
     }
 
     const id = generateSessionId()
@@ -55,8 +69,26 @@ export const sessionManager = {
 
     if (!useDev) {
       const s = supabase()
-      const { error } = await s.from('sessions').insert(session)
-      if (error) throw error
+      // Try to insert with auth UID first (as per current FK)
+      let { error } = await s.from('sessions').insert(session)
+      
+      // If FK constraint fails because it's pointing to public.users instead of auth.users,
+      // try inserting the internal user ID instead
+      if (error && error.code === '23503') {
+        console.warn('[sessionManager.create] Auth UID insert failed, trying internal user ID:', error.message)
+        // Try with the original userId (which should be the internal ID)
+        const sessionWithInternal = { ...session, user_id: userId }
+        const { error: error2 } = await s.from('sessions').insert(sessionWithInternal)
+        if (error2) {
+          console.error('[sessionManager.create] Both insert attempts failed:', error2)
+          throw error2
+        }
+      } else if (error) {
+        console.error('[sessionManager.create] Insert error:', error)
+        throw error
+      }
+      
+      console.info('[sessionManager.create] Session created:', id)
       return session
     }
 

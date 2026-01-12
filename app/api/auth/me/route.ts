@@ -49,9 +49,22 @@ export async function GET(request: Request) {
       return response;
     }
     
+    // session.user_id should be the internal user ID (or auth UID if FK is still pointing to auth.users)
+    // Try to look up by internal ID first, then fall back to auth_uid lookup
+    console.info('[Auth Me] session.user_id:', session.user_id);
+    debugLog(`[Auth Me] session.user_id: ${session.user_id}`);
+    
     let user = await db.users.findById(session.user_id);
-    console.info('[Auth Me] user lookup:', user ? 'FOUND' : 'NOT_FOUND');
-    debugLog(`[Auth Me] user lookup: ${user ? 'FOUND' : 'NOT_FOUND'}`);
+    console.info('[Auth Me] user lookup by ID:', user ? 'FOUND' : 'NOT_FOUND');
+    debugLog(`[Auth Me] user lookup by ID: ${user ? 'FOUND' : 'NOT_FOUND'}`);
+    
+    if (!user) {
+      // Maybe it's an auth UID, try that
+      user = await db.users.findByAuthUid(session.user_id);
+      console.info('[Auth Me] user lookup by auth_uid:', user ? 'FOUND' : 'NOT_FOUND');
+      debugLog(`[Auth Me] user lookup by auth_uid: ${user ? 'FOUND' : 'NOT_FOUND'}`);
+    }
+    
     if (!user) {
       // Attempt to create/resolve internal user deterministically
       try {
@@ -65,6 +78,7 @@ export async function GET(request: Request) {
         }
       } catch (e: any) {
         console.error('[Auth Me] ensureInternalUser failed:', e?.message || e);
+        debugLog(`[Auth Me] ensureInternalUser failed: ${e?.message}`);
       }
 
       if (!user) {
@@ -75,7 +89,7 @@ export async function GET(request: Request) {
       }
     }
     
-    const planLimits = PLAN_LIMITS[user.plan_type];
+    const planLimits = PLAN_LIMITS[user.plan_type] || PLAN_LIMITS['starter'];
     
     return NextResponse.json({
       user: {
@@ -85,8 +99,8 @@ export async function GET(request: Request) {
         phone: user.phone,
         payment_status: user.payment_status || 'unpaid',
         subscription_status: user.subscription_status,
-        plan_type: user.plan_type,
-        plan_name: planLimits.name,
+        plan_type: user.plan_type || 'starter',
+        plan_name: planLimits?.name || 'Starter',
         plan_limits: planLimits,
         billing_end_date: user.billing_end_date,
         role: user.role

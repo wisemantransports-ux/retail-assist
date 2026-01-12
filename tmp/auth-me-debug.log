@@ -1,14 +1,35 @@
-2026-01-12T11:46:37.451Z [Auth Me] Cookie header present: YES
-2026-01-12T11:46:37.467Z [Auth Me] session_id cookie present: YES
-2026-01-12T11:46:37.696Z [Auth Me] session lookup: FOUND
-2026-01-12T11:46:38.137Z [Auth Me] user lookup: NOT_FOUND
-2026-01-12T11:46:38.149Z [Auth Me] Cookie header present: YES
-2026-01-12T11:46:38.150Z [Auth Me] session_id cookie present: YES
-2026-01-12T11:46:38.357Z [Auth Me] session lookup: FOUND
-2026-01-12T11:46:38.785Z [Auth Me] user lookup: NOT_FOUND
-2026-01-12T11:52:23.522Z [Auth Me] Cookie header present: YES
-2026-01-12T11:52:23.529Z [Auth Me] session_id cookie present: YES
-2026-01-12T11:52:23.746Z [Auth Me] session lookup: FOUND
-2026-01-12T11:52:24.212Z [Auth Me] user lookup: NOT_FOUND
-2026-01-12T11:52:24.213Z [Auth Me] attempting ensureInternalUser for 42839083-a756-4ade-ae20-4a9154040060
-2026-01-12T11:52:24.878Z [Auth Me] user lookup after ensureInternalUser: NOT_FOUND
+2026-01-12T16:33:36.871Z [Auth Me] Cookie header present: YES
+2026-01-12T16:33:36.873Z [Auth Me] session_id cookie present: YES
+2026-01-12T16:33:37.110Z [Auth Me] session lookup: FOUND
+2026-01-12T16:33:37.111Z [Auth Me] session.user_id: f010a2d3-80ba-4c25-91ba-50d6269bb921
+2026-01-12T16:33:37.350Z [Auth Me] user lookup by ID: FOUND
+2026-01-12T17:01:20.364Z [Auth Me] Cookie header present: YES
+2026-01-12T17:01:20.367Z [Auth Me] session_id cookie present: YES
+2026-01-12T17:01:20.735Z [Auth Me] session lookup: FOUND
+2026-01-12T17:01:20.735Z [Auth Me] session.user_id: c485e177-6fea-4deb-8e2a-f097d2f4a31d
+2026-01-12T17:01:20.998Z [Auth Me] user lookup by ID: FOUND
+2026-01-12T17:01:22.769Z [Auth Me] Cookie header present: YES
+2026-01-12T17:01:22.771Z [Auth Me] session_id cookie present: YES
+2026-01-12T17:01:23.049Z [Auth Me] session lookup: FOUND
+2026-01-12T17:01:23.049Z [Auth Me] session.user_id: c485e177-6fea-4deb-8e2a-f097d2f4a31d
+2026-01-12T17:01:23.302Z [Auth Me] user lookup by ID: FOUND
+2026-01-12T17:01:23.699Z [Auth Me] Cookie header present: YES
+2026-01-12T17:01:23.701Z [Auth Me] session_id cookie present: YES
+2026-01-12T17:01:23.958Z [Auth Me] session lookup: FOUND
+2026-01-12T17:01:23.958Z [Auth Me] session.user_id: c485e177-6fea-4deb-8e2a-f097d2f4a31d
+2026-01-12T17:01:24.212Z [Auth Me] user lookup by ID: FOUND
+2026-01-12T17:01:25.937Z [Auth Me] Cookie header present: YES
+2026-01-12T17:01:25.939Z [Auth Me] session_id cookie present: YES
+2026-01-12T17:01:26.186Z [Auth Me] session lookup: FOUND
+2026-01-12T17:01:26.186Z [Auth Me] session.user_id: c485e177-6fea-4deb-8e2a-f097d2f4a31d
+2026-01-12T17:01:26.408Z [Auth Me] user lookup by ID: FOUND
+2026-01-12T17:02:54.678Z [Auth Me] Cookie header present: YES
+2026-01-12T17:02:54.682Z [Auth Me] session_id cookie present: YES
+2026-01-12T17:02:55.300Z [Auth Me] session lookup: FOUND
+2026-01-12T17:02:55.300Z [Auth Me] session.user_id: c485e177-6fea-4deb-8e2a-f097d2f4a31d
+2026-01-12T17:02:55.551Z [Auth Me] user lookup by ID: FOUND
+2026-01-12T17:02:55.951Z [Auth Me] Cookie header present: YES
+2026-01-12T17:02:55.953Z [Auth Me] session_id cookie present: YES
+2026-01-12T17:02:56.195Z [Auth Me] session lookup: FOUND
+2026-01-12T17:02:56.196Z [Auth Me] session.user_id: c485e177-6fea-4deb-8e2a-f097d2f4a31d
+2026-01-12T17:02:56.445Z [Auth Me] user lookup by ID: FOUND
