@@ -9,15 +9,15 @@ const PLANS = [
   {
     id: 'starter',
     name: 'Starter',
-    price: 22,
+    price: 350,
+    priceAlt: 'BWP 25',
     period: '/month',
     description: 'Perfect for small businesses just getting started',
     features: [
-      'Facebook Messenger auto-reply',
-      'Comment-to-DM automation (100/month)',
-      '1 Facebook Page',
-      'Basic AI responses',
-      'Email support'
+      'Facebook OR Instagram + Website Chat',
+      'Basic Automation',
+      'AI Auto-Replies (50K tokens/month)',
+      'Community Support'
     ],
     cta: 'Get Started',
     popular: false
@@ -25,34 +25,50 @@ const PLANS = [
   {
     id: 'pro',
     name: 'Pro',
-    price: 45,
+    price: 600,
+    priceAlt: 'BWP 36',
     period: '/month',
     description: 'For growing businesses with higher volume',
     features: [
-      'Facebook + Instagram automation',
-      'Comment-to-DM automation (500/month)',
-      '3 Pages/Accounts',
-      'AI-powered responses',
-      'Priority support'
+      'Facebook + Instagram + Website Chat',
+      'Advanced Automation',
+      'AI Auto-Replies (150K tokens/month)',
+      'Priority Support'
     ],
     cta: 'Get Started',
     popular: true
   },
   {
-    id: 'enterprise',
-    name: 'Enterprise',
-    price: 75,
+    id: 'advanced',
+    name: 'Advanced',
+    price: 900,
+    priceAlt: 'BWP 72',
     period: '/month',
-    description: 'Enterprise solution with full customization',
+    description: 'For enterprises with maximum scale and flexibility',
     features: [
-      'All features unlocked',
-      'Unlimited pages/accounts',
-      'Unlimited Comment-to-DM',
-      'Priority support',
-      'Custom automation rules',
-      'Dedicated account manager'
+      'Facebook + Instagram + Website Chat',
+      'Full Automation (Unlimited rules)',
+      'AI Auto-Replies (500K tokens/month)',
+      'Priority Support'
     ],
     cta: 'Get Started',
+    popular: false
+  },
+  {
+    id: 'enterprise',
+    name: 'Enterprise',
+    price: null,
+    priceAlt: 'Contact Sales',
+    period: '',
+    description: 'White-labeled solution with dedicated support and enterprise-specific features',
+    features: [
+      'All Channels (Custom setup)',
+      'Custom Automation',
+      'AI Auto-Replies (Custom tokens)',
+      'White-label capabilities',
+      'Dedicated Support & Account Manager'
+    ],
+    cta: 'Contact Sales',
     popular: false
   }
 ];
@@ -81,6 +97,12 @@ export default function PricingPage() {
   }
 
   async function handlePlanSelect(planId: string) {
+    // Enterprise requires manual contact - don't allow direct selection
+    if (planId === 'enterprise') {
+      window.location.href = `mailto:${brand.supportEmail}`;
+      return;
+    }
+    
     if (isLoggedIn) {
       // Update user's plan and go to payment
       await fetch("/api/billing/update-plan", {
@@ -147,8 +169,15 @@ export default function PricingPage() {
                 <h3 className="text-2xl font-bold text-white mb-2">{plan.name}</h3>
                 <p className="text-gray-400 text-sm mb-4">{plan.description}</p>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-bold text-white">${plan.price}</span>
-                  <span className="text-gray-400">{plan.period}</span>
+                  {plan.price !== null ? (
+                    <>
+                      <span className="text-4xl font-bold text-white">${plan.price}</span>
+                      <span className="text-gray-400">{plan.period}</span>
+                      <span className="text-gray-500 text-sm ml-2">({plan.priceAlt})</span>
+                    </>
+                  ) : (
+                    <span className="text-2xl font-bold text-blue-400">{plan.priceAlt}</span>
+                  )}
                 </div>
               </div>
 

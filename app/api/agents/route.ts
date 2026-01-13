@@ -4,6 +4,7 @@ import { createAgent, getCurrentUser, resolveUserId } from '@/lib/supabase/queri
 import { generateApiKey } from '@/lib/utils/helpers';
 import { env } from '@/lib/env';
 import { checkWorkspaceActive } from '@/lib/supabase/subscriptionCheck';
+import { validateFeatureAccess, forbiddenSubscriptionError } from '@/lib/subscription-validation';
 
 /**
  * GET /api/agents
@@ -68,7 +69,7 @@ export async function GET(request: Request) {
 
 /**
  * POST /api/agents
- * Create a new agent
+ * Create a new agent (subscription required)
  */
 export async function POST(request: Request) {
   try {
@@ -93,6 +94,17 @@ export async function POST(request: Request) {
 
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Validate subscription: agents require paid plan
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    const subValidation = await validateFeatureAccess(user, 'agents');
+    if (!subValidation.isValid) {
+      return forbiddenSubscriptionError(subValidation.error);
     }
 
     const body = await request.json();

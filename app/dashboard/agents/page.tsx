@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
+import { canManageAgents, isFreeUser } from '@/lib/feature-gates';
 
 interface Agent {
   id: string;
@@ -11,9 +12,19 @@ interface Agent {
   created_at?: string;
 }
 
-interface User {
+interface UserData {
+  id: string;
+  email: string;
+  business_name: string;
+  subscription_status?: string;
+  payment_status?: string;
+  plan_type?: string;
   plan_limits?: {
-    enabledAiAgents?: boolean;
+    maxPages: number;
+    hasInstagram: boolean;
+    hasAiResponses: boolean;
+    commentToDmLimit: number;
+    price: number;
   };
 }
 
@@ -21,7 +32,7 @@ export default function AgentsPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<UserData | null>(null);
 
   // TASK P0.1: Fetch agents from live API on mount
   useEffect(() => {
@@ -86,13 +97,32 @@ export default function AgentsPage() {
           <h1 className="text-2xl font-bold text-white">AI Agents</h1>
           <p className="text-gray-400">Create and manage your AI agents</p>
         </div>
-        <Link
-          href="/dashboard/agents/new"
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
-        >
-          Create New Agent
-        </Link>
+        {!user || !canManageAgents(user) ? (
+          <button
+            disabled
+            title={!user ? 'Loading...' : 'Upgrade to a paid plan to create agents'}
+            className="bg-gray-600 text-gray-300 px-4 py-2 rounded-lg text-sm font-medium cursor-not-allowed opacity-50"
+          >
+            🔒 Create New Agent (Paid only)
+          </button>
+        ) : (
+          <Link
+            href="/dashboard/agents/new"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+          >
+            Create New Agent
+          </Link>
+        )}
       </div>
+
+      {/* Subscription Warning */}
+      {user && isFreeUser(user) && (
+        <div className="bg-yellow-900/30 border border-yellow-600 rounded-xl p-4">
+          <p className="text-yellow-200 text-sm">
+            <strong>Free Account:</strong> You're using the dashboard in preview mode. Upgrade to a paid plan to create agents and automate your conversations.
+          </p>
+        </div>
+      )}
 
       {/* Loading State */}
       {loading ? (
@@ -117,13 +147,28 @@ export default function AgentsPage() {
       ) : agents.length === 0 ? (
         /* Empty State */
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-12 text-center">
-          <p className="text-gray-400 mb-4">No agents created yet.</p>
-          <Link
-            href="/dashboard/agents/new"
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg text-sm font-medium inline-block"
-          >
-            Create Your First Agent
-          </Link>
+          {user && !canManageAgents(user) ? (
+            <>
+              <p className="text-gray-400 mb-4">Agent creation is only available on paid plans.</p>
+              <p className="text-gray-500 text-sm mb-6">Upgrade your account to create custom AI agents and automate your customer conversations.</p>
+              <Link
+                href="/pricing"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg text-sm font-medium inline-block"
+              >
+                View Pricing Plans
+              </Link>
+            </>
+          ) : (
+            <>
+              <p className="text-gray-400 mb-4">No agents created yet.</p>
+              <Link
+                href="/dashboard/agents/new"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg text-sm font-medium inline-block"
+              >
+                Create Your First Agent
+              </Link>
+            </>
+          )}
         </div>
       ) : (
         /* Agents Grid */

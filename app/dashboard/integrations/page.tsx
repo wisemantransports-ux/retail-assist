@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { canConnectFacebook, canUseInstagram, isFreeUser } from '@/lib/feature-gates';
 
 interface ConnectedPage {
   id: string;
@@ -17,8 +18,25 @@ interface PendingPage {
   category?: string;
 }
 
+interface UserData {
+  id: string;
+  email: string;
+  business_name: string;
+  subscription_status?: string;
+  payment_status?: string;
+  plan_type?: string;
+  plan_limits?: {
+    maxPages: number;
+    hasInstagram: boolean;
+    hasAiResponses: boolean;
+    commentToDmLimit: number;
+    price: number;
+  };
+}
+
 export default function IntegrationsPage() {
   const searchParams = useSearchParams();
+  const [user, setUser] = useState<UserData | null>(null);
   const [connectedPages, setConnectedPages] = useState<ConnectedPage[]>([]);
   const [pendingPages, setPendingPages] = useState<PendingPage[]>([]);
   const [pendingToken, setPendingToken] = useState<string | null>(null);
@@ -27,7 +45,7 @@ export default function IntegrationsPage() {
   const [selectedPages, setSelectedPages] = useState<string[]>([]);
 
   useEffect(() => {
-    loadConnectedPages();
+    loadUserAndPages();
     
     const success = searchParams.get('success');
     const error = searchParams.get('error');
@@ -57,19 +75,42 @@ export default function IntegrationsPage() {
     }
   }, [searchParams]);
 
-  async function loadConnectedPages() {
+  async function loadUserAndPages() {
     try {
-      const res = await fetch('/api/meta/pages');
-      const data = await res.json();
-      if (res.ok) {
-        setConnectedPages(data.pages || []);
+      const [userRes, pagesRes] = await Promise.all([
+        fetch('/api/auth/me'),
+        fetch('/api/meta/pages')
+      ]);
+
+      if (userRes.ok) {
+        const userData = await userRes.json();
+        setUser(userData.user);
+      }
+
+      if (pagesRes.ok) {
+        const pagesData = await pagesRes.json();
+        setConnectedPages(pagesData.pages || []);
       }
     } catch (error) {
-      console.error('Failed to load pages:', error);
+      console.error('[Integrations Page] Failed to load user/pages:', error);
     }
   }
 
   async function handleConnectFacebook() {
+    // Feature gate: Only paid users can connect Facebook
+    if (!user) {
+      setMessage({ type: 'error', text: 'User data not loaded. Please refresh.' });
+      return;
+    }
+
+    if (!canConnectFacebook(user)) {
+      setMessage({ 
+        type: 'error', 
+        text: 'Facebook integration requires a paid subscription. Upgrade to connect your Facebook page.' 
+      });
+      return;
+    }
+
     setLoading(true);
     setMessage(null);
     
@@ -222,7 +263,7 @@ export default function IntegrationsPage() {
         </div>
       )}
 
-      <div className="bg-gray-800 border border-gray-700 rounded-xl p-6">
+      <div className={`border border-gray-700 rounded-xl p-6 ${!user || !canConnectFacebook(user) ? 'bg-gray-800/50 opacity-60' : 'bg-gray-800'}`}>
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center text-white text-2xl">
@@ -233,13 +274,21 @@ export default function IntegrationsPage() {
               <p className="text-gray-400 text-sm">Connect your Facebook pages for auto-reply</p>
             </div>
           </div>
-          <button
-            onClick={handleConnectFacebook}
-            disabled={loading}
-            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-6 py-2 rounded-lg font-medium"
-          >
-            {loading ? 'Connecting...' : 'Connect Facebook'}
-          </button>
+          <div className="flex items-center gap-3">
+            {user && !canConnectFacebook(user) && (
+              <span className="px-3 py-1 bg-red-900/30 text-red-400 text-sm rounded-lg border border-red-700">
+                🔒 Paid only
+              </span>
+            )}
+            <button
+              onClick={handleConnectFacebook}
+              disabled={loading || !user || !canConnectFacebook(user)}
+              title={!user ? 'Loading...' : !canConnectFacebook(user) ? 'Upgrade to a paid plan to connect Facebook' : ''}
+              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg font-medium"
+            >
+              {loading ? 'Connecting...' : 'Connect Facebook'}
+            </button>
+          </div>
         </div>
 
         {connectedPages.length > 0 ? (
@@ -278,7 +327,7 @@ export default function IntegrationsPage() {
         )}
       </div>
 
-      <div className="bg-gray-800 border border-gray-700 rounded-xl p-6">
+      <div className={`border border-gray-700 rounded-xl p-6 ${!user || isFreeUser(user) || !canUseInstagram(user) ? 'bg-gray-800/50 opacity-60' : 'bg-gray-800'}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-pink-500 rounded-xl flex items-center justify-center text-white text-xl">
@@ -286,15 +335,23 @@ export default function IntegrationsPage() {
             </div>
             <div>
               <h2 className="text-lg font-semibold text-white">Instagram</h2>
-              <p className="text-gray-400 text-sm">Manage Instagram DMs (Pro plan required)</p>
+              <p className="text-gray-400 text-sm">Manage Instagram DMs</p>
             </div>
           </div>
-          <span className="px-3 py-1 bg-gray-600 text-gray-300 text-sm rounded-lg">
-            Coming with Facebook
-          </span>
+          {user && !canUseInstagram(user) && (
+            <span className="px-3 py-1 bg-red-900/30 text-red-400 text-sm rounded-lg border border-red-700">
+              🔒 Pro plan required
+            </span>
+          )}
+          {user && canUseInstagram(user) && (
+            <span className="px-3 py-1 bg-gray-600 text-gray-300 text-sm rounded-lg">
+              Coming with Facebook
+            </span>
+          )}
         </div>
         <p className="text-gray-500 text-sm mt-4">
           Instagram is automatically connected when you link a Facebook Page with an Instagram Business account.
+          {user && !canUseInstagram(user) && ' Upgrade to Pro or Enterprise to use Instagram.'}
         </p>
       </div>
 

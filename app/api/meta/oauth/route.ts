@@ -3,6 +3,7 @@ import { env } from '@/lib/env';
 import { sessionManager } from '@/lib/session';
 import { db } from '@/lib/db';
 import { cookies } from 'next/headers';
+import { validateFeatureAccess, forbiddenSubscriptionError } from '@/lib/subscription-validation';
 
 export async function GET(request: Request) {
   try {
@@ -18,8 +19,14 @@ export async function GET(request: Request) {
     }
 
     const user = await db.users.findById(session.user_id);
-    if (!user || user.subscription_status !== 'active') {
-      return NextResponse.json({ error: 'Subscription not active' }, { status: 403 });
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // Validate subscription: integrations require paid plan
+    const subValidation = await validateFeatureAccess(user, 'integrations');
+    if (!subValidation.isValid) {
+      return forbiddenSubscriptionError(subValidation.error);
     }
 
     const canAdd = await db.users.canAddPage(user.id);
