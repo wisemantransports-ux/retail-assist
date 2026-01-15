@@ -1,3 +1,4 @@
+“Not applied. Auth verified stable. Superseded.”
 -- 026_update_rpc_create_user_profile.sql
 -- Update the RPC to return user data and update business_name, phone, full_name.
 

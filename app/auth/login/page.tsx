@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase/client";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -17,21 +18,28 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/auth/login', {
+      const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password }),
       });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Login failed');
 
-      const data = await res.json();
+      // Use role from API response
+      const role = data.user?.role;
+      const workspaceId = data.workspaceId;
+      console.log('[Login Page] Role from API:', role);
+      console.log('[Login Page] Workspace ID from API:', workspaceId);
 
-      if (!res.ok) {
-        throw new Error(data.error || 'Login failed');
-      }
+      // Role-based redirect
+      let targetPath = '/dashboard'; // fallback
+      if (role === 'super_admin') targetPath = '/admin';
+      else if (role === 'admin') targetPath = '/dashboard';
+      else if (role === 'employee') targetPath = '/employees/dashboard';
 
-      // Redirect to dashboard after successful login (server session created)
-      router.replace('/dashboard');
-      router.refresh();
+      console.log('[Login Page] Redirecting to:', targetPath);
+      router.push(targetPath);
     } catch (err: any) {
       setError(err.message || "Failed to log in");
     } finally {

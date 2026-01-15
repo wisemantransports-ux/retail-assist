@@ -46,12 +46,12 @@ const stubClient = {
 };
 
 export function createBrowserSupabaseClient() {
-  // If mock mode is enabled, return stub to avoid dialing Supabase
-  if (env.useMockMode) return stubClient as unknown as SupabaseClient;
-
   // Ensure required client-side env vars exist
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+  // If mock mode is enabled, return stub to avoid dialing Supabase
+  if (env.useMockMode && (!url || !key)) return stubClient as unknown as SupabaseClient;
   // Temporary runtime check for F-1: log presence of public Supabase env vars
   try {
     console.debug('F-1 check: NEXT_PUBLIC_SUPABASE_URL present?', Boolean(url));

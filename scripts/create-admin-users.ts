@@ -12,7 +12,7 @@ const NOTES_FILE = path.join(OUT_DIR, 'admin-users-notes.txt')
 
 const DEFAULT_USERS = [
   // Example minimal admin user. Provide `password` to set exact password, otherwise a random temp password is generated.
-  { email: process.env.ADMIN_EMAIL || 'admin@example.com', password: process.env.ADMIN_PASSWORD || undefined, role: 'admin', business_name: 'Acme Corp', createWorkspace: true },
+  { email: process.env.ADMIN_EMAIL || 'admin@example.com', password: process.env.ADMIN_PASSWORD || undefined, role: 'super_admin', business_name: 'Acme Corp', createWorkspace: true },
   // Demo user (optional)
   { email: process.env.DEMO_EMAIL || 'demo@example.com', password: process.env.DEMO_PASSWORD || undefined, role: 'user', business_name: 'Demo Co', createWorkspace: false }
 ]

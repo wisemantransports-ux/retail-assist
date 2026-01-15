@@ -1,93 +1,56 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { db, PLAN_LIMITS } from '@/lib/db';
 import { ensureInternalUser } from '@/lib/supabase/queries';
-import { sessionManager } from '@/lib/session';
-import { cookies } from 'next/headers';
 import { env } from '@/lib/env';
 import { createServerClient } from '@/lib/supabase/server';
 
-// Minimal file-backed logger (temporary, reversible)
-function debugLog(msg: string) {
-    try {
-      // write into workspace so we can read it from the agent
-      // keep entries short and never write cookie values
-      const line = `${new Date().toISOString()} ${msg}\n`;
-      require('fs').appendFileSync('/workspaces/retail-assist/tmp/auth-me-debug.log', line);
-    } catch (_) {}
-}
-
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    // Log presence of Cookie header (only presence, never values)
-    const cookieHeaderPresent = !!request.headers.get('cookie');
-    console.info('[Auth Me] Cookie header present:', cookieHeaderPresent ? 'YES' : 'NO');
-    debugLog(`[Auth Me] Cookie header present: ${cookieHeaderPresent ? 'YES' : 'NO'}`);
+    // Use Supabase auth
+    // @ts-ignore
+    const supabase = createServerClient(request);
+    const { data: userData, error: authError } = await supabase.auth.getUser();
+    console.info('[Auth Me] Supabase getUser:', userData?.user ? 'FOUND' : 'NOT_FOUND', authError ? `Error: ${authError.message}` : '');
 
-    const cookieStore = await cookies();
-    const sessionId = cookieStore.get('session_id')?.value;
-    console.info('[Auth Me] session_id cookie present:', sessionId ? 'YES' : 'NO');
-    debugLog(`[Auth Me] session_id cookie present: ${sessionId ? 'YES' : 'NO'}`);
-
-    if (!sessionId) {
+    if (authError || !userData?.user) {
       return NextResponse.json(
         { error: 'Not authenticated' },
         { status: 401 }
       );
     }
-    
-    const session = await sessionManager.validate(sessionId);
-    console.info('[Auth Me] session lookup:', session ? 'FOUND' : 'NOT_FOUND');
-    debugLog(`[Auth Me] session lookup: ${session ? 'FOUND' : 'NOT_FOUND'}`);
-    if (!session) {
-      const response = NextResponse.json(
-        { error: 'Session expired' },
-        { status: 401 }
-      );
-      console.info('[Auth Me] Clearing expired session_id cookie');
-      debugLog('[Auth Me] Clearing expired session_id cookie');
-      // Clear cookie using same path
-      cookieStore.set('session_id', '', { path: '/', maxAge: 0, httpOnly: true, secure: env.isProduction, sameSite: 'lax' });
-      return response;
-    }
-    
-    // session.user_id should be the internal user ID (or auth UID if FK is still pointing to auth.users)
-    // Try to look up by internal ID first, then fall back to auth_uid lookup
-    console.info('[Auth Me] session.user_id:', session.user_id);
-    debugLog(`[Auth Me] session.user_id: ${session.user_id}`);
-    
-    let user = await db.users.findById(session.user_id);
-    console.info('[Auth Me] user lookup by ID:', user ? 'FOUND' : 'NOT_FOUND');
-    debugLog(`[Auth Me] user lookup by ID: ${user ? 'FOUND' : 'NOT_FOUND'}`);
-    
-    if (!user) {
-      // Maybe it's an auth UID, try that
-      user = await db.users.findByAuthUid(session.user_id);
-      console.info('[Auth Me] user lookup by auth_uid:', user ? 'FOUND' : 'NOT_FOUND');
-      debugLog(`[Auth Me] user lookup by auth_uid: ${user ? 'FOUND' : 'NOT_FOUND'}`);
-    }
-    
-    if (!user) {
-      // Attempt to create/resolve internal user deterministically
-      try {
-        console.info('[Auth Me] attempting ensureInternalUser for', session.user_id);
-        debugLog(`[Auth Me] attempting ensureInternalUser for ${session.user_id}`);
-        const ensured = await ensureInternalUser(session.user_id);
-        if (ensured && ensured.id) {
-          user = await db.users.findById(ensured.id);
-          console.info('[Auth Me] user lookup after ensureInternalUser:', user ? 'FOUND' : 'NOT_FOUND');
-          debugLog(`[Auth Me] user lookup after ensureInternalUser: ${user ? 'FOUND' : 'NOT_FOUND'}`);
-        }
-      } catch (e: any) {
-        console.error('[Auth Me] ensureInternalUser failed:', e?.message || e);
-        debugLog(`[Auth Me] ensureInternalUser failed: ${e?.message}`);
-      }
 
-      if (!user) {
-        return NextResponse.json(
-          { error: 'User not found' },
-          { status: 404 }
-        );
+    const authUser = userData.user;
+    
+    // Look up user in database
+    console.info('[Auth Me] auth user id:', authUser.id);
+    
+    // Use Supabase for user lookup to ensure consistency
+    const { data: userDataFromDb, error: userError } = await supabase.from('users').select('*').eq('auth_uid', authUser.id).single();
+    console.info('[Auth Me] user lookup:', userDataFromDb ? 'FOUND' : 'NOT_FOUND', userError ? `Error: ${userError.message}` : '');
+    
+    if (userError && userError.code !== 'PGRST116') { // PGRST116 is "not found"
+      console.error('[Auth Me] user lookup error:', userError);
+      return NextResponse.json({ error: 'Database error' }, { status: 500 });
+    }
+    
+    let user = userDataFromDb;
+    if (!user) {
+      // Ensure user exists
+      const ensured = await ensureInternalUser(authUser.id);
+      if (!ensured.id) {
+        console.error('[Auth Me] failed to ensure user');
+        return NextResponse.json({ error: 'User creation failed' }, { status: 500 });
       }
+      // Fetch again
+      const { data: newUser } = await supabase.from('users').select('*').eq('auth_uid', authUser.id).single();
+      user = newUser;
+    }
+    
+    if (!user) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      );
     }
     
     const planLimits = PLAN_LIMITS[user.plan_type] || PLAN_LIMITS['starter'];
@@ -96,7 +59,6 @@ export async function GET(request: Request) {
     // Query workspace by owner_id (assumes 1:1 relationship for now)
     let workspaceId = user.id; // fallback to user.id
     try {
-      const supabase = await createServerClient();
       const { data: workspace } = await supabase
         .from('workspaces')
         .select('id')
@@ -114,6 +76,15 @@ export async function GET(request: Request) {
       workspaceId = user.id;
     }
     
+    // Fetch role from RPC
+    const { data: userAccess } = await supabase.rpc('rpc_get_user_access');
+    const accessRecord = userAccess?.[0];
+    const role = accessRecord?.role || 'user';
+    const workspaceIdFromRpc = accessRecord?.workspace_id;
+    
+    console.log('[Auth Me] Resolved role:', role);
+    console.log('[Auth Me] Workspace ID from RPC:', workspaceIdFromRpc);
+    
     return NextResponse.json({
       user: {
         id: user.id,
@@ -126,7 +97,7 @@ export async function GET(request: Request) {
         plan_name: planLimits?.name || 'Starter',
         plan_limits: planLimits,
         billing_end_date: user.billing_end_date,
-        role: user.role,
+        role: role,
         workspace_id: workspaceId  // NEW: Added for dashboard workspace scoping
       }
     });

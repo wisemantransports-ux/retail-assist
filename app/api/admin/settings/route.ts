@@ -27,7 +27,7 @@ async function verifyAdmin(request: Request) {
   if (!session) return null;
 
   const user = await db.users.findById(session.user_id);
-  if (!user || user.role !== 'admin') return null;
+  if (!user || user.role !== 'super_admin') return null;
 
   return user;
 }

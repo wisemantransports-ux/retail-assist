@@ -73,3 +73,343 @@
 2026-01-12T18:01:01.573Z [Auth Me] session lookup: FOUND
 2026-01-12T18:01:01.574Z [Auth Me] session.user_id: c485e177-6fea-4deb-8e2a-f097d2f4a31d
 2026-01-12T18:01:01.795Z [Auth Me] user lookup by ID: FOUND
+2026-01-13T11:58:54.326Z [Auth Me] Cookie header present: YES
+2026-01-13T11:58:54.329Z [Auth Me] session_id cookie present: YES
+2026-01-13T11:58:56.028Z [Auth Me] session lookup: FOUND
+2026-01-13T11:58:56.029Z [Auth Me] session.user_id: c485e177-6fea-4deb-8e2a-f097d2f4a31d
+2026-01-13T11:58:56.314Z [Auth Me] user lookup by ID: FOUND
+2026-01-13T11:58:57.165Z [Auth Me] Cookie header present: YES
+2026-01-13T11:58:57.167Z [Auth Me] session_id cookie present: YES
+2026-01-13T11:58:57.445Z [Auth Me] session lookup: FOUND
+2026-01-13T11:58:57.446Z [Auth Me] session.user_id: c485e177-6fea-4deb-8e2a-f097d2f4a31d
+2026-01-13T11:58:57.719Z [Auth Me] user lookup by ID: FOUND
+2026-01-13T11:58:58.356Z [Auth Me] Cookie header present: YES
+2026-01-13T11:58:58.358Z [Auth Me] session_id cookie present: YES
+2026-01-13T11:58:58.616Z [Auth Me] session lookup: FOUND
+2026-01-13T11:58:58.617Z [Auth Me] session.user_id: c485e177-6fea-4deb-8e2a-f097d2f4a31d
+2026-01-13T11:58:58.869Z [Auth Me] user lookup by ID: FOUND
+2026-01-13T12:00:49.418Z [Auth Me] Cookie header present: YES
+2026-01-13T12:00:49.418Z [Auth Me] session_id cookie present: YES
+2026-01-13T12:00:49.614Z [Auth Me] session lookup: FOUND
+2026-01-13T12:00:49.615Z [Auth Me] session.user_id: 02edc293-ef41-49ea-94c1-2422bc69bcf5
+2026-01-13T12:00:49.785Z [Auth Me] user lookup by ID: FOUND
+2026-01-13T12:00:50.403Z [Auth Me] Cookie header present: YES
+2026-01-13T12:00:50.405Z [Auth Me] session_id cookie present: YES
+2026-01-13T12:00:50.604Z [Auth Me] session lookup: FOUND
+2026-01-13T12:00:50.605Z [Auth Me] session.user_id: 02edc293-ef41-49ea-94c1-2422bc69bcf5
+2026-01-13T12:00:50.778Z [Auth Me] user lookup by ID: FOUND
+2026-01-13T12:00:51.327Z [Auth Me] Cookie header present: YES
+2026-01-13T12:00:51.328Z [Auth Me] session_id cookie present: YES
+2026-01-13T12:00:51.489Z [Auth Me] session lookup: FOUND
+2026-01-13T12:00:51.489Z [Auth Me] session.user_id: 02edc293-ef41-49ea-94c1-2422bc69bcf5
+2026-01-13T12:00:51.667Z [Auth Me] user lookup by ID: FOUND
+2026-01-13T12:00:52.221Z [Auth Me] Cookie header present: YES
+2026-01-13T12:00:52.225Z [Auth Me] session_id cookie present: YES
+2026-01-13T12:00:52.388Z [Auth Me] session lookup: FOUND
+2026-01-13T12:00:52.388Z [Auth Me] session.user_id: 02edc293-ef41-49ea-94c1-2422bc69bcf5
+2026-01-13T12:00:52.549Z [Auth Me] user lookup by ID: FOUND
+2026-01-13T12:01:08.938Z [Auth Me] Cookie header present: YES
+2026-01-13T12:01:08.940Z [Auth Me] session_id cookie present: YES
+2026-01-13T12:01:09.198Z [Auth Me] session lookup: FOUND
+2026-01-13T12:01:09.198Z [Auth Me] session.user_id: 02edc293-ef41-49ea-94c1-2422bc69bcf5
+2026-01-13T12:01:09.443Z [Auth Me] user lookup by ID: FOUND
+2026-01-13T12:01:10.283Z [Auth Me] Cookie header present: YES
+2026-01-13T12:01:10.285Z [Auth Me] session_id cookie present: YES
+2026-01-13T12:01:10.549Z [Auth Me] session lookup: FOUND
+2026-01-13T12:01:10.550Z [Auth Me] session.user_id: 02edc293-ef41-49ea-94c1-2422bc69bcf5
+2026-01-13T12:01:10.788Z [Auth Me] user lookup by ID: FOUND
+2026-01-13T12:01:11.414Z [Auth Me] Cookie header present: YES
+2026-01-13T12:01:11.416Z [Auth Me] session_id cookie present: YES
+2026-01-13T12:01:11.655Z [Auth Me] session lookup: FOUND
+2026-01-13T12:01:11.655Z [Auth Me] session.user_id: 02edc293-ef41-49ea-94c1-2422bc69bcf5
+2026-01-13T12:01:11.891Z [Auth Me] user lookup by ID: FOUND
+2026-01-13T12:04:42.087Z [Auth Me] Cookie header present: YES
+2026-01-13T12:04:42.089Z [Auth Me] session_id cookie present: YES
+2026-01-13T12:04:42.323Z [Auth Me] session lookup: FOUND
+2026-01-13T12:04:42.324Z [Auth Me] session.user_id: 02edc293-ef41-49ea-94c1-2422bc69bcf5
+2026-01-13T12:04:42.558Z [Auth Me] user lookup by ID: FOUND
+2026-01-13T12:04:43.192Z [Auth Me] Cookie header present: YES
+2026-01-13T12:04:43.193Z [Auth Me] session_id cookie present: YES
+2026-01-13T12:04:43.444Z [Auth Me] session lookup: FOUND
+2026-01-13T12:04:43.445Z [Auth Me] session.user_id: 02edc293-ef41-49ea-94c1-2422bc69bcf5
+2026-01-13T12:04:43.684Z [Auth Me] user lookup by ID: FOUND
+2026-01-13T12:04:44.458Z [Auth Me] Cookie header present: YES
+2026-01-13T12:04:44.460Z [Auth Me] session_id cookie present: YES
+2026-01-13T12:04:44.703Z [Auth Me] session lookup: FOUND
+2026-01-13T12:04:44.703Z [Auth Me] session.user_id: 02edc293-ef41-49ea-94c1-2422bc69bcf5
+2026-01-13T12:04:44.939Z [Auth Me] user lookup by ID: FOUND
+2026-01-13T12:04:47.176Z [Auth Me] Cookie header present: YES
+2026-01-13T12:04:47.178Z [Auth Me] session_id cookie present: YES
+2026-01-13T12:04:47.424Z [Auth Me] session lookup: FOUND
+2026-01-13T12:04:47.424Z [Auth Me] session.user_id: 02edc293-ef41-49ea-94c1-2422bc69bcf5
+2026-01-13T12:04:47.671Z [Auth Me] user lookup by ID: FOUND
+2026-01-13T12:05:19.256Z [Auth Me] Cookie header present: YES
+2026-01-13T12:05:19.258Z [Auth Me] session_id cookie present: YES
+2026-01-13T12:05:19.452Z [Auth Me] session lookup: FOUND
+2026-01-13T12:05:19.452Z [Auth Me] session.user_id: 02edc293-ef41-49ea-94c1-2422bc69bcf5
+2026-01-13T12:05:19.619Z [Auth Me] user lookup by ID: FOUND
+2026-01-13T12:05:20.691Z [Auth Me] Cookie header present: YES
+2026-01-13T12:05:20.692Z [Auth Me] session_id cookie present: YES
+2026-01-13T12:05:20.858Z [Auth Me] session lookup: FOUND
+2026-01-13T12:05:20.859Z [Auth Me] session.user_id: 02edc293-ef41-49ea-94c1-2422bc69bcf5
+2026-01-13T12:05:21.027Z [Auth Me] user lookup by ID: FOUND
+2026-01-13T12:05:21.571Z [Auth Me] Cookie header present: YES
+2026-01-13T12:05:21.573Z [Auth Me] session_id cookie present: YES
+2026-01-13T12:05:21.738Z [Auth Me] session lookup: FOUND
+2026-01-13T12:05:21.738Z [Auth Me] session.user_id: 02edc293-ef41-49ea-94c1-2422bc69bcf5
+2026-01-13T12:05:21.906Z [Auth Me] user lookup by ID: FOUND
+2026-01-14T11:46:27.173Z [Auth Me] Cookie header present: YES
+2026-01-14T11:46:27.208Z [Auth Me] session_id cookie present: YES
+2026-01-14T11:46:29.111Z [Auth Me] session lookup: FOUND
+2026-01-14T11:46:29.112Z [Auth Me] session.user_id: 02edc293-ef41-49ea-94c1-2422bc69bcf5
+2026-01-14T11:46:29.383Z [Auth Me] user lookup by ID: FOUND
+2026-01-14T11:46:32.473Z [Auth Me] Cookie header present: YES
+2026-01-14T11:46:32.474Z [Auth Me] session_id cookie present: YES
+2026-01-14T11:46:32.753Z [Auth Me] session lookup: FOUND
+2026-01-14T11:46:32.753Z [Auth Me] session.user_id: 02edc293-ef41-49ea-94c1-2422bc69bcf5
+2026-01-14T11:46:33.020Z [Auth Me] user lookup by ID: FOUND
+2026-01-14T11:46:33.676Z [Auth Me] Cookie header present: YES
+2026-01-14T11:46:33.678Z [Auth Me] session_id cookie present: YES
+2026-01-14T11:46:33.932Z [Auth Me] session lookup: FOUND
+2026-01-14T11:46:33.932Z [Auth Me] session.user_id: 02edc293-ef41-49ea-94c1-2422bc69bcf5
+2026-01-14T11:46:34.196Z [Auth Me] user lookup by ID: FOUND
+2026-01-14T11:48:10.935Z [Auth Me] Cookie header present: YES
+2026-01-14T11:48:10.937Z [Auth Me] session_id cookie present: YES
+2026-01-14T11:48:11.173Z [Auth Me] session lookup: FOUND
+2026-01-14T11:48:11.174Z [Auth Me] session.user_id: 0d5ff8c7-31ac-4d5f-8c4c-556d8bd08ab7
+2026-01-14T11:48:11.392Z [Auth Me] user lookup by ID: FOUND
+2026-01-14T11:48:12.001Z [Auth Me] Cookie header present: YES
+2026-01-14T11:48:12.003Z [Auth Me] session_id cookie present: YES
+2026-01-14T11:48:12.226Z [Auth Me] session lookup: FOUND
+2026-01-14T11:48:12.227Z [Auth Me] session.user_id: 0d5ff8c7-31ac-4d5f-8c4c-556d8bd08ab7
+2026-01-14T11:48:12.464Z [Auth Me] user lookup by ID: FOUND
+2026-01-14T11:48:13.097Z [Auth Me] Cookie header present: YES
+2026-01-14T11:48:13.099Z [Auth Me] session_id cookie present: YES
+2026-01-14T11:48:13.337Z [Auth Me] session lookup: FOUND
+2026-01-14T11:48:13.338Z [Auth Me] session.user_id: 0d5ff8c7-31ac-4d5f-8c4c-556d8bd08ab7
+2026-01-14T11:48:13.559Z [Auth Me] user lookup by ID: FOUND
+2026-01-14T11:48:14.472Z [Auth Me] Cookie header present: YES
+2026-01-14T11:48:14.475Z [Auth Me] session_id cookie present: YES
+2026-01-14T11:48:14.705Z [Auth Me] session lookup: FOUND
+2026-01-14T11:48:14.706Z [Auth Me] session.user_id: 0d5ff8c7-31ac-4d5f-8c4c-556d8bd08ab7
+2026-01-14T11:48:14.931Z [Auth Me] user lookup by ID: FOUND
+2026-01-14T11:50:05.046Z [Auth Me] Cookie header present: YES
+2026-01-14T11:50:05.047Z [Auth Me] session_id cookie present: YES
+2026-01-14T11:50:05.259Z [Auth Me] session lookup: FOUND
+2026-01-14T11:50:05.259Z [Auth Me] session.user_id: 0d5ff8c7-31ac-4d5f-8c4c-556d8bd08ab7
+2026-01-14T11:50:05.476Z [Auth Me] user lookup by ID: FOUND
+2026-01-14T11:50:06.259Z [Auth Me] Cookie header present: YES
+2026-01-14T11:50:06.260Z [Auth Me] session_id cookie present: YES
+2026-01-14T11:50:06.495Z [Auth Me] session lookup: FOUND
+2026-01-14T11:50:06.495Z [Auth Me] session.user_id: 0d5ff8c7-31ac-4d5f-8c4c-556d8bd08ab7
+2026-01-14T11:50:06.713Z [Auth Me] user lookup by ID: FOUND
+2026-01-14T11:50:08.254Z [Auth Me] Cookie header present: YES
+2026-01-14T11:50:08.256Z [Auth Me] session_id cookie present: YES
+2026-01-14T11:50:08.470Z [Auth Me] session lookup: FOUND
+2026-01-14T11:50:08.470Z [Auth Me] session.user_id: 0d5ff8c7-31ac-4d5f-8c4c-556d8bd08ab7
+2026-01-14T11:50:08.677Z [Auth Me] user lookup by ID: FOUND
+2026-01-14T11:50:09.307Z [Auth Me] Cookie header present: YES
+2026-01-14T11:50:09.309Z [Auth Me] session_id cookie present: YES
+2026-01-14T11:50:09.521Z [Auth Me] session lookup: FOUND
+2026-01-14T11:50:09.522Z [Auth Me] session.user_id: 0d5ff8c7-31ac-4d5f-8c4c-556d8bd08ab7
+2026-01-14T11:50:09.733Z [Auth Me] user lookup by ID: FOUND
+2026-01-14T12:31:32.162Z [Auth Me] Cookie header present: YES
+2026-01-14T12:31:32.220Z [Auth Me] session_id cookie present: YES
+2026-01-14T12:31:33.442Z [Auth Me] session lookup: FOUND
+2026-01-14T12:31:33.443Z [Auth Me] session.user_id: 0d5ff8c7-31ac-4d5f-8c4c-556d8bd08ab7
+2026-01-14T12:31:33.689Z [Auth Me] user lookup by ID: FOUND
+2026-01-14T12:31:35.379Z [Auth Me] Cookie header present: YES
+2026-01-14T12:31:35.381Z [Auth Me] session_id cookie present: YES
+2026-01-14T12:31:35.622Z [Auth Me] session lookup: FOUND
+2026-01-14T12:31:35.622Z [Auth Me] session.user_id: 0d5ff8c7-31ac-4d5f-8c4c-556d8bd08ab7
+2026-01-14T12:31:35.846Z [Auth Me] user lookup by ID: FOUND
+2026-01-14T12:31:36.609Z [Auth Me] Cookie header present: YES
+2026-01-14T12:31:36.611Z [Auth Me] session_id cookie present: YES
+2026-01-14T12:31:36.839Z [Auth Me] session lookup: FOUND
+2026-01-14T12:31:36.839Z [Auth Me] session.user_id: 0d5ff8c7-31ac-4d5f-8c4c-556d8bd08ab7
+2026-01-14T12:31:37.094Z [Auth Me] user lookup by ID: FOUND
+2026-01-14T12:39:58.896Z [Auth Me] Cookie header present: YES
+2026-01-14T12:39:58.899Z [Auth Me] session_id cookie present: YES
+2026-01-14T12:39:59.178Z [Auth Me] session lookup: FOUND
+2026-01-14T12:39:59.178Z [Auth Me] session.user_id: 0d5ff8c7-31ac-4d5f-8c4c-556d8bd08ab7
+2026-01-14T12:39:59.388Z [Auth Me] user lookup by ID: FOUND
+2026-01-14T12:40:00.105Z [Auth Me] Cookie header present: YES
+2026-01-14T12:40:00.107Z [Auth Me] session_id cookie present: YES
+2026-01-14T12:40:00.312Z [Auth Me] session lookup: FOUND
+2026-01-14T12:40:00.312Z [Auth Me] session.user_id: 0d5ff8c7-31ac-4d5f-8c4c-556d8bd08ab7
+2026-01-14T12:40:00.520Z [Auth Me] user lookup by ID: FOUND
+2026-01-14T12:40:01.222Z [Auth Me] Cookie header present: YES
+2026-01-14T12:40:01.224Z [Auth Me] session_id cookie present: YES
+2026-01-14T12:40:01.455Z [Auth Me] session lookup: FOUND
+2026-01-14T12:40:01.455Z [Auth Me] session.user_id: 0d5ff8c7-31ac-4d5f-8c4c-556d8bd08ab7
+2026-01-14T12:40:01.658Z [Auth Me] user lookup by ID: FOUND
+2026-01-14T12:40:02.429Z [Auth Me] Cookie header present: YES
+2026-01-14T12:40:02.434Z [Auth Me] session_id cookie present: YES
+2026-01-14T12:40:02.604Z [Auth Me] session lookup: FOUND
+2026-01-14T12:40:02.604Z [Auth Me] session.user_id: 0d5ff8c7-31ac-4d5f-8c4c-556d8bd08ab7
+2026-01-14T12:40:02.804Z [Auth Me] user lookup by ID: FOUND
+2026-01-14T22:01:42.457Z [Auth Me] Cookie header present: YES
+2026-01-14T22:01:42.538Z [Auth Me] session_id cookie present: YES
+2026-01-14T22:01:44.160Z [Auth Me] session lookup: FOUND
+2026-01-14T22:01:44.161Z [Auth Me] session.user_id: 0d5ff8c7-31ac-4d5f-8c4c-556d8bd08ab7
+2026-01-14T22:01:44.384Z [Auth Me] user lookup by ID: FOUND
+2026-01-14T22:01:47.832Z [Auth Me] Cookie header present: YES
+2026-01-14T22:01:47.834Z [Auth Me] session_id cookie present: YES
+2026-01-14T22:01:48.012Z [Auth Me] session lookup: FOUND
+2026-01-14T22:01:48.013Z [Auth Me] session.user_id: 0d5ff8c7-31ac-4d5f-8c4c-556d8bd08ab7
+2026-01-14T22:01:48.183Z [Auth Me] user lookup by ID: FOUND
+2026-01-14T22:01:49.866Z [Auth Me] Cookie header present: YES
+2026-01-14T22:01:49.867Z [Auth Me] session_id cookie present: YES
+2026-01-14T22:01:50.346Z [Auth Me] session lookup: FOUND
+2026-01-14T22:01:50.346Z [Auth Me] session.user_id: 0d5ff8c7-31ac-4d5f-8c4c-556d8bd08ab7
+2026-01-14T22:01:50.512Z [Auth Me] user lookup by ID: FOUND
+2026-01-15T08:28:42.679Z [Auth Me] Cookie header present: YES
+2026-01-15T08:28:42.681Z [Auth Me] session_id cookie present: YES
+2026-01-15T08:28:44.076Z [Auth Me] session lookup: FOUND
+2026-01-15T08:28:44.076Z [Auth Me] session.user_id: 0d5ff8c7-31ac-4d5f-8c4c-556d8bd08ab7
+2026-01-15T08:28:44.232Z [Auth Me] user lookup by ID: FOUND
+2026-01-15T08:28:44.902Z [Auth Me] Cookie header present: YES
+2026-01-15T08:28:44.906Z [Auth Me] session_id cookie present: YES
+2026-01-15T08:28:45.057Z [Auth Me] session lookup: FOUND
+2026-01-15T08:28:45.058Z [Auth Me] session.user_id: 0d5ff8c7-31ac-4d5f-8c4c-556d8bd08ab7
+2026-01-15T08:28:45.210Z [Auth Me] user lookup by ID: FOUND
+2026-01-15T08:52:27.960Z [Auth Me] Cookie header present: YES
+2026-01-15T08:52:27.962Z [Auth Me] session_id cookie present: NO
+2026-01-15T08:52:30.359Z [Auth Me] Cookie header present: YES
+2026-01-15T08:52:30.360Z [Auth Me] session_id cookie present: NO
+2026-01-15T08:52:56.434Z [Auth Me] Cookie header present: YES
+2026-01-15T08:52:56.435Z [Auth Me] session_id cookie present: NO
+2026-01-15T08:52:58.300Z [Auth Me] Cookie header present: YES
+2026-01-15T08:52:58.301Z [Auth Me] session_id cookie present: NO
+2026-01-15T08:57:22.735Z [Auth Me] Cookie header present: YES
+2026-01-15T08:57:22.737Z [Auth Me] session_id cookie present: NO
+2026-01-15T08:57:24.426Z [Auth Me] Cookie header present: YES
+2026-01-15T08:57:24.430Z [Auth Me] session_id cookie present: NO
+2026-01-15T09:08:15.711Z [Auth Me] Cookie header present: YES
+2026-01-15T09:08:15.716Z [Auth Me] Supabase getUser: NOT_FOUND
+2026-01-15T09:08:21.317Z [Auth Me] Cookie header present: YES
+2026-01-15T09:08:21.318Z [Auth Me] Supabase getUser: NOT_FOUND
+2026-01-15T09:11:11.140Z [Auth Me] Cookie header present: YES
+2026-01-15T09:11:11.160Z [Auth Me] Supabase getUser: NOT_FOUND
+2026-01-15T09:11:14.349Z [Auth Me] Cookie header present: YES
+2026-01-15T09:11:14.350Z [Auth Me] Supabase getUser: NOT_FOUND
+2026-01-15T09:21:16.050Z [Auth Me] Cookie header present: YES
+2026-01-15T09:21:16.059Z [Auth Me] Supabase getUser: NOT_FOUND
+2026-01-15T09:21:18.220Z [Auth Me] Cookie header present: YES
+2026-01-15T09:21:18.221Z [Auth Me] Supabase getUser: NOT_FOUND
+2026-01-15T09:27:18.617Z [Auth Me] Cookie header present: YES
+2026-01-15T09:27:18.618Z [Auth Me] Cookie names: __next_hmr_refresh_hash__
+2026-01-15T09:27:18.626Z [Auth Me] Supabase getUser: NOT_FOUND
+2026-01-15T09:27:19.167Z [Auth Me] Cookie header present: YES
+2026-01-15T09:27:19.168Z [Auth Me] Cookie names: __next_hmr_refresh_hash__
+2026-01-15T09:27:19.169Z [Auth Me] Supabase getUser: NOT_FOUND
+2026-01-15T09:32:26.878Z [Auth Me] Cookie header present: YES
+2026-01-15T09:32:26.879Z [Auth Me] Cookie names: __next_hmr_refresh_hash__
+2026-01-15T09:32:26.881Z [Auth Me] Supabase getUser: NOT_FOUND
+2026-01-15T09:32:30.583Z [Auth Me] Cookie header present: YES
+2026-01-15T09:32:30.583Z [Auth Me] Cookie names: __next_hmr_refresh_hash__
+2026-01-15T09:32:30.585Z [Auth Me] Supabase getUser: NOT_FOUND
+2026-01-15T09:46:08.209Z [Auth Me] Cookie header present: YES
+2026-01-15T09:46:08.210Z [Auth Me] Cookie names: __next_hmr_refresh_hash__, session_id
+2026-01-15T09:46:08.213Z [Auth Me] Supabase getUser: NOT_FOUND
+2026-01-15T09:46:08.696Z [Auth Me] Cookie header present: YES
+2026-01-15T09:46:08.696Z [Auth Me] Cookie names: __next_hmr_refresh_hash__, session_id
+2026-01-15T09:46:08.698Z [Auth Me] Supabase getUser: NOT_FOUND
+2026-01-15T10:08:59.202Z [Auth Me] Cookie header present: YES
+2026-01-15T10:08:59.203Z [Auth Me] Cookie names: __next_hmr_refresh_hash__, session_id
+2026-01-15T10:08:59.213Z [Auth Me] Supabase getUser: NOT_FOUND
+2026-01-15T10:09:00.122Z [Auth Me] Cookie header present: YES
+2026-01-15T10:09:00.122Z [Auth Me] Cookie names: __next_hmr_refresh_hash__, session_id
+2026-01-15T10:09:00.123Z [Auth Me] Supabase getUser: NOT_FOUND
+2026-01-15T10:09:34.350Z [Auth Me] Cookie header present: YES
+2026-01-15T10:09:34.351Z [Auth Me] Cookie names: __next_hmr_refresh_hash__, session_id
+2026-01-15T10:09:34.353Z [Auth Me] Supabase getUser: NOT_FOUND
+2026-01-15T10:09:34.907Z [Auth Me] Cookie header present: YES
+2026-01-15T10:09:34.907Z [Auth Me] Cookie names: __next_hmr_refresh_hash__, session_id
+2026-01-15T10:09:34.909Z [Auth Me] Supabase getUser: NOT_FOUND
+2026-01-15T11:30:28.290Z [Auth Me] Cookie header present: YES
+2026-01-15T11:30:28.292Z [Auth Me] Cookie names: __next_hmr_refresh_hash__, session_id
+2026-01-15T11:30:28.297Z [Auth Me] Supabase getUser: NOT_FOUND
+2026-01-15T11:30:29.017Z [Auth Me] Cookie header present: YES
+2026-01-15T11:30:29.018Z [Auth Me] Cookie names: __next_hmr_refresh_hash__, session_id
+2026-01-15T11:30:29.019Z [Auth Me] Supabase getUser: NOT_FOUND
+2026-01-15T12:42:28.823Z [Auth Me] Cookie header present: YES
+2026-01-15T12:42:28.826Z [Auth Me] Cookie names: sb-dzrwxdjzgwvdmfbbfotn-auth-token, session_id
+2026-01-15T12:42:29.085Z [Auth Me] Supabase getUser: FOUND
+2026-01-15T12:42:29.085Z [Auth Me] auth user id: 2f188791-47ac-43e0-b5f5-eae63fcb90f2
+2026-01-15T12:42:29.407Z [Auth Me] user lookup: FOUND
+2026-01-15T12:42:31.999Z [Auth Me] Cookie header present: YES
+2026-01-15T12:42:31.999Z [Auth Me] Cookie names: sb-dzrwxdjzgwvdmfbbfotn-auth-token, session_id
+2026-01-15T12:42:32.229Z [Auth Me] Supabase getUser: FOUND
+2026-01-15T12:42:32.234Z [Auth Me] auth user id: 2f188791-47ac-43e0-b5f5-eae63fcb90f2
+2026-01-15T12:42:32.454Z [Auth Me] user lookup: FOUND
+2026-01-15T12:42:33.327Z [Auth Me] Cookie header present: YES
+2026-01-15T12:42:33.327Z [Auth Me] Cookie names: sb-dzrwxdjzgwvdmfbbfotn-auth-token, session_id
+2026-01-15T12:42:33.558Z [Auth Me] Supabase getUser: FOUND
+2026-01-15T12:42:33.558Z [Auth Me] auth user id: 2f188791-47ac-43e0-b5f5-eae63fcb90f2
+2026-01-15T12:42:33.777Z [Auth Me] user lookup: FOUND
+2026-01-15T12:42:34.798Z [Auth Me] Cookie header present: YES
+2026-01-15T12:42:34.799Z [Auth Me] Cookie names: sb-dzrwxdjzgwvdmfbbfotn-auth-token, session_id
+2026-01-15T12:42:35.035Z [Auth Me] Supabase getUser: FOUND
+2026-01-15T12:42:35.035Z [Auth Me] auth user id: 2f188791-47ac-43e0-b5f5-eae63fcb90f2
+2026-01-15T12:42:35.320Z [Auth Me] user lookup: FOUND
+2026-01-15T13:10:56.500Z [Auth Me] Cookie header present: YES
+2026-01-15T13:10:56.501Z [Auth Me] Cookie names: sb-dzrwxdjzgwvdmfbbfotn-auth-token, session_id
+2026-01-15T13:10:56.769Z [Auth Me] Supabase getUser: FOUND
+2026-01-15T13:10:56.769Z [Auth Me] auth user id: 2f188791-47ac-43e0-b5f5-eae63fcb90f2
+2026-01-15T13:10:57.038Z [Auth Me] user lookup: FOUND
+2026-01-15T13:10:57.992Z [Auth Me] Cookie header present: YES
+2026-01-15T13:10:57.992Z [Auth Me] Cookie names: sb-dzrwxdjzgwvdmfbbfotn-auth-token, session_id
+2026-01-15T13:10:58.230Z [Auth Me] Supabase getUser: FOUND
+2026-01-15T13:10:58.230Z [Auth Me] auth user id: 2f188791-47ac-43e0-b5f5-eae63fcb90f2
+2026-01-15T13:10:58.456Z [Auth Me] user lookup: FOUND
+2026-01-15T13:11:01.083Z [Auth Me] Cookie header present: YES
+2026-01-15T13:11:01.084Z [Auth Me] Cookie names: sb-dzrwxdjzgwvdmfbbfotn-auth-token, session_id
+2026-01-15T13:11:01.341Z [Auth Me] Supabase getUser: FOUND
+2026-01-15T13:11:01.341Z [Auth Me] auth user id: 2f188791-47ac-43e0-b5f5-eae63fcb90f2
+2026-01-15T13:11:01.603Z [Auth Me] user lookup: FOUND
+2026-01-15T13:11:02.554Z [Auth Me] Cookie header present: YES
+2026-01-15T13:11:02.554Z [Auth Me] Cookie names: sb-dzrwxdjzgwvdmfbbfotn-auth-token, session_id
+2026-01-15T13:11:02.792Z [Auth Me] Supabase getUser: FOUND
+2026-01-15T13:11:02.792Z [Auth Me] auth user id: 2f188791-47ac-43e0-b5f5-eae63fcb90f2
+2026-01-15T13:11:03.170Z [Auth Me] user lookup: FOUND
+2026-01-15T13:12:39.356Z [Auth Me] Cookie header present: YES
+2026-01-15T13:12:39.357Z [Auth Me] Cookie names: sb-dzrwxdjzgwvdmfbbfotn-auth-token, session_id
+2026-01-15T13:12:39.529Z [Auth Me] Supabase getUser: FOUND
+2026-01-15T13:12:39.529Z [Auth Me] auth user id: 2f188791-47ac-43e0-b5f5-eae63fcb90f2
+2026-01-15T13:12:39.692Z [Auth Me] user lookup: FOUND
+2026-01-15T13:12:40.513Z [Auth Me] Cookie header present: YES
+2026-01-15T13:12:40.514Z [Auth Me] Cookie names: sb-dzrwxdjzgwvdmfbbfotn-auth-token, session_id
+2026-01-15T13:12:40.681Z [Auth Me] Supabase getUser: FOUND
+2026-01-15T13:12:40.682Z [Auth Me] auth user id: 2f188791-47ac-43e0-b5f5-eae63fcb90f2
+2026-01-15T13:12:40.850Z [Auth Me] user lookup: FOUND
+2026-01-15T14:11:52.957Z [Auth Me] Cookie header present: YES
+2026-01-15T14:11:52.958Z [Auth Me] Cookie names: sb-dzrwxdjzgwvdmfbbfotn-auth-token, session_id
+2026-01-15T14:11:53.291Z [Auth Me] Supabase getUser: FOUND
+2026-01-15T14:11:53.291Z [Auth Me] auth user id: 2f188791-47ac-43e0-b5f5-eae63fcb90f2
+2026-01-15T14:11:53.570Z [Auth Me] user lookup: FOUND
+2026-01-15T14:11:56.981Z [Auth Me] Cookie header present: YES
+2026-01-15T14:11:56.982Z [Auth Me] Cookie names: sb-dzrwxdjzgwvdmfbbfotn-auth-token, session_id
+2026-01-15T14:11:57.237Z [Auth Me] Supabase getUser: FOUND
+2026-01-15T14:11:57.237Z [Auth Me] auth user id: 2f188791-47ac-43e0-b5f5-eae63fcb90f2
+2026-01-15T14:11:57.486Z [Auth Me] user lookup: FOUND
+2026-01-15T14:12:35.279Z [Auth Me] Cookie header present: YES
+2026-01-15T14:12:35.280Z [Auth Me] Cookie names: sb-dzrwxdjzgwvdmfbbfotn-auth-token, session_id
+2026-01-15T14:12:35.521Z [Auth Me] Supabase getUser: FOUND
+2026-01-15T14:12:35.522Z [Auth Me] auth user id: 2f188791-47ac-43e0-b5f5-eae63fcb90f2
+2026-01-15T14:12:35.749Z [Auth Me] user lookup: FOUND
+2026-01-15T14:12:36.679Z [Auth Me] Cookie header present: YES
+2026-01-15T14:12:36.679Z [Auth Me] Cookie names: sb-dzrwxdjzgwvdmfbbfotn-auth-token, session_id
+2026-01-15T14:12:36.843Z [Auth Me] Supabase getUser: FOUND
+2026-01-15T14:12:36.843Z [Auth Me] auth user id: 2f188791-47ac-43e0-b5f5-eae63fcb90f2
+2026-01-15T14:12:36.995Z [Auth Me] user lookup: FOUND
+2026-01-15T14:13:24.957Z [Auth Me] Cookie header present: YES
+2026-01-15T14:13:24.958Z [Auth Me] Cookie names: sb-dzrwxdjzgwvdmfbbfotn-auth-token, session_id
+2026-01-15T14:13:25.848Z [Auth Me] Supabase getUser: FOUND
+2026-01-15T14:13:25.848Z [Auth Me] auth user id: 2f188791-47ac-43e0-b5f5-eae63fcb90f2
+2026-01-15T14:13:26.070Z [Auth Me] user lookup: FOUND
+2026-01-15T14:13:26.991Z [Auth Me] Cookie header present: YES
+2026-01-15T14:13:26.991Z [Auth Me] Cookie names: sb-dzrwxdjzgwvdmfbbfotn-auth-token, session_id
+2026-01-15T14:13:27.211Z [Auth Me] Supabase getUser: FOUND
+2026-01-15T14:13:27.211Z [Auth Me] auth user id: 2f188791-47ac-43e0-b5f5-eae63fcb90f2
+2026-01-15T14:13:27.430Z [Auth Me] user lookup: FOUND

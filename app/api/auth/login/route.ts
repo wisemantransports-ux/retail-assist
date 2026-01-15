@@ -1,17 +1,12 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
-import { sessionManager } from '@/lib/session'
 import { db } from '@/lib/db'
 import { env } from '@/lib/env'
-import { ensureWorkspaceForUser } from '@/lib/supabase/ensureWorkspaceForUser'
 import { resolveUserId, ensureInternalUser } from '@/lib/supabase/queries'
-import { cookies } from 'next/headers'
 
 // Use mock mode to avoid calling Supabase in CI or while testing.
 // To go live, set NEXT_PUBLIC_USE_MOCK_SUPABASE=false and configure SUPABASE_* env vars.
 const useDev = env.useMockMode
-
-// session TTL is determined by sessionManager.create -> use returned session.expires_at
 
 export async function POST(request: Request) {
   try {
@@ -24,24 +19,10 @@ export async function POST(request: Request) {
       )
     }
 
-    // Dev fallback (local seed)
-    if (useDev) {
-      const user = await db.users.authenticate(email, password)
-      if (!user) {
-        console.warn('[LOGIN] Dev auth failed for:', email)
-        return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
-      }
-
-      const session = await sessionManager.create(user.id, 24 * 7)
-      const maxAge = 7 * 24 * 60 * 60
-      const res = NextResponse.json({ success: true, user: { id: user.id, email: user.email, role: user.role } })
-      const cookieStore = await cookies()
-      cookieStore.set('session_id', session.id, { path: '/', httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge })
-      return res
-    }
-
     // Production (Supabase)
-    const supabase = createServerClient()
+    const res = NextResponse.json({}) // placeholder for cookie setting
+    // @ts-ignore
+    const supabase = createServerClient(request, res as any)
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -65,20 +46,28 @@ export async function POST(request: Request) {
     }
     const internalUserId = ensured.id
 
-    // Ensure user has a workspace (safe to call multiple times) — pass internal id
-    const workspaceResult = await ensureWorkspaceForUser(internalUserId)
-    if (workspaceResult.error) {
-      console.warn('[LOGIN] Workspace provisioning warning:', workspaceResult.error)
-      // Don't fail login if workspace provisioning fails - user can create/join later
+    // Fetch user role and workspace from RPC
+    const { data: userAccess, error: rpcError } = await supabase.rpc('rpc_get_user_access')
+    if (rpcError) {
+      console.error('[LOGIN] RPC error:', rpcError)
+      return NextResponse.json({ error: 'Role resolution failed' }, { status: 500 })
+    }
+    const accessRecord = userAccess?.[0]
+    const role = accessRecord?.role || 'user'
+    const workspaceId = accessRecord?.workspace_id || null
+
+    console.log('[LOGIN] Resolved role:', role)
+    console.log('[LOGIN] Workspace ID:', workspaceId)
+
+    // Create final response with data
+    const finalRes = NextResponse.json({ success: true, user: { id: internalUserId, email: data.user.email, role }, workspaceId })
+
+    // Copy Supabase cookies from placeholder res to finalRes
+    for (const cookie of res.cookies.getAll()) {
+      finalRes.cookies.set(cookie.name, cookie.value, cookie)
     }
 
-    // create our session record using the deterministic internal users.id
-    const session = await sessionManager.create(internalUserId, 24 * 7)
-    const maxAge = 7 * 24 * 60 * 60
-    const res = NextResponse.json({ success: true, user: { id: internalUserId, email: data.user.email, role: (data.user as any).role || 'user' }, workspaceId: workspaceResult.workspaceId })
-    const cookieStore = await cookies()
-    cookieStore.set('session_id', session.id, { path: '/', httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge })
-    return res
+    return finalRes
   } catch (err) {
     console.error('[LOGIN_ERROR]', err)
     return NextResponse.json(

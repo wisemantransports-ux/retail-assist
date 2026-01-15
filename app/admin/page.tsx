@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase/client";
 
 interface User {
   id: string;
@@ -47,7 +48,22 @@ export default function AdminDashboard() {
       const res = await fetch('/api/auth/me');
       const data = await res.json();
       
-      if (!res.ok || data.user.role !== 'admin') {
+      if (!res.ok) {
+        router.push('/admin/login');
+        return;
+      }
+      
+      // Fetch access role from RPC
+      const { data: userAccess } = await supabase.rpc('rpc_get_user_access');
+      const accessRecord = userAccess?.[0];
+      const role = accessRecord?.role;
+      const workspaceId = accessRecord?.workspace_id;
+      
+      console.log('[Admin Page] Resolved role:', role);
+      console.log('[Admin Page] Workspace ID:', workspaceId);
+      
+      if (role !== 'super_admin') {
+        console.log('[Admin Page] Access denied for role:', role, 'redirecting to login');
         router.push('/admin/login');
         return;
       }

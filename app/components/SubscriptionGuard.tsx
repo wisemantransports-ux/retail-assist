@@ -51,7 +51,7 @@ export default function SubscriptionGuard({ children, requiredFeature }: Subscri
       const userData = data.user;
       setUser(userData);
 
-      if (userData.role === "admin") {
+      if (userData.role === "admin" || userData.role === "super_admin") {
         setLoading(false);
         return;
       }
@@ -218,7 +218,7 @@ export function useSubscription() {
   }, []);
 
   const canUseFeature = (feature: "instagram" | "ai" | "unlimited_pages") => {
-    if (!user || user.role === "admin") return true;
+    if (!user || user.role === "admin" || user.role === "super_admin") return true;
     const subStatus = user.subscription_status;
     if (subStatus !== "active") return false;
 
@@ -230,7 +230,7 @@ export function useSubscription() {
     return true;
   };
 
-  const readOnly = !!user && user.role !== "admin" && user.subscription_status !== "active";
+  const readOnly = !!user && user.role !== "admin" && user.role !== "super_admin" && user.subscription_status !== "active";
 
   return { user, loading, canUseFeature, readOnly };
 }

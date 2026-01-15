@@ -24,6 +24,7 @@ interface UserData {
     hasInstagram: boolean;
     hasAiResponses: boolean;
     commentToDmLimit: number;
+    aiTokenLimitMonthly: number;
     price: number;
   };
 }

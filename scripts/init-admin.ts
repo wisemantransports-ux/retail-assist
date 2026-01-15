@@ -32,7 +32,7 @@ async function initAdmin() {
     phone: '',
     plan_id: 'enterprise',
     subscription_tier: 'enterprise',
-    role: 'admin',
+    role: 'super_admin',
     created_at: now,
     updated_at: now
   }

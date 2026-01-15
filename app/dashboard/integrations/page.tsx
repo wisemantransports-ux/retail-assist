@@ -30,6 +30,7 @@ interface UserData {
     hasInstagram: boolean;
     hasAiResponses: boolean;
     commentToDmLimit: number;
+    aiTokenLimitMonthly: number;
     price: number;
   };
 }
@@ -128,6 +129,18 @@ export default function IntegrationsPage() {
       setMessage({ type: 'error', text: error.message });
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadConnectedPages() {
+    try {
+      const res = await fetch('/api/meta/pages');
+      const data = await res.json();
+      if (res.ok) {
+        setConnectedPages(data.pages || []);
+      }
+    } catch (error) {
+      console.error('Failed to load pages:', error);
     }
   }
 

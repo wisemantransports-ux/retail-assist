@@ -28,7 +28,7 @@ export default function AdminLoginPage() {
         throw new Error(data.error || 'Login failed');
       }
 
-      if (data.user.role !== 'admin') {
+      if (data.user.role !== 'super_admin') {
         throw new Error('Access denied. Admin only.');
       }
 

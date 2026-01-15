@@ -5,13 +5,13 @@
 -- =============================================
 
 -- ============================================================================
--- 1. META PAGES
+-- 1. META PAGES TABLE
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS public.meta_pages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   workspace_id UUID NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
-  page_id TEXT NOT NULL UNIQUE,  -- FB Page ID
+  page_id TEXT NOT NULL UNIQUE,  -- Facebook Page ID
   name TEXT,
   access_token TEXT,
   active BOOLEAN DEFAULT true,
@@ -39,7 +39,8 @@ CREATE POLICY "users_can_view_meta_pages"
   ON public.meta_pages FOR SELECT
   USING (
     EXISTS (
-      SELECT 1 FROM public.workspace_members wm
+      SELECT 1
+      FROM public.workspace_members wm
       JOIN public.users u ON u.id = wm.user_id
       WHERE wm.workspace_id = meta_pages.workspace_id
         AND u.auth_uid = auth.uid()
@@ -52,7 +53,8 @@ CREATE POLICY "users_can_update_meta_pages"
   ON public.meta_pages FOR UPDATE
   USING (
     EXISTS (
-      SELECT 1 FROM public.workspace_members wm
+      SELECT 1
+      FROM public.workspace_members wm
       JOIN public.users u ON u.id = wm.user_id
       WHERE wm.workspace_id = meta_pages.workspace_id
         AND u.auth_uid = auth.uid()
@@ -60,10 +62,9 @@ CREATE POLICY "users_can_update_meta_pages"
   );
 
 -- ============================================================================
--- 4. TRIGGERS
+-- 4. TRIGGERS: auto-update updated_at
 -- ============================================================================
 
--- Automatically update updated_at
 CREATE OR REPLACE FUNCTION public.set_meta_pages_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN

@@ -5,8 +5,23 @@
  */
 
 // ============================================================================
-// USER & AUTHENTICATION TYPES
+// BILLING TYPES
 // ============================================================================
+
+export interface Plan {
+  id: string;
+  name: string;
+  display_name: string;
+  price_monthly?: number;
+  price_currency_bwp: number;
+  price_yearly?: number;
+  ai_token_limit_monthly: number;
+  included_monthly_usage: number; // Optional, as per API response
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface User {
   id: string;
@@ -134,7 +149,7 @@ export interface Comment {
 // ============================================================================
 
 export type MessagePlatform = 'email' | 'facebook_messenger' | 'whatsapp' | 'instagram_dm';
-export type MessageStatus = 'sent' | 'failed' | 'read' | 'replied';
+export type MessageLogStatus = 'sent' | 'failed' | 'read' | 'replied';
 
 export interface DirectMessage {
   id: string;
@@ -146,7 +161,7 @@ export interface DirectMessage {
   content: string;
   platform: MessagePlatform;
   platform_message_id?: string;
-  status: MessageStatus;
+  status: MessageLogStatus;
   created_at: string;
   updated_at: string;
 }
@@ -558,4 +573,64 @@ export interface ManualPayment {
   approved_by?: string;
   created_at: string;
   approved_at?: string;
+}
+
+// ============================================================================
+// EMPLOYEES DASHBOARD TYPES
+// ============================================================================
+
+export type EmployeeRole = 'super_admin' | 'admin' | 'employee';
+
+export interface Employee {
+  id: string;
+  user_id: string;
+  business_id?: string; // null for Retail Assist employees
+  role: EmployeeRole;
+  created_at: string;
+  updated_at: string;
+}
+
+export type MessageChannel = 'facebook' | 'instagram' | 'whatsapp' | 'website_chat';
+export type EmployeeMessageStatus = 'new' | 'in_progress' | 'escalated' | 'completed';
+
+export interface Message {
+  id: string;
+  sender_id: string;
+  channel: MessageChannel;
+  content: string;
+  ai_response?: string;
+  ai_confidence?: number;
+  status: EmployeeMessageStatus;
+  assigned_to_employee_id?: string;
+  escalated_to_admin_id?: string;
+  business_id?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type QueueStatus = 'pending' | 'assigned' | 'completed';
+
+export interface MessageQueue {
+  id: string;
+  message_id: string;
+  employee_id: string;
+  status: QueueStatus;
+  priority: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MessageWithQueue extends Message {
+  queue_entry?: MessageQueue;
+}
+
+export interface AIResponseSuggestion {
+  response: string;
+  confidence: number;
+}
+
+export interface MessageResponse {
+  message_id: string;
+  response: string;
+  escalate?: boolean;
 }

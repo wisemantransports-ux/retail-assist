@@ -29,7 +29,7 @@ export default function AdminLogsPage() {
       const res = await fetch('/api/auth/me');
       const data = await res.json();
       
-      if (!res.ok || data.user.role !== 'admin') {
+      if (!res.ok || data.user.role !== 'super_admin') {
         router.push('/admin/login');
       }
     } catch {

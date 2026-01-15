@@ -103,9 +103,15 @@ function SignupForm() {
           throw new Error(signInError?.message || 'Sign in after signup failed');
         }
 
-        // Redirect to dashboard on successful sign-in
-        router.replace('/dashboard');
-        router.refresh();
+        // Fetch role from RPC
+        const { data: userAccess } = await supabase.rpc('rpc_get_user_access');
+        const role = userAccess?.[0]?.role;
+        console.log('Signup user role:', role);
+
+        // Role-based redirect
+        if (role === 'super_admin') router.push('/admin');
+        if (role === 'admin') router.push('/dashboard');
+        if (role === 'employee') router.push('/employees/dashboard');
       } catch (signErr: any) {
         // If client-side sign-in fails, surface an error but do not modify backend
         setError(signErr?.message || 'Failed to sign in after signup');

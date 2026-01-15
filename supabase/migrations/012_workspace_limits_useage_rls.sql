@@ -1,6 +1,6 @@
--- =============================================
+--- =============================================
 -- 012_workspace_limits_usage_rls_fixed.sql
--- Aligned with 002
+-- Aligned with 002 schema
 -- =============================================
 
 -- 1. WORKSPACE LIMITS TABLE
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS public.workspace_limits (
 CREATE TABLE IF NOT EXISTS public.ai_usage_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   workspace_id UUID NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,  -- matches users.id
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   agent_id UUID NOT NULL REFERENCES public.agents(id) ON DELETE CASCADE,
   tokens_used INTEGER DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -44,6 +44,8 @@ ALTER TABLE public.workspace_limits ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ai_usage_logs ENABLE ROW LEVEL SECURITY;
 
 -- 5. WORKSPACE LIMITS POLICIES
+
+-- SELECT policy
 DROP POLICY IF EXISTS "workspace_limits_select" ON public.workspace_limits;
 CREATE POLICY "workspace_limits_select"
 ON public.workspace_limits
@@ -57,6 +59,7 @@ USING (
   )
 );
 
+-- UPDATE policy
 DROP POLICY IF EXISTS "workspace_limits_update" ON public.workspace_limits;
 CREATE POLICY "workspace_limits_update"
 ON public.workspace_limits
@@ -71,6 +74,8 @@ USING (
 );
 
 -- 6. AI USAGE LOGS POLICIES
+
+-- SELECT policy
 DROP POLICY IF EXISTS "ai_usage_logs_select" ON public.ai_usage_logs;
 CREATE POLICY "ai_usage_logs_select"
 ON public.ai_usage_logs
@@ -84,6 +89,7 @@ USING (
   )
 );
 
+-- INSERT policy
 DROP POLICY IF EXISTS "ai_usage_logs_insert" ON public.ai_usage_logs;
 CREATE POLICY "ai_usage_logs_insert"
 ON public.ai_usage_logs

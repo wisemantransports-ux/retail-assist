@@ -1,4 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { createServerClient as createSSRServerClient } from '@supabase/ssr'
+import { NextRequest, NextResponse } from 'next/server'
 
 // IMPORTANT: Do not use Supabase server clients while mock mode is enabled.
 // The factory functions below will throw if `env.useMockMode` is true to prevent accidental live DB calls.
@@ -41,7 +43,7 @@ export function createAdminSupabaseClient(): SupabaseClient {
   return createServerSupabaseClient();
 }
 
-export function createServerClient(): SupabaseClient {
+export function createServerClient(request?: NextRequest, response?: NextResponse): SupabaseClient {
   const hasAnonCreds = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
   if (env.useMockMode && !hasAnonCreds) {
     throw new Error('Supabase client disabled: mock mode is enabled (NEXT_PUBLIC_USE_MOCK_SUPABASE=true). Set NEXT_PUBLIC_USE_MOCK_SUPABASE=false and provide NEXT_PUBLIC_SUPABASE_* env vars to enable the client.')
@@ -49,12 +51,31 @@ export function createServerClient(): SupabaseClient {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     throw new Error('Missing Supabase configuration. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY for server client.')
   }
-  if (!anonClient) {
-    anonClient = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
-      auth: { persistSession: false }
+  if (request) {
+    // Use SSR client for cookie handling
+    return createSSRServerClient(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          if (response) {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              response.cookies.set(name, value, options)
+            })
+          }
+        },
+      },
     })
+  } else {
+    // Fallback for places without request (e.g., server components using cookies())
+    if (!anonClient) {
+      anonClient = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
+        auth: { persistSession: false }
+      })
+    }
+    return anonClient
   }
-  return anonClient
 }
 
 export async function createMockAdminSupabaseClient(): Promise<any> {

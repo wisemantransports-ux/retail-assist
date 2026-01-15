@@ -34,11 +34,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Features table trigger
 DROP TRIGGER IF EXISTS trg_workspace_features_updated ON public.workspace_features;
 CREATE TRIGGER trg_workspace_features_updated
 BEFORE UPDATE ON public.workspace_features
 FOR EACH ROW EXECUTE FUNCTION public.set_workspace_updated_at();
 
+-- Limits table trigger
 DROP TRIGGER IF EXISTS trg_workspace_limits_updated ON public.workspace_limits;
 CREATE TRIGGER trg_workspace_limits_updated
 BEFORE UPDATE ON public.workspace_limits
@@ -49,7 +51,7 @@ ALTER TABLE public.workspace_features ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.workspace_limits ENABLE ROW LEVEL SECURITY;
 
 -- 5. RLS POLICIES: workspace access
--- FEATURES
+-- WORKSPACE FEATURES
 DROP POLICY IF EXISTS "workspace_features_select" ON public.workspace_features;
 CREATE POLICY "workspace_features_select"
 ON public.workspace_features FOR SELECT
@@ -89,7 +91,7 @@ WITH CHECK (
   )
 );
 
--- LIMITS
+-- WORKSPACE LIMITS
 DROP POLICY IF EXISTS "workspace_limits_select" ON public.workspace_limits;
 CREATE POLICY "workspace_limits_select"
 ON public.workspace_limits FOR SELECT

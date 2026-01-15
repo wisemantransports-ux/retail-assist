@@ -25,7 +25,7 @@ export async function PUT(request: Request) {
     const userId = sessionCookie.value;
     const user = await db.users.findById(userId);
     
-    if (!user || user.role !== 'admin') {
+    if (!user || user.role !== 'super_admin') {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 

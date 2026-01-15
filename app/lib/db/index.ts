@@ -19,6 +19,7 @@ export const PLAN_LIMITS = {
     hasInstagram: false,
     hasAiResponses: true,
     commentToDmLimit: 100,
+    aiTokenLimitMonthly: 10000,
     features: ['Facebook Messenger auto-reply', 'Comment-to-DM (100/month)', '1 Facebook Page', 'Basic AI responses']
   },
   pro: {
@@ -28,6 +29,7 @@ export const PLAN_LIMITS = {
     hasInstagram: true,
     hasAiResponses: true,
     commentToDmLimit: 500,
+    aiTokenLimitMonthly: 50000,
     features: ['Facebook + Instagram automation', 'Comment-to-DM (500/month)', '3 Pages/Accounts', 'AI-powered responses']
   },
   enterprise: {
@@ -37,6 +39,7 @@ export const PLAN_LIMITS = {
     hasInstagram: true,
     hasAiResponses: true,
     commentToDmLimit: -1,
+    aiTokenLimitMonthly: -1,
     features: ['All features unlocked', 'Unlimited pages/accounts', 'Priority support', 'Custom automation rules']
   }
 }

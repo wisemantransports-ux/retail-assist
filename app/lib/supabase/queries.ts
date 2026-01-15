@@ -13,6 +13,11 @@ import type {
 	AutomationRule,
 	Invoice,
 	SubscriptionStatus,
+	EmployeeMessageStatus,
+	Employee,
+	Message,
+	MessageWithQueue,
+	Plan,
 } from '../types/database'
 
 // Centralized Supabase query helpers used by server routes.
@@ -817,7 +822,7 @@ export async function createSubscription(a: any, maybePayload?: any) {
 // -----------------------------
 // Plans / Billing helpers
 // -----------------------------
-export async function getAllPlans() {
+export async function getAllPlansMock() {
 	const db = anon()
 	// Try to read from a `plans` table if present, otherwise return a static list
 	try {
@@ -1078,6 +1083,217 @@ export async function getInvoiceById(invoiceId: string) {
 	return { data: data || null, error }
 }
 
+// -----------------------------
+// Employees Dashboard
+// -----------------------------
+export async function createEmployee(payload: { user_id: string; business_id?: string; role: Employee['role'] }) {
+	const db = admin()
+	const now = new Date().toISOString()
+	const record = { ...payload, created_at: now, updated_at: now }
+	const { data, error } = await db.from('employees').insert(record).select().limit(1).maybeSingle()
+	return { data: data as Employee | null, error }
+}
+
+export async function getEmployeeById(employeeId: string) {
+	const db = anon()
+	const { data, error } = await db.from('employees').select('*').eq('id', employeeId).limit(1).maybeSingle()
+	return { data: data as Employee | null, error }
+}
+
+export async function listEmployeesForBusiness(businessId?: string) {
+	const db = anon()
+	let query = db.from('employees').select('*')
+	if (businessId) {
+		query = query.eq('business_id', businessId)
+	} else {
+		query = query.is('business_id', null)
+	}
+	const { data, error } = await query.order('created_at', { ascending: false })
+	return { data: data as Employee[] | null, error }
+}
+
+export async function createMessage(payload: {
+	sender_id: string;
+	channel: Message['channel'];
+	content: string;
+	ai_response?: string;
+	ai_confidence?: number;
+	business_id?: string;
+}) {
+	const db = admin()
+	const now = new Date().toISOString()
+	const record = { ...payload, status: 'new', created_at: now, updated_at: now }
+	const { data, error } = await db.from('messages').insert(record).select().limit(1).maybeSingle()
+	return { data: data as Message | null, error }
+}
+
+export async function getMessageById(messageId: string) {
+	const db = anon()
+	const { data, error } = await db.from('messages').select('*').eq('id', messageId).limit(1).maybeSingle()
+	return { data: data as Message | null, error }
+}
+
+export async function listMessagesForEmployee(employeeId: string, filters?: {
+	status?: string[];
+	channel?: string[];
+	search?: string;
+	sortBy?: 'created_at' | 'updated_at' | 'priority';
+	sortOrder?: 'asc' | 'desc';
+	limit?: number;
+	offset?: number;
+}) {
+	const db = anon()
+	let query = db.from('messages').select(`
+		*,
+		message_queues!inner(*)
+	`).eq('message_queues.employee_id', employeeId)
+
+	if (filters?.status?.length) {
+		query = query.in('status', filters.status)
+	}
+	if (filters?.channel?.length) {
+		query = query.in('channel', filters.channel)
+	}
+	if (filters?.search) {
+		query = query.ilike('content', `%${filters.search}%`)
+	}
+
+	const sortBy = filters?.sortBy || 'created_at'
+	const sortOrder = filters?.sortOrder || 'desc'
+	query = query.order(sortBy, { ascending: sortOrder === 'asc' })
+
+	if (filters?.limit) {
+		query = query.limit(filters.limit)
+		if (filters?.offset) {
+			query = query.range(filters.offset, filters.offset + filters.limit - 1)
+		}
+	}
+
+	const { data, error } = await query
+	return { data: data as MessageWithQueue[] | null, error }
+}
+
+export async function listMessagesForBusiness(businessId?: string, filters?: {
+	status?: string[];
+	channel?: string[];
+	search?: string;
+	sortBy?: 'created_at' | 'updated_at';
+	sortOrder?: 'asc' | 'desc';
+	limit?: number;
+	offset?: number;
+}) {
+	const db = anon()
+	let query = db.from('messages').select('*')
+	if (businessId) {
+		query = query.eq('business_id', businessId)
+	} else {
+		query = query.is('business_id', null)
+	}
+
+	if (filters?.status?.length) {
+		query = query.in('status', filters.status)
+	}
+	if (filters?.channel?.length) {
+		query = query.in('channel', filters.channel)
+	}
+	if (filters?.search) {
+		query = query.ilike('content', `%${filters.search}%`)
+	}
+
+	const sortBy = filters?.sortBy || 'created_at'
+	const sortOrder = filters?.sortOrder || 'desc'
+	query = query.order(sortBy, { ascending: sortOrder === 'asc' })
+
+	if (filters?.limit) {
+		query = query.limit(filters.limit)
+		if (filters?.offset) {
+			query = query.range(filters.offset, filters.offset + filters.limit - 1)
+		}
+	}
+
+	const { data, error } = await query
+	return { data: data as Message[] | null, error }
+}
+
+export async function updateMessageStatus(messageId: string, status: EmployeeMessageStatus, employeeId?: string) {
+	const db = admin()
+	const updateData: any = { status, updated_at: new Date().toISOString() }
+	if (employeeId && status === 'in_progress') {
+		updateData.assigned_to_employee_id = employeeId
+	}
+	const { data, error } = await db.from('messages').update(updateData).eq('id', messageId).select().limit(1).maybeSingle()
+	return { data: data as Message | null, error }
+}
+
+export async function respondToMessage(messageId: string, response: string, employeeId: string) {
+	const db = admin()
+	const now = new Date().toISOString()
+	const { data, error } = await db.from('messages').update({
+		ai_response: response,
+		status: 'completed',
+		assigned_to_employee_id: employeeId,
+		updated_at: now
+	}).eq('id', messageId).select().limit(1).maybeSingle()
+	return { data: data as Message | null, error }
+}
+
+export async function escalateMessage(messageId: string, adminId: string, employeeId: string) {
+	const db = admin()
+	const now = new Date().toISOString()
+	const { data, error } = await db.from('messages').update({
+		status: 'escalated',
+		escalated_to_admin_id: adminId,
+		assigned_to_employee_id: employeeId,
+		updated_at: now
+	}).eq('id', messageId).select().limit(1).maybeSingle()
+	return { data: data as Message | null, error }
+}
+
+export async function generateAIResponse(messageId: string, aiResponse: string, confidence: number) {
+	const db = admin()
+	const { data, error } = await db.from('messages').update({
+		ai_response: aiResponse,
+		ai_confidence: confidence,
+		updated_at: new Date().toISOString()
+	}).eq('id', messageId).select().limit(1).maybeSingle()
+	return { data: data as Message | null, error }
+}
+
+export async function assignMessageToEmployee(messageId: string, employeeId: string) {
+	const db = admin()
+	const now = new Date().toISOString()
+	// Update message
+	const { data: messageData, error: messageError } = await db.from('messages').update({
+		assigned_to_employee_id: employeeId,
+		status: 'in_progress',
+		updated_at: now
+	}).eq('id', messageId).select().limit(1).maybeSingle()
+
+	if (messageError) return { data: null, error: messageError }
+
+	// Update queue
+	const { data: queueData, error: queueError } = await db.from('message_queues').update({
+		status: 'assigned',
+		updated_at: now
+	}).eq('message_id', messageId).eq('employee_id', employeeId).select().limit(1).maybeSingle()
+
+	return { data: { message: messageData, queue: queueData }, error: queueError }
+}
+
+// ============================================================================
+// BILLING QUERIES
+// ============================================================================
+
+export async function getAllPlans(): Promise<{ data: Plan[] | null, error: string | null }> {
+  const db = admin()
+  const { data, error } = await db.from('plans').select('*').eq('is_active', true).order('sort_order')
+  if (error) {
+    console.error('[getAllPlans] Error:', error)
+    return { data: null, error: error.message }
+  }
+  return { data: data as Plan[], error: null }
+}
+
 export default {
 	// users
 	getUserProfile,
@@ -1127,4 +1343,19 @@ export default {
   // invoices
   createInvoice,
   getInvoiceById,
+  // employees dashboard
+  createEmployee,
+  getEmployeeById,
+  listEmployeesForBusiness,
+  createMessage,
+  getMessageById,
+  listMessagesForEmployee,
+  listMessagesForBusiness,
+  updateMessageStatus,
+  respondToMessage,
+  escalateMessage,
+  generateAIResponse,
+  assignMessageToEmployee,
+  // billing
+  getAllPlans,
 }

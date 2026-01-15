@@ -1,3 +1,4 @@
+“Not applied. Auth verified stable. Superseded.”
 -- 025_fix_sessions_fk.sql
 -- Fix the sessions table foreign key constraint.
 -- Currently it references auth.users(id), but it should reference public.users(id).

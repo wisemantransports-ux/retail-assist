@@ -5,7 +5,7 @@
 -- =============================================
 
 -- ============================================================================
--- 1. FB / META EVENTS
+-- 1. FB / META EVENTS TABLE
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS public.meta_events (
@@ -71,14 +71,20 @@ CREATE POLICY "users_can_update_meta_events"
 -- 4. TRIGGERS
 -- ============================================================================
 
--- Automatically update updated_at (if we add updated_at in future)
+-- Placeholder trigger for future updated_at column
 CREATE OR REPLACE FUNCTION public.set_meta_events_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
-  -- Placeholder: add updated_at column in future if needed
+  -- Add updated_at logic in the future if needed
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Trigger creation is optional until updated_at column exists
+-- DROP TRIGGER IF EXISTS trg_meta_events_updated ON public.meta_events;
+-- CREATE TRIGGER trg_meta_events_updated
+-- BEFORE UPDATE ON public.meta_events
+-- FOR EACH ROW EXECUTE FUNCTION public.set_meta_events_updated_at();
 
 -- ============================================================================
 -- END OF 016

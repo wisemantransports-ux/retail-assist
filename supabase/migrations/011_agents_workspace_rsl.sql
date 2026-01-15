@@ -1,6 +1,7 @@
 -- =============================================
 -- 011_agents_workspace_rls.sql
--- Migration 011: RLS policies for inserts/updates
+-- Migration 011: RLS policies for agents and workspace updates
+-- Safe to run now; comments and message_logs policies deferred
 -- Builds on 002 and 010
 -- =============================================
 
@@ -19,7 +20,7 @@ WITH CHECK (
     SELECT 1
     FROM public.workspaces w
     JOIN public.users u ON u.id = w.owner_id
-    WHERE w.id = workspace_id
+    WHERE w.id = agents.workspace_id
       AND u.auth_uid = auth.uid()
   )
 );
@@ -61,46 +62,14 @@ USING (
 );
 
 -- ============================================================================
--- 4. COMMENTS: Ensure only members can insert comments
+-- 4. COMMENTS & MESSAGE_LOGS
 -- ============================================================================
 
-DROP POLICY IF EXISTS "comments_member_insert" ON public.comments;
-
-CREATE POLICY "comments_member_insert"
-ON public.comments
-FOR INSERT
-TO public
-WITH CHECK (
-  EXISTS (
-    SELECT 1
-    FROM public.agents a
-    JOIN public.workspace_members wm ON wm.workspace_id = a.workspace_id
-    JOIN public.users u ON u.id = wm.user_id
-    WHERE a.id = comments.agent_id
-      AND u.auth_uid = auth.uid()
-  )
-);
+-- NOTE: RLS for comments and message_logs is deferred.
+-- Apply these once the tables 'comments' and 'message_logs' exist.
+-- DROP POLICY IF EXISTS "comments_member_insert" ON public.comments;
+-- DROP POLICY IF EXISTS "message_logs_member_insert" ON public.message_logs;
 
 -- ============================================================================
--- 5. MESSAGE LOGS: Ensure only workspace members can insert logs
--- ============================================================================
-
-DROP POLICY IF EXISTS "message_logs_member_insert" ON public.message_logs;
-
-CREATE POLICY "message_logs_member_insert"
-ON public.message_logs
-FOR INSERT
-TO public
-WITH CHECK (
-  EXISTS (
-    SELECT 1
-    FROM public.workspace_members wm
-    JOIN public.users u ON u.id = wm.user_id
-    WHERE wm.workspace_id = message_logs.workspace_id
-      AND u.auth_uid = auth.uid()
-  )
-);
-
--- ============================================================================
--- END OF 011
+-- END OF 011 (safe version)
 -- ============================================================================

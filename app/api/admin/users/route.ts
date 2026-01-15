@@ -12,7 +12,7 @@ async function verifyAdmin(request: Request) {
   if (!session) return null;
 
   const user = await db.users.findById(session.user_id);
-  if (!user || user.role !== 'admin') return null;
+  if (!user || user.role !== 'super_admin') return null;
 
   return user;
 }
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     const users = await db.users.getAll();
     
     const filteredUsers = users
-      .filter(u => u.role !== 'admin')
+      .filter(u => u.role !== 'super_admin')
       .map(u => ({
         id: u.id,
         email: u.email,
