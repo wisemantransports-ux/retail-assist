@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
 import { resolveUserId } from '@/lib/supabase/queries';
 import { checkWorkspaceActive } from '@/lib/supabase/subscriptionCheck';
@@ -13,7 +13,7 @@ import { env } from '@/lib/env';
  * - agentId: filter by agent ID (optional)
  * - enabledOnly: only return enabled rules (optional, default false)
  */
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     if (env.useMockMode) {
       return NextResponse.json({
@@ -31,7 +31,8 @@ export async function GET(request: Request) {
       });
     }
 
-    const supabase = await createServerClient();
+    // @ts-ignore
+    const supabase = createServerClient(request);
     const { data: { session } } = await supabase.auth.getSession();
     
     if (!session) {
@@ -40,17 +41,28 @@ export async function GET(request: Request) {
 
     // Resolve session user to internal id (read-only)
     const effectiveUserId = (await resolveUserId(session.user.id, false)) || session.user.id
-    // Get user's workspace
-    const { data: workspace, error: workspaceError } = await supabase
-      .from('workspaces')
-      .select('id')
-      .eq('owner_id', effectiveUserId)
-      .limit(1)
-      .single();
-
-    if (workspaceError || !workspace) {
+    
+    // Get workspace from RPC (works for both owners and admins)
+    const { data: userAccess, error: rpcError } = await supabase.rpc('rpc_get_user_access');
+    
+    if (rpcError || !userAccess || userAccess.length === 0) {
+      console.error('[automation-rules] RPC error or no access:', rpcError?.message);
       return NextResponse.json({ rules: [] });
     }
+    
+    const accessRecord = userAccess[0];
+    const workspaceId = accessRecord?.workspace_id;
+    
+    // Super admin can have NULL workspace_id and access all workspaces
+    // Client admin must have a workspace_id
+    if (!workspaceId) {
+      // This is a super admin - they can access all rules from all workspaces
+      // For now, return empty (could be expanded to show all workspaces)
+      console.log('[automation-rules] Super admin with NULL workspace - returning empty for now');
+      return NextResponse.json({ rules: [] });
+    }
+    
+    console.log('[automation-rules] Using workspace_id from RPC:', workspaceId);
 
     // Parse query params
     const url = new URL(request.url);
@@ -61,7 +73,7 @@ export async function GET(request: Request) {
     let query = supabase
       .from('automation_rules')
       .select('*')
-      .eq('workspace_id', workspace.id);
+      .eq('workspace_id', workspaceId);
 
     if (agentId) {
       query = query.eq('agent_id', agentId);

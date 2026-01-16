@@ -2,9 +2,38 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function Topbar() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const router = useRouter();
+  const [signingOut, setSigningOut] = useState(false);
+
+  async function handleLogout() {
+    try {
+      setSigningOut(true);
+      console.log('[Topbar] Initiating logout...');
+      const response = await fetch('/api/auth/logout', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Logout failed with status ${response.status}`);
+      }
+      
+      console.log('[Topbar] Logout successful, redirecting to /login');
+      // Close dropdown
+      setDropdownOpen(false);
+      // Redirect to login
+      router.push('/login');
+    } catch (error) {
+      console.error('[Topbar] Logout error:', error);
+      setSigningOut(false);
+      // Still redirect even if logout fails
+      router.push('/login');
+    }
+  }
 
   return (
     <div className="bg-card-bg border-b border-card-border px-6 lg:px-8 py-4 flex items-center justify-between">
@@ -62,8 +91,12 @@ export default function Topbar() {
                 Help
               </button>
               <div className="border-t border-card-border my-2"></div>
-              <button className="w-full text-left px-3 py-2 hover:bg-error/10 text-error rounded-lg text-sm transition-colors">
-                Sign Out
+              <button 
+                onClick={handleLogout}
+                disabled={signingOut}
+                className="w-full text-left px-3 py-2 hover:bg-error/10 text-error rounded-lg text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {signingOut ? 'Signing out...' : 'Sign Out'}
               </button>
             </div>
           )}

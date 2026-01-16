@@ -6,13 +6,18 @@ import { createServerClient } from '@/lib/supabase/server';
 
 export async function GET(request: NextRequest) {
   try {
-    // Use Supabase auth
+    // Create response to capture cookie updates
+    const res = NextResponse.json({});
+    
+    // Use Supabase auth with request/response for proper cookie handling
     // @ts-ignore
-    const supabase = createServerClient(request);
+    const supabase = createServerClient(request, res as any);
+    
     const { data: userData, error: authError } = await supabase.auth.getUser();
     console.info('[Auth Me] Supabase getUser:', userData?.user ? 'FOUND' : 'NOT_FOUND', authError ? `Error: ${authError.message}` : '');
 
     if (authError || !userData?.user) {
+      console.warn('[Auth Me] Auth check failed:', authError?.message || 'no user');
       return NextResponse.json(
         { error: 'Not authenticated' },
         { status: 401 }
@@ -20,11 +25,9 @@ export async function GET(request: NextRequest) {
     }
 
     const authUser = userData.user;
-    
-    // Look up user in database
     console.info('[Auth Me] auth user id:', authUser.id);
     
-    // Use Supabase for user lookup to ensure consistency
+    // Look up user in database
     const { data: userDataFromDb, error: userError } = await supabase.from('users').select('*').eq('auth_uid', authUser.id).single();
     console.info('[Auth Me] user lookup:', userDataFromDb ? 'FOUND' : 'NOT_FOUND', userError ? `Error: ${userError.message}` : '');
     
@@ -77,7 +80,13 @@ export async function GET(request: NextRequest) {
     }
     
     // Fetch role from RPC
-    const { data: userAccess } = await supabase.rpc('rpc_get_user_access');
+    const { data: userAccess, error: rpcError } = await supabase.rpc('rpc_get_user_access');
+    
+    if (rpcError) {
+      console.error('[Auth Me] RPC error:', rpcError.message);
+      return NextResponse.json({ error: 'Role resolution failed' }, { status: 500 });
+    }
+    
     const accessRecord = userAccess?.[0];
     const role = accessRecord?.role || 'user';
     const workspaceIdFromRpc = accessRecord?.workspace_id;
@@ -85,7 +94,8 @@ export async function GET(request: NextRequest) {
     console.log('[Auth Me] Resolved role:', role);
     console.log('[Auth Me] Workspace ID from RPC:', workspaceIdFromRpc);
     
-    return NextResponse.json({
+    // Return response with proper session
+    const finalRes = NextResponse.json({
       user: {
         id: user.id,
         email: user.email,
@@ -98,9 +108,17 @@ export async function GET(request: NextRequest) {
         plan_limits: planLimits,
         billing_end_date: user.billing_end_date,
         role: role,
-        workspace_id: workspaceId  // NEW: Added for dashboard workspace scoping
+        workspace_id: workspaceId
       }
-    });
+    }, { status: 200 });
+    
+    // Copy any Supabase cookies to response to maintain session
+    const cookies = res.cookies.getAll();
+    for (const cookie of cookies) {
+      finalRes.cookies.set(cookie);
+    }
+    
+    return finalRes;
   } catch (error: any) {
     console.error('[Auth Me] Error:', error.message);
     return NextResponse.json(
@@ -109,3 +127,4 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+

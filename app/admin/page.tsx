@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase/client";
 
 interface User {
   id: string;
@@ -53,11 +52,9 @@ export default function AdminDashboard() {
         return;
       }
       
-      // Fetch access role from RPC
-      const { data: userAccess } = await supabase.rpc('rpc_get_user_access');
-      const accessRecord = userAccess?.[0];
-      const role = accessRecord?.role;
-      const workspaceId = accessRecord?.workspace_id;
+      // Role is already resolved server-side in /api/auth/me
+      const role = data.user.role;
+      const workspaceId = data.user.workspace_id;
       
       console.log('[Admin Page] Resolved role:', role);
       console.log('[Admin Page] Workspace ID:', workspaceId);
@@ -107,8 +104,24 @@ export default function AdminDashboard() {
   }
 
   async function handleLogout() {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    router.push('/admin/login');
+    try {
+      console.log('[Admin] Initiating logout...');
+      const response = await fetch('/api/auth/logout', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (!response.ok) {
+        console.error('[Admin] Logout failed with status:', response.status);
+      }
+      
+      console.log('[Admin] Logout complete, redirecting to /login');
+      router.push('/login');
+    } catch (error) {
+      console.error('[Admin] Logout error:', error);
+      // Still redirect even if logout fails
+      router.push('/login');
+    }
   }
 
   const filteredUsers = filter === 'all' 

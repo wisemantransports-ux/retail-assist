@@ -29,7 +29,9 @@ as $$
 
     union all
 
-    -- 2️⃣ Client Admin (workspace-level, admin_access with workspace)
+    -- 2️⃣ Client Admin & Super Admin (workspace-level, admin_access)
+    -- Super admin can have workspace_id = NULL (platform-wide access)
+    -- Client admin must have workspace_id != NULL (workspace-specific access)
     select
       aa.user_id,
       aa.workspace_id,
@@ -38,7 +40,8 @@ as $$
     from public.admin_access aa
     join public.users u on u.id = aa.user_id
     where u.auth_uid = auth.uid()
-      and aa.workspace_id is not null
+      -- Accept both super admin (NULL workspace) and client admin (non-NULL workspace)
+      -- This allows super admin to function without a workspace
 
     union all
 

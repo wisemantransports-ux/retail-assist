@@ -3,6 +3,7 @@ import { createServerClient } from '@/lib/supabase/server'
 import { db } from '@/lib/db'
 import { env } from '@/lib/env'
 import { resolveUserId, ensureInternalUser } from '@/lib/supabase/queries'
+import { sessionManager } from '@/lib/session'
 
 // Use mock mode to avoid calling Supabase in CI or while testing.
 // To go live, set NEXT_PUBLIC_USE_MOCK_SUPABASE=false and configure SUPABASE_* env vars.
@@ -19,10 +20,10 @@ export async function POST(request: Request) {
       )
     }
 
-    // Production (Supabase)
-    const res = NextResponse.json({}) // placeholder for cookie setting
+    // Create a placeholder response to capture Supabase cookies
+    const placeholderRes = NextResponse.json({})
     // @ts-ignore
-    const supabase = createServerClient(request, res as any)
+    const supabase = createServerClient(request, placeholderRes as any)
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -59,13 +60,40 @@ export async function POST(request: Request) {
     console.log('[LOGIN] Resolved role:', role)
     console.log('[LOGIN] Workspace ID:', workspaceId)
 
-    // Create final response with data
-    const finalRes = NextResponse.json({ success: true, user: { id: internalUserId, email: data.user.email, role }, workspaceId })
-
-    // Copy Supabase cookies from placeholder res to finalRes
-    for (const cookie of res.cookies.getAll()) {
-      finalRes.cookies.set(cookie.name, cookie.value, cookie)
+    // Create custom session in database
+    let sessionId: string
+    try {
+      const session = await sessionManager.create(internalUserId)
+      sessionId = session.id
+      console.log('[LOGIN] Created session:', sessionId)
+    } catch (sessionErr: any) {
+      console.error('[LOGIN] Session creation failed:', sessionErr.message)
+      return NextResponse.json({ error: 'Session creation failed' }, { status: 500 })
     }
+
+    // Create final response with user data
+    const finalRes = NextResponse.json(
+      { success: true, user: { id: internalUserId, email: data.user.email, role }, workspaceId },
+      { status: 200 }
+    )
+
+    // CRITICAL: Copy ALL Supabase cookies from placeholder to final response
+    // These are essential for maintaining the Supabase Auth session
+    const supabaseCookies = placeholderRes.cookies.getAll()
+    console.log('[LOGIN] Setting Supabase cookies:', supabaseCookies.map(c => c.name))
+    
+    for (const cookie of supabaseCookies) {
+      finalRes.cookies.set(cookie)
+    }
+
+    // Set the custom session_id cookie for custom session manager
+    finalRes.cookies.set('session_id', sessionId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 // 7 days
+    })
+    console.log('[LOGIN] Set session_id cookie:', sessionId)
 
     return finalRes
   } catch (err) {

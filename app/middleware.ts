@@ -25,14 +25,30 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Get current session
-  const { data: { session } } = await supabase.auth.getSession();
+  // Get current session - MUST read from Supabase Auth via cookies
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  
+  console.log('[Middleware] Session check:', {
+    hasSession: !!session,
+    userId: session?.user?.id || 'none',
+    error: sessionError?.message || 'none',
+    cookies: request.cookies.getAll().map(c => c.name)
+  });
 
   // If no session, redirect to login
-  if (!session) return NextResponse.redirect(new URL('/login', request.url));
+  if (!session || sessionError) {
+    console.warn('[Middleware] No valid session found, redirecting to /login');
+    return NextResponse.redirect(new URL('/login', request.url));
+  }
 
   // Fetch user role from RPC
-  const { data: userAccess } = await supabase.rpc('rpc_get_user_access');
+  const { data: userAccess, error: rpcError } = await supabase.rpc('rpc_get_user_access');
+  
+  if (rpcError) {
+    console.error('[Middleware] RPC error:', rpcError.message);
+    return NextResponse.redirect(new URL('/login', request.url));
+  }
+  
   const accessRecord = userAccess?.[0];
   const role = accessRecord?.role;
   const workspaceId = accessRecord?.workspace_id;
@@ -53,10 +69,23 @@ export async function middleware(request: NextRequest) {
     console.log('[Middleware] Redirecting super_admin to:', url.pathname);
     return NextResponse.redirect(url);
   }
-  if (role === 'admin' && !url.pathname.startsWith('/dashboard')) {
-    url.pathname = '/dashboard';
-    console.log('[Middleware] Redirecting admin to:', url.pathname);
-    return NextResponse.redirect(url);
+  // Admin role: distinguish between super admin (NULL workspace) and client admin
+  if (role === 'admin') {
+    if (workspaceId === null) {
+      // Super admin without workspace - redirect to /admin
+      if (!url.pathname.startsWith('/admin')) {
+        url.pathname = '/admin';
+        console.log('[Middleware] Redirecting super_admin (via admin role) to /admin');
+        return NextResponse.redirect(url);
+      }
+    } else {
+      // Client admin with workspace - redirect to /dashboard
+      if (!url.pathname.startsWith('/dashboard')) {
+        url.pathname = '/dashboard';
+        console.log('[Middleware] Redirecting client_admin to /dashboard');
+        return NextResponse.redirect(url);
+      }
+    }
   }
   if (role === 'employee' && !url.pathname.startsWith('/employees/dashboard')) {
     url.pathname = '/employees/dashboard';
@@ -71,3 +100,4 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: ['/admin/:path*', '/dashboard/:path*', '/employees/:path*'],
 };
+
