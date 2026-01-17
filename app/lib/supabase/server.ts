@@ -33,7 +33,24 @@ function requireConfig() {
     throw new Error('Supabase client disabled: mock mode is enabled (NEXT_PUBLIC_USE_MOCK_SUPABASE=true). Set NEXT_PUBLIC_USE_MOCK_SUPABASE=false and provide SUPABASE_* env vars to enable Supabase.')
   }
   if (!url || !serviceRoleKey) {
-    throw new Error('Missing Supabase configuration. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in environment.')
+    // Add detailed diagnostic information
+    const envKeys = Object.keys(process.env).filter(k => k.includes('SUPABASE') || k.includes('supabase')).sort()
+    const debugInfo = {
+      url: !!url,
+      serviceRoleKey: !!serviceRoleKey,
+      SUPABASE_URL: !!process.env.SUPABASE_URL,
+      NEXT_PUBLIC_SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+      SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      availableSupabaseEnvKeys: envKeys,
+      nodeEnv: process.env.NODE_ENV
+    }
+    console.error('[Supabase Config Error]', JSON.stringify(debugInfo, null, 2))
+    throw new Error(
+      `Supabase configuration missing. ` +
+      `SUPABASE_URL is ${url ? 'set' : 'NOT SET'}. ` +
+      `SUPABASE_SERVICE_ROLE_KEY is ${serviceRoleKey ? 'set' : 'NOT SET'}. ` +
+      `See VERCEL_SETUP.md for instructions to set environment variables in Vercel.`
+    )
   }
 }
 
