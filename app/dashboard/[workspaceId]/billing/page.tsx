@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { getWorkspaceSubscription, getAllPlans, getBillingPaymentHistory, getPendingMobileMoneyPayments } from '@/lib/supabase/queries';
+import { getWorkspaceSubscription, getAllPlans, getBillingPaymentHistory, getPendingMobileMoneyPayments } from '@/lib/supabase/server-actions';
 import type { Subscription, Plan, BillingPayment, MobileMoneyPayment } from '@/lib/types/database';
 
 interface BillingPageProps {

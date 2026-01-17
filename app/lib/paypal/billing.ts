@@ -86,6 +86,7 @@ export async function createPaymentOrder(params: CreatePaymentOrderParams) {
     return { success: false, error: 'Failed to get access token' };
   }
 
+  const brandConfig = await getBrand();
   const body = {
     intent: 'CAPTURE',
     purchase_units: [
@@ -99,7 +100,7 @@ export async function createPaymentOrder(params: CreatePaymentOrderParams) {
       },
     ],
     application_context: {
-      brand_name: getBrand().name,
+      brand_name: brandConfig.name,
       landing_page: 'LOGIN',
       return_url: params.returnUrl,
       cancel_url: params.cancelUrl,

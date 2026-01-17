@@ -65,7 +65,7 @@ export async function createPayPalSubscription(planId: string, returnUrl: string
   const token = await getAccessToken();
   if (!token) return { success: false, error: 'No access token' };
 
-  const brandConfig = getBrand();
+  const brandConfig = await getBrand();
   const body = {
     plan_id: planId,
     application_context: {
@@ -157,6 +157,7 @@ export async function createPayPalOrder(
   const token = await getAccessToken();
   if (!token) return { success: false, error: 'No access token' };
 
+  const brandConfig = await getBrand();
   const body = {
     intent: 'CAPTURE',
     purchase_units: [
@@ -168,7 +169,7 @@ export async function createPayPalOrder(
       },
     ],
     application_context: {
-      brand_name: getBrand().name,
+      brand_name: brandConfig.name,
       return_url: returnUrl,
       cancel_url: cancelUrl,
       user_action: 'PAY_NOW',

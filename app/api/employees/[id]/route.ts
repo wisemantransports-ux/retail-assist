@@ -12,10 +12,10 @@ import { NextRequest, NextResponse } from 'next/server';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const employeeId = params.id;
+    const { id: employeeId } = await params;
 
     if (!employeeId) {
       return NextResponse.json({ error: 'Employee ID is required' }, { status: 400 });
@@ -54,7 +54,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unable to determine user role' }, { status: 403 });
     }
 
-    const { role, workspace_id } = roleData;
+    const { role, workspace_id } = roleData as { role: string; workspace_id: string };
 
     // Only admins can view employee details
     if (role !== 'admin') {
@@ -101,10 +101,10 @@ export async function GET(
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const employeeId = params.id;
+    const { id: employeeId } = await params;
     const body = await request.json();
     const { full_name, phone, is_active } = body;
 
@@ -145,7 +145,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Unable to determine user role' }, { status: 403 });
     }
 
-    const { role, workspace_id } = roleData;
+    const { role, workspace_id } = roleData as { role: string; workspace_id: string };
 
     // Only admins can update employees
     if (role !== 'admin') {
@@ -210,10 +210,10 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const employeeId = params.id;
+    const { id: employeeId } = await params;
 
     if (!employeeId) {
       return NextResponse.json({ error: 'Employee ID is required' }, { status: 400 });
@@ -252,7 +252,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unable to determine user role' }, { status: 403 });
     }
 
-    const { role, workspace_id } = roleData;
+    const { role, workspace_id } = roleData as { role: string; workspace_id: string };
 
     // Only admins can delete employees
     if (role !== 'admin') {

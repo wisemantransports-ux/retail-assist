@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unable to determine user role' }, { status: 403 });
     }
 
-    const { role, workspace_id } = roleData;
+    const { role, workspace_id } = roleData as { role: string; workspace_id: string };
 
     // Only admins can list employees
     if (role !== 'admin') {
@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unable to determine user role' }, { status: 403 });
     }
 
-    const { role, workspace_id } = roleData;
+    const { role, workspace_id } = roleData as { role: string; workspace_id: string };
 
     // Only admins can create invites
     if (role !== 'admin') {

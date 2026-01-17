@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
     // Now create auth account for this user with the provided password
     // Note: In production, you might want to skip password and use email confirmation instead
     // For now, we'll set the password if not already created
-    const { data: authUser, error: signUpError } = await supabase.auth.signUpWithPassword({
+    const { data: authUser, error: signUpError } = await supabase.auth.signUp({
       email: result.email, // Email from invite
       password,
     });

@@ -5,7 +5,7 @@ import { db } from '@/lib/db';
 
 export async function GET() {
   try {
-    const brand = getBrand();
+    const brand = await getBrand();
     return NextResponse.json(brand);
   } catch (error: any) {
     console.error('[Branding API] GET error:', error.message);
@@ -30,7 +30,7 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const updated = saveBrand(body);
+    const updated = await saveBrand(body);
     
     return NextResponse.json({ brand: updated, success: true });
   } catch (error: any) {

@@ -1,5 +1,4 @@
-import fs from 'fs';
-import path from 'path';
+// Do NOT import fs/path at module top-level. They will be imported lazily only when needed.
 
 export interface BrandConfig {
   name: string;
@@ -35,20 +34,29 @@ const DEFAULT_BRAND: BrandConfig = {
   }
 };
 
-const BRAND_CONFIG_PATH = path.join(process.cwd(), '.data', 'branding.json');
+// Get path to config file lazily
+async function getBrandConfigPath(): Promise<string> {
+  const path = await import('path');
+  return path.join(process.cwd(), '.data', 'branding.json');
+}
 
-function ensureDataDir(): void {
+// Ensure .data directory exists
+async function ensureDataDir(): Promise<void> {
+  const fs = await import('fs');
+  const path = await import('path');
   const dataDir = path.join(process.cwd(), '.data');
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }
 }
 
-export function getBrand(): BrandConfig {
+export async function getBrand(): Promise<BrandConfig> {
   try {
-    ensureDataDir();
-    if (fs.existsSync(BRAND_CONFIG_PATH)) {
-      const data = fs.readFileSync(BRAND_CONFIG_PATH, 'utf-8');
+    const fs = await import('fs');
+    const brandPath = await getBrandConfigPath();
+    await ensureDataDir();
+    if (fs.existsSync(brandPath)) {
+      const data = fs.readFileSync(brandPath, 'utf-8');
       return { ...DEFAULT_BRAND, ...JSON.parse(data) };
     }
   } catch (error) {
@@ -57,16 +65,17 @@ export function getBrand(): BrandConfig {
   return DEFAULT_BRAND;
 }
 
-export function saveBrand(brand: Partial<BrandConfig>): BrandConfig {
+export async function saveBrand(brand: Partial<BrandConfig>): Promise<BrandConfig> {
   try {
-    ensureDataDir();
-    const current = getBrand();
+    const fs = await import('fs');
+    await ensureDataDir();
+    const current = await getBrand();
     const updated = { ...current, ...brand };
-    fs.writeFileSync(BRAND_CONFIG_PATH, JSON.stringify(updated, null, 2));
+    const brandPath = await getBrandConfigPath();
+    fs.writeFileSync(brandPath, JSON.stringify(updated, null, 2));
     return updated;
   } catch (error) {
     console.error('[Branding] Error saving brand config:', error);
     throw error;
   }
 }
-

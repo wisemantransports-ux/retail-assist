@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { getAllPlans, getPlanById } from '@/lib/supabase/queries';
+import { getAllPlans, getPlanById } from '@/lib/supabase/server-actions';
 import type { Plan } from '@/lib/types/database';
 
 interface CheckoutPageProps {

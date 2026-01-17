@@ -3,7 +3,7 @@ import "./globals.css";
 import { getBrand } from "./config/branding";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const brand = getBrand();
+  const brand = await getBrand();
   return {
     title: brand.name,
     description: brand.tagline,

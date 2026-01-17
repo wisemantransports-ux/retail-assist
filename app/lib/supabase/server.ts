@@ -4,31 +4,45 @@ import { NextRequest, NextResponse } from 'next/server'
 
 // IMPORTANT: Do not use Supabase server clients while mock mode is enabled.
 // The factory functions below will throw if `env.useMockMode` is true to prevent accidental live DB calls.
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
 
-import { env } from '../env.ts'
+// Do NOT read env vars at module top-level. Instead, read them inside the functions.
+let adminClient: SupabaseClient | null = null
+let anonClient: SupabaseClient | null = null
+
+function getEnv() {
+  return {
+    url: process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL,
+    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY,
+  }
+}
+
+// Lazy-import env to avoid top-level execution
+async function getUseMockMode(): Promise<boolean> {
+  const { env } = await import('../env.ts')
+  return env.useMockMode
+}
 
 function requireConfig() {
-  // Respect mock mode: prevent accidental use of Supabase clients when mock mode is enabled
-  // but allow creation if real Supabase credentials are present in the environment.
-  const hasServerCreds = Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
-  if (env.useMockMode && !hasServerCreds) {
+  const { url, serviceRoleKey } = getEnv()
+  
+  // Check if we're in mock mode
+  const isMockMode = process.env.NEXT_PUBLIC_USE_MOCK_SUPABASE === 'true'
+  
+  if (isMockMode && !url && !serviceRoleKey) {
     throw new Error('Supabase client disabled: mock mode is enabled (NEXT_PUBLIC_USE_MOCK_SUPABASE=true). Set NEXT_PUBLIC_USE_MOCK_SUPABASE=false and provide SUPABASE_* env vars to enable Supabase.')
   }
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  if (!url || !serviceRoleKey) {
     throw new Error('Missing Supabase configuration. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in environment.')
   }
 }
 
-let adminClient: SupabaseClient | null = null
-let anonClient: SupabaseClient | null = null
-
 export function createServerSupabaseClient(): SupabaseClient {
   requireConfig()
+  const { url, serviceRoleKey } = getEnv()
+  
   if (!adminClient) {
-    adminClient = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!, {
+    adminClient = createClient(url!, serviceRoleKey!, {
       auth: { persistSession: false }
     })
   }
@@ -36,24 +50,27 @@ export function createServerSupabaseClient(): SupabaseClient {
 }
 
 export function createAdminSupabaseClient(): SupabaseClient {
-  if (env.useMockMode) {
-    // In mock/dev mode, delegate to the server client (anon) to avoid throwing
+  // In mock mode, avoid throwing and use server client instead
+  const isMockMode = process.env.NEXT_PUBLIC_USE_MOCK_SUPABASE === 'true'
+  if (isMockMode) {
     return createServerClient();
   }
   return createServerSupabaseClient();
 }
 
 export function createServerClient(request?: NextRequest, response?: NextResponse): SupabaseClient {
-  const hasAnonCreds = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
-  if (env.useMockMode && !hasAnonCreds) {
+  const { url, anonKey } = getEnv()
+  
+  const isMockMode = process.env.NEXT_PUBLIC_USE_MOCK_SUPABASE === 'true'
+  if (isMockMode && !url && !anonKey) {
     throw new Error('Supabase client disabled: mock mode is enabled (NEXT_PUBLIC_USE_MOCK_SUPABASE=true). Set NEXT_PUBLIC_USE_MOCK_SUPABASE=false and provide NEXT_PUBLIC_SUPABASE_* env vars to enable the client.')
   }
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  if (!url || !anonKey) {
     throw new Error('Missing Supabase configuration. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY for server client.')
   }
   if (request) {
     // Use SSR client for cookie handling
-    return createSSRServerClient(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
+    return createSSRServerClient(url!, anonKey!, {
       cookies: {
         getAll() {
           return request.cookies.getAll()
@@ -70,7 +87,7 @@ export function createServerClient(request?: NextRequest, response?: NextRespons
   } else {
     // Fallback for places without request (e.g., server components using cookies())
     if (!anonClient) {
-      anonClient = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
+      anonClient = createClient(url!, anonKey!, {
         auth: { persistSession: false }
       })
     }

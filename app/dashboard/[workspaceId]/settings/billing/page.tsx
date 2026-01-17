@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { getAllPlans, getWorkspaceSubscription, getBillingPaymentHistory } from '@/lib/supabase/queries';
+import { getAllPlans, getWorkspaceSubscription, getBillingPaymentHistory } from '@/lib/supabase/server-actions';
 import type { Plan, Subscription, BillingPayment } from '@/lib/types/database';
 
 export default function BillingPage() {

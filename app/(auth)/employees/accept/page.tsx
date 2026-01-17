@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
-export default function AcceptInvite() {
+function AcceptInviteContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
@@ -185,5 +185,18 @@ export default function AcceptInvite() {
         </div>
       </div>
     </div>
+  );
+}
+export default function AcceptInvite() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="bg-white rounded-lg shadow-md p-8 w-full max-w-md text-center">
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <AcceptInviteContent />
+    </Suspense>
   );
 }
