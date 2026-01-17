@@ -52,7 +52,7 @@ export default function Sidebar() {
     fetchUserData();
   }, []);
 
-  // Check if user is admin or super_admin
+  // Check if user is admin or super_admin (both can see Employees)
   const isAdmin = user && (user.role === "admin" || user.role === "super_admin");
 
   const baseLinks = [
