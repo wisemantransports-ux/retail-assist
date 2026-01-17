@@ -62,13 +62,15 @@ export default function Sidebar() {
   const getEmployeesLink = (): NavLink | null => {
     if (!user) return null;
 
-    // CASE 1: super_admin - Always show Employees link to /admin/platform-staff
+    // CASE 1: super_admin - Always show Employees link to /admin/employees
+    // (super_admin is on /admin routes, not /dashboard routes)
     if (user.role === "super_admin") {
-      console.log("[Sidebar] super_admin detected: showing Employees link to /admin/platform-staff");
-      return { href: "/admin/platform-staff", label: "Employees", icon: "👥" };
+      console.log("[Sidebar] super_admin detected: showing Employees link to /admin/employees");
+      return { href: "/admin/employees", label: "Employees", icon: "👥" };
     }
 
     // CASE 2: admin (client_admin) - Show Employees link only if workspaceId exists
+    // (client_admin is on /dashboard/[workspaceId] routes)
     if (user.role === "admin" && workspaceId) {
       console.log("[Sidebar] client_admin detected with workspace:", {
         workspace_id: workspaceId,
