@@ -10,16 +10,21 @@ interface User {
   workspace_id?: string;
 }
 
+interface NavLink {
+  href: string;
+  label: string;
+  icon: string;
+}
+
 export default function Sidebar() {
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Extract workspaceId from pathname (e.g., /dashboard/uuid/employees -> uuid)
+  // Only extracts if parts[2] contains hyphens (characteristic of UUIDs)
   const getWorkspaceId = (): string | null => {
     const parts = pathname.split("/");
-    // Check if parts[2] exists and looks like a UUID (contains hyphens)
-    // UUIDs have format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
     if (parts[2] && parts[2].includes("-")) {
       return parts[2];
     }
@@ -28,7 +33,7 @@ export default function Sidebar() {
 
   const workspaceId = getWorkspaceId();
 
-  // Fetch user data to check role
+  // Fetch user data from /api/auth/me
   useEffect(() => {
     async function fetchUserData() {
       try {
@@ -36,9 +41,15 @@ export default function Sidebar() {
         if (res.ok) {
           const data = await res.json();
           setUser(data.user);
+          console.log("[Sidebar] User fetched successfully:", {
+            role: data.user?.role,
+            workspace_id: data.user?.workspace_id
+          });
+        } else {
+          console.warn("[Sidebar] Failed to fetch user, status:", res.status);
         }
       } catch (error) {
-        console.error("Failed to fetch user data:", error);
+        console.error("[Sidebar] Error fetching user data:", error);
       } finally {
         setLoading(false);
       }
@@ -47,24 +58,67 @@ export default function Sidebar() {
     fetchUserData();
   }, []);
 
-  // Check if user is admin or super_admin (both can see Employees)
-  const isAdmin = user && (user.role === "admin" || user.role === "super_admin");
+  // Determine which Employees link to show based on role
+  const getEmployeesLink = (): NavLink | null => {
+    if (!user) return null;
 
-  const baseLinks = [
+    // CASE 1: super_admin - Always show Employees link to /admin/platform-staff
+    if (user.role === "super_admin") {
+      console.log("[Sidebar] super_admin detected: showing Employees link to /admin/platform-staff");
+      return { href: "/admin/platform-staff", label: "Employees", icon: "👥" };
+    }
+
+    // CASE 2: admin (client_admin) - Show Employees link only if workspaceId exists
+    if (user.role === "admin" && workspaceId) {
+      console.log("[Sidebar] client_admin detected with workspace:", {
+        workspace_id: workspaceId,
+        employees_route: `/dashboard/${workspaceId}/employees`
+      });
+      return {
+        href: `/dashboard/${workspaceId}/employees`,
+        label: "Employees",
+        icon: "👥"
+      };
+    }
+
+    if (user.role === "admin" && !workspaceId) {
+      console.log("[Sidebar] client_admin detected but NO workspaceId found in pathname");
+      return null;
+    }
+
+    // CASE 3: Other roles (employee, agent) - Don't show Employees link
+    console.log("[Sidebar] Role", user.role, "does not have access to Employees link");
+    return null;
+  };
+
+  const employeesLink = getEmployeesLink();
+
+  // Debug logging
+  console.log("[Sidebar] Render state:", {
+    pathname,
+    workspaceId,
+    userRole: user?.role,
+    employeesLinkShown: !!employeesLink,
+    employeesHref: employeesLink?.href,
+    loading
+  });
+
+  // Base links - same for all users
+  const baseLinks: NavLink[] = [
     { href: "/dashboard", label: "Dashboard", icon: "📊" },
     { href: "/dashboard/analytics", label: "Analytics", icon: "📈" },
     { href: "/dashboard/agents", label: "AI Agents", icon: "🤖" },
     { href: "/dashboard/integrations", label: "Integrations", icon: "🔗" },
     { href: "/dashboard/billing", label: "Billing", icon: "💳" },
-    { href: "/dashboard/settings", label: "Settings", icon: "⚙️" },
+    { href: "/dashboard/settings", label: "Settings", icon: "⚙️" }
   ];
 
-  // Add Employees link only if user is admin/super_admin and we have a workspaceId
-  const links = isAdmin && workspaceId
+  // Build final links array: insert Employees link after Billing if applicable
+  const links: NavLink[] = employeesLink
     ? [
         ...baseLinks.slice(0, 5), // Dashboard, Analytics, Agents, Integrations, Billing
-        { href: `/dashboard/${workspaceId}/employees`, label: "Employees", icon: "👥" },
-        ...baseLinks.slice(5), // Settings
+        employeesLink, // Employees (conditional)
+        ...baseLinks.slice(5) // Settings
       ]
     : baseLinks;
 
