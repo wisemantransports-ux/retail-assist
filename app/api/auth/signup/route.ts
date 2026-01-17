@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { supabaseAdmin } from '../../../lib/supabaseAdmin';
+import { getSupabaseAdmin } from '../../../lib/supabaseAdmin';
 import { sessionManager } from '../../../lib/session';
 import { ensureInternalUser } from '@/lib/supabase/queries';
 
@@ -31,6 +31,7 @@ export async function POST(req: Request) {
     }
 
     // 1) Create auth user using service-role client
+    const supabaseAdmin = getSupabaseAdmin();
     const { data: authData, error: authError } =
       await supabaseAdmin.auth.admin.createUser({
         email,

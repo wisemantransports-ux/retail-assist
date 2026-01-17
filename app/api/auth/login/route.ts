@@ -8,10 +8,6 @@ import { sessionManager } from '@/lib/session'
 // Platform workspace ID for internal Retail Assist staff
 const PLATFORM_WORKSPACE_ID = '00000000-0000-0000-0000-000000000001';
 
-// Use mock mode to avoid calling Supabase in CI or while testing.
-// To go live, set NEXT_PUBLIC_USE_MOCK_SUPABASE=false and configure SUPABASE_* env vars.
-const useDev = env.useMockMode
-
 export async function POST(request: Request) {
   try {
     const { email, password } = await request.json()
