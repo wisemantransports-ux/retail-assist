@@ -38,6 +38,11 @@ import EditEmployeeModal from '@/components/EditEmployeeModal';
 interface UserAccess {
   role: string;
   workspace_id: string | null;
+  plan_limits?: {
+    maxEmployees: number;
+    maxPages?: number;
+    hasInstagram?: boolean;
+  };
 }
 
 function EmployeesContent() {
@@ -69,9 +74,11 @@ function EmployeesContent() {
         const data = await response.json();
         const role = data.user?.role;
         const userWorkspaceId = data.user?.workspace_id;
+        const planLimits = data.user?.plan_limits;
 
         console.log('[EmployeesPage] Resolved role:', role);
         console.log('[EmployeesPage] Workspace ID:', userWorkspaceId);
+        console.log('[EmployeesPage] Plan limits:', planLimits);
         console.log('[EmployeesPage] URL Workspace ID:', workspaceId);
 
         // Only admin (client) can access this page
@@ -99,7 +106,11 @@ function EmployeesContent() {
           return;
         }
 
-        setUserAccess({ role, workspace_id: userWorkspaceId });
+        setUserAccess({ 
+          role, 
+          workspace_id: userWorkspaceId,
+          plan_limits: planLimits || { maxEmployees: 2 }
+        });
         fetchEmployees();
       } catch (err) {
         console.error('[EmployeesPage] Auth check error:', err);
@@ -210,11 +221,51 @@ function EmployeesContent() {
           </p>
         </div>
 
+        {/* Plan Limit Info */}
+        {userAccess && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-blue-900">
+                  Employee Limit: <span className="font-bold">{employees.length}</span> of{' '}
+                  <span className="font-bold">
+                    {userAccess.plan_limits?.maxEmployees === -1 ? 'Unlimited' : userAccess.plan_limits?.maxEmployees || 2}
+                  </span>
+                </p>
+                <p className="text-xs text-blue-700 mt-1">
+                  {userAccess.plan_limits?.maxEmployees === -1
+                    ? 'Your Enterprise plan allows unlimited employees'
+                    : userAccess.plan_limits?.maxEmployees === 5
+                    ? 'Your Pro plan allows up to 5 employees'
+                    : 'Your Starter plan allows up to 2 employees'}
+                </p>
+              </div>
+              {userAccess.plan_limits && userAccess.plan_limits.maxEmployees !== -1 && userAccess.plan_limits.maxEmployees - employees.length === 0 && (
+                <div className="text-right">
+                  <p className="text-xs font-medium text-orange-600">⚠ Limit Reached</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Action Buttons */}
         <div className="mb-6 flex gap-3 flex-wrap">
           <button
             onClick={() => setShowInviteModal(true)}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm flex items-center gap-2"
+            disabled={
+              loading ||
+              authLoading ||
+              (userAccess?.plan_limits?.maxEmployees !== -1 &&
+                employees.length >= (userAccess?.plan_limits?.maxEmployees || 2))
+            }
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            title={
+              userAccess?.plan_limits?.maxEmployees !== -1 &&
+              employees.length >= (userAccess?.plan_limits?.maxEmployees || 2)
+                ? `Your plan allows only ${userAccess?.plan_limits?.maxEmployees || 2} employee(s). Upgrade to add more.`
+                : 'Invite a new employee'
+            }
           >
             📧 Invite Employee
           </button>
@@ -226,6 +277,19 @@ function EmployeesContent() {
             🔄 Refresh
           </button>
         </div>
+
+        {/* Limit Reached Warning */}
+        {userAccess &&
+          userAccess.plan_limits?.maxEmployees !== -1 &&
+          employees.length >= (userAccess.plan_limits?.maxEmployees || 2) && (
+            <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+              <p className="text-sm text-orange-800">
+                🔒 <span className="font-medium">Employee limit reached</span> - Your{' '}
+                {userAccess.plan_limits?.maxEmployees === 5 ? 'Pro' : 'Starter'} plan allows only{' '}
+                {userAccess.plan_limits?.maxEmployees} employee(s). Upgrade to add more.
+              </p>
+            </div>
+          )}
 
         {/* API Error */}
         {error && (

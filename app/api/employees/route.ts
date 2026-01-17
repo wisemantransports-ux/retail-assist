@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
+import { PLAN_LIMITS } from '@/lib/db/index';
 
 /**
  * GET /api/employees
@@ -89,6 +90,7 @@ export async function GET(request: NextRequest) {
  * - Only admins can create invites for their workspace
  * - Invites are scoped to the admin's workspace_id
  * - RPC validates authorization before creating invite
+ * - Plan-aware restrictions enforced (Starter: max 2, Pro: max 5, Enterprise: unlimited)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -150,6 +152,70 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid admin state' }, { status: 403 });
     }
 
+    // ============================================================================
+    // PLAN-AWARE RESTRICTION: Check employee limit before creating invite
+    // ============================================================================
+    
+    // Fetch workspace/user plan information to enforce limits
+    const { data: workspaceData, error: workspaceError } = await supabase
+      .from('workspaces')
+      .select('plan_type')
+      .eq('id', workspace_id)
+      .single();
+
+    if (workspaceError || !workspaceData) {
+      console.error('[/api/employees/invite POST] Workspace lookup error:', workspaceError);
+      return NextResponse.json({ error: 'Failed to fetch workspace information' }, { status: 500 });
+    }
+
+    const planType = (workspaceData.plan_type || 'starter') as 'starter' | 'pro' | 'enterprise';
+    const planLimits = PLAN_LIMITS[planType];
+    const maxEmployees = planLimits.maxEmployees;
+
+    // Count current active employees in workspace (only counting non-invites, actual employees)
+    const { data: employees, error: countError } = await supabase
+      .from('employees')
+      .select('id', { count: 'exact' })
+      .eq('workspace_id', workspace_id);
+
+    if (countError) {
+      console.error('[/api/employees/invite POST] Employee count error:', countError);
+      return NextResponse.json({ error: 'Failed to check employee limit' }, { status: 500 });
+    }
+
+    const currentEmployeeCount = employees?.length || 0;
+
+    // Check if adding a new employee would exceed limit
+    if (maxEmployees !== -1 && currentEmployeeCount >= maxEmployees) {
+      // Log violation for audit trail
+      await supabase.from('logs').insert({
+        user_id: user.id,
+        level: 'warn',
+        message: `Employee limit violation: Attempted to invite employee when at limit`,
+        meta: {
+          reason: 'plan_limit_exceeded',
+          plan_type: planType,
+          max_employees: maxEmployees,
+          current_employees: currentEmployeeCount,
+          attempted_addition: 1,
+          workspace_id: workspace_id,
+          invitee_email: email,
+        },
+      }).catch(err => console.error('[/api/employees/invite POST] Logging error:', err));
+
+      console.warn(`[/api/employees/invite POST] Plan limit violation: User ${user.id} workspace ${workspace_id} at limit (${planType}: ${maxEmployees} max, ${currentEmployeeCount} current)`);
+      
+      return NextResponse.json(
+        { 
+          error: `Your ${planLimits.name} plan allows only ${maxEmployees} employee(s). You currently have ${currentEmployeeCount}. Upgrade to add more.`,
+          plan: planType,
+          limit: maxEmployees,
+          current: currentEmployeeCount,
+        },
+        { status: 403 }
+      );
+    }
+
     // Call RPC to create invite (RPC validates authorization + creates scoped invite)
     // AUTHORIZATION: RPC verifies admin is inviting to their own workspace
     const { data: invite, error: rpcError } = await supabase.rpc(
@@ -168,8 +234,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: rpcError.message || 'Failed to create invite' }, { status: 400 });
     }
 
-    // Log action for audit trail
-    console.log(`[/api/employees/invite POST] Admin ${user.id} created invite for ${email} in workspace ${workspace_id}`);
+    // Log successful action for audit trail
+    await supabase.from('logs').insert({
+      user_id: user.id,
+      level: 'info',
+      message: `Created employee invite: ${email}`,
+      meta: {
+        workspace_id: workspace_id,
+        plan_type: planType,
+        invitee_email: email,
+        current_employees: currentEmployeeCount,
+        max_employees: maxEmployees,
+      },
+    }).catch(err => console.error('[/api/employees/invite POST] Logging error:', err));
+
+    console.log(`[/api/employees/invite POST] Admin ${user.id} created invite for ${email} in workspace ${workspace_id} (${planType}: ${currentEmployeeCount}/${maxEmployees})`);
 
     return NextResponse.json(
       {

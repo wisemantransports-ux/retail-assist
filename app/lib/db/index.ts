@@ -16,31 +16,34 @@ export const PLAN_LIMITS = {
     name: 'Starter',
     price: 22,
     maxPages: 1,
+    maxEmployees: 2,
     hasInstagram: false,
     hasAiResponses: true,
     commentToDmLimit: 100,
     aiTokenLimitMonthly: 10000,
-    features: ['Facebook Messenger auto-reply', 'Comment-to-DM (100/month)', '1 Facebook Page', 'Basic AI responses']
+    features: ['Facebook Messenger auto-reply', 'Comment-to-DM (100/month)', '1 Facebook Page', '2 Employees', 'Basic AI responses']
   },
   pro: {
     name: 'Pro',
     price: 45,
     maxPages: 3,
+    maxEmployees: 5,
     hasInstagram: true,
     hasAiResponses: true,
     commentToDmLimit: 500,
     aiTokenLimitMonthly: 50000,
-    features: ['Facebook + Instagram automation', 'Comment-to-DM (500/month)', '3 Pages/Accounts', 'AI-powered responses']
+    features: ['Facebook + Instagram automation', 'Comment-to-DM (500/month)', '3 Pages/Accounts', '5 Employees', 'AI-powered responses']
   },
   enterprise: {
     name: 'Enterprise',
     price: 75,
     maxPages: -1,
+    maxEmployees: -1,
     hasInstagram: true,
     hasAiResponses: true,
     commentToDmLimit: -1,
     aiTokenLimitMonthly: -1,
-    features: ['All features unlocked', 'Unlimited pages/accounts', 'Priority support', 'Custom automation rules']
+    features: ['All features unlocked', 'Unlimited pages/accounts', 'Unlimited Employees', 'Priority support', 'Custom automation rules']
   }
 }
 

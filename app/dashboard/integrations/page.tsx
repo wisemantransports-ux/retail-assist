@@ -2,7 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { canConnectFacebook, canUseInstagram, isFreeUser } from '@/lib/feature-gates';
+import { 
+  canConnectFacebook, 
+  canUseInstagram, 
+  isFreeUser,
+  canConnectAccount,
+  getPageCapacityMessage,
+  getMaxPages
+} from '@/lib/feature-gates';
 
 interface ConnectedPage {
   id: string;
@@ -16,6 +23,12 @@ interface PendingPage {
   id: string;
   name: string;
   category?: string;
+}
+
+interface PendingAccount {
+  id: string;
+  name: string;
+  username?: string;
 }
 
 interface UserData {
@@ -41,9 +54,13 @@ export default function IntegrationsPage() {
   const [connectedPages, setConnectedPages] = useState<ConnectedPage[]>([]);
   const [pendingPages, setPendingPages] = useState<PendingPage[]>([]);
   const [pendingToken, setPendingToken] = useState<string | null>(null);
+  const [pendingIgAccounts, setPendingIgAccounts] = useState<PendingAccount[]>([]);
+  const [pendingIgToken, setPendingIgToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [igLoading, setIgLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [selectedPages, setSelectedPages] = useState<string[]>([]);
+  const [selectedIgAccounts, setSelectedIgAccounts] = useState<string[]>([]);
 
   useEffect(() => {
     loadUserAndPages();
@@ -52,6 +69,9 @@ export default function IntegrationsPage() {
     const error = searchParams.get('error');
     const token = searchParams.get('token');
     const pagesCount = searchParams.get('pages');
+    const igSuccess = searchParams.get('ig_success');
+    const igToken = searchParams.get('ig_token');
+    const igAccountsCount = searchParams.get('ig_accounts');
 
     if (success === 'true' && token) {
       setPendingToken(token);
@@ -62,6 +82,16 @@ export default function IntegrationsPage() {
         setMessage({ type: 'success', text: `Found ${pagesCount} page(s). Select which ones to connect.` });
       } catch {
         setMessage({ type: 'error', text: 'Failed to parse page data' });
+      }
+    } else if (igSuccess === 'true' && igToken) {
+      setPendingIgToken(igToken);
+      try {
+        const tokenData = JSON.parse(Buffer.from(igToken, 'base64').toString());
+        setPendingIgAccounts(tokenData.accounts || []);
+        setSelectedIgAccounts(tokenData.accounts?.map((a: any) => a.id) || []);
+        setMessage({ type: 'success', text: `Found ${igAccountsCount} Instagram account(s). Select which ones to connect.` });
+      } catch {
+        setMessage({ type: 'error', text: 'Failed to parse Instagram account data' });
       }
     } else if (error) {
       const errorMessages: Record<string, string> = {
@@ -207,11 +237,84 @@ export default function IntegrationsPage() {
     }
   }
 
-  function togglePageSelection(pageId: string) {
-    setSelectedPages(prev => 
-      prev.includes(pageId) 
-        ? prev.filter(id => id !== pageId)
-        : [...prev, pageId]
+  async function handleConnectInstagram() {
+    if (!user) {
+      setMessage({ type: 'error', text: 'User data not loaded. Please refresh.' });
+      return;
+    }
+
+    if (!canUseInstagram(user)) {
+      setMessage({ 
+        type: 'error', 
+        text: 'Instagram integration requires a Pro or Enterprise plan. Upgrade to connect your Instagram account.' 
+      });
+      return;
+    }
+
+    setIgLoading(true);
+    setMessage(null);
+    
+    try {
+      const res = await fetch('/api/meta/instagram/oauth');
+      const data = await res.json();
+      
+      if (!res.ok) {
+        setMessage({ type: 'error', text: data.error });
+        return;
+      }
+      
+      window.location.href = data.authUrl;
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error.message });
+    } finally {
+      setIgLoading(false);
+    }
+  }
+
+  async function handleSaveIgAccounts() {
+    if (!pendingIgToken || selectedIgAccounts.length === 0) {
+      setMessage({ type: 'error', text: 'Please select at least one Instagram account' });
+      return;
+    }
+
+    setIgLoading(true);
+    try {
+      const res = await fetch('/api/meta/pages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          token: pendingIgToken,
+          platform: 'instagram',
+          selectedPageIds: selectedIgAccounts
+        })
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        setMessage({ type: 'error', text: data.error });
+        return;
+      }
+      
+      setMessage({ type: 'success', text: `Connected ${data.pages.length} Instagram account(s) successfully!` });
+      setPendingIgAccounts([]);
+      setPendingIgToken(null);
+      setSelectedIgAccounts([]);
+      loadConnectedPages();
+      
+      window.history.replaceState({}, '', '/dashboard/integrations');
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error.message });
+    } finally {
+      setIgLoading(false);
+    }
+  }
+
+  function toggleIgAccountSelection(accountId: string) {
+    setSelectedIgAccounts(prev => 
+      prev.includes(accountId) 
+        ? prev.filter(id => id !== accountId)
+        : [...prev, accountId]
     );
   }
 
@@ -232,9 +335,18 @@ export default function IntegrationsPage() {
         </div>
       )}
 
+      {/* Plan Capacity Display */}
+      {user && !isFreeUser(user) && (
+        <div className="bg-blue-900/30 border border-blue-600 rounded-xl p-4">
+          <p className="text-blue-200 text-sm">
+            <strong>Account Capacity:</strong> {getPageCapacityMessage(user, connectedPages.length)}
+          </p>
+        </div>
+      )}
+
       {pendingPages.length > 0 && (
         <div className="bg-blue-900/30 border border-blue-600 rounded-xl p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Select Pages to Connect</h2>
+          <h2 className="text-lg font-semibold text-white mb-4">Select Facebook Pages to Connect</h2>
           <div className="space-y-3 mb-4">
             {pendingPages.map(page => (
               <label 
@@ -276,6 +388,50 @@ export default function IntegrationsPage() {
         </div>
       )}
 
+      {pendingIgAccounts.length > 0 && (
+        <div className="bg-purple-900/30 border border-purple-600 rounded-xl p-6">
+          <h2 className="text-lg font-semibold text-white mb-4">Select Instagram Accounts to Connect</h2>
+          <div className="space-y-3 mb-4">
+            {pendingIgAccounts.map(account => (
+              <label 
+                key={account.id} 
+                className="flex items-center gap-3 p-3 bg-gray-800 rounded-lg cursor-pointer hover:bg-gray-700"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedIgAccounts.includes(account.id)}
+                  onChange={() => toggleIgAccountSelection(account.id)}
+                  className="w-5 h-5 rounded"
+                />
+                <div className="flex-1">
+                  <p className="text-white font-medium">{account.name}</p>
+                  {account.username && <p className="text-gray-400 text-sm">@{account.username}</p>}
+                </div>
+              </label>
+            ))}
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={handleSaveIgAccounts}
+              disabled={igLoading || selectedIgAccounts.length === 0}
+              className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white py-2 rounded-lg font-medium"
+            >
+              {igLoading ? 'Connecting...' : `Connect ${selectedIgAccounts.length} Account(s)`}
+            </button>
+            <button
+              onClick={() => {
+                setPendingIgAccounts([]);
+                setPendingIgToken(null);
+                window.history.replaceState({}, '', '/dashboard/integrations');
+              }}
+              className="px-6 bg-gray-700 hover:bg-gray-600 text-white py-2 rounded-lg font-medium"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className={`border border-gray-700 rounded-xl p-6 ${!user || !canConnectFacebook(user) ? 'bg-gray-800/50 opacity-60' : 'bg-gray-800'}`}>
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
@@ -293,10 +449,20 @@ export default function IntegrationsPage() {
                 🔒 Paid only
               </span>
             )}
+            {user && canConnectFacebook(user) && !canConnectAccount(user, connectedPages.length) && (
+              <span className="px-3 py-1 bg-orange-900/30 text-orange-400 text-sm rounded-lg border border-orange-700">
+                ⚠️ Limit reached
+              </span>
+            )}
             <button
               onClick={handleConnectFacebook}
-              disabled={loading || !user || !canConnectFacebook(user)}
-              title={!user ? 'Loading...' : !canConnectFacebook(user) ? 'Upgrade to a paid plan to connect Facebook' : ''}
+              disabled={loading || !user || !canConnectFacebook(user) || !canConnectAccount(user, connectedPages.length)}
+              title={
+                !user ? 'Loading...' : 
+                !canConnectFacebook(user) ? 'Upgrade to a paid plan to connect Facebook' : 
+                !canConnectAccount(user, connectedPages.length) ? `You\'ve reached your ${user.plan_type} plan limit. Upgrade to add more.` : 
+                ''
+              }
               className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg font-medium"
             >
               {loading ? 'Connecting...' : 'Connect Facebook'}
@@ -341,31 +507,77 @@ export default function IntegrationsPage() {
       </div>
 
       <div className={`border border-gray-700 rounded-xl p-6 ${!user || isFreeUser(user) || !canUseInstagram(user) ? 'bg-gray-800/50 opacity-60' : 'bg-gray-800'}`}>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-pink-500 rounded-xl flex items-center justify-center text-white text-xl">
+            <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-pink-500 rounded-xl flex items-center justify-center text-white text-xl font-bold">
               IG
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-white">Instagram</h2>
-              <p className="text-gray-400 text-sm">Manage Instagram DMs</p>
+              <h2 className="text-lg font-semibold text-white">Instagram Business Accounts</h2>
+              <p className="text-gray-400 text-sm">Connect Instagram accounts for DM automation</p>
             </div>
           </div>
-          {user && !canUseInstagram(user) && (
-            <span className="px-3 py-1 bg-red-900/30 text-red-400 text-sm rounded-lg border border-red-700">
-              🔒 Pro plan required
-            </span>
-          )}
-          {user && canUseInstagram(user) && (
-            <span className="px-3 py-1 bg-gray-600 text-gray-300 text-sm rounded-lg">
-              Coming with Facebook
-            </span>
-          )}
+          <div className="flex items-center gap-3">
+            {user && !canUseInstagram(user) && (
+              <span className="px-3 py-1 bg-red-900/30 text-red-400 text-sm rounded-lg border border-red-700">
+                🔒 Pro plan required
+              </span>
+            )}
+            {user && canUseInstagram(user) && !canConnectAccount(user, connectedPages.length) && (
+              <span className="px-3 py-1 bg-orange-900/30 text-orange-400 text-sm rounded-lg border border-orange-700">
+                ⚠️ Limit reached
+              </span>
+            )}
+            <button
+              onClick={handleConnectInstagram}
+              disabled={igLoading || !user || !canUseInstagram(user) || !canConnectAccount(user, connectedPages.length)}
+              title={
+                !user ? 'Loading...' : 
+                !canUseInstagram(user) ? 'Upgrade to Pro plan to connect Instagram' : 
+                !canConnectAccount(user, connectedPages.length) ? `You\'ve reached your ${user.plan_type} plan limit. Upgrade to add more.` : 
+                ''
+              }
+              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg font-medium"
+            >
+              {igLoading ? 'Connecting...' : 'Connect Instagram'}
+            </button>
+          </div>
         </div>
-        <p className="text-gray-500 text-sm mt-4">
-          Instagram is automatically connected when you link a Facebook Page with an Instagram Business account.
-          {user && !canUseInstagram(user) && ' Upgrade to Pro or Enterprise to use Instagram.'}
-        </p>
+
+        {connectedPages.filter(p => p.platform === 'instagram').length > 0 ? (
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium text-gray-400">Connected Instagram Accounts</h3>
+            {connectedPages.filter(p => p.platform === 'instagram').map(account => (
+              <div key={account.id} className="flex items-center justify-between p-4 bg-gray-700/50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-white font-bold">
+                    IG
+                  </div>
+                  <div>
+                    <p className="text-white font-medium">{account.page_name}</p>
+                    <p className="text-gray-400 text-sm">
+                      Connected {new Date(account.connected_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-1 bg-green-900/50 text-green-400 text-xs rounded">Active</span>
+                  <button
+                    onClick={() => handleDisconnect(account.page_id)}
+                    className="text-red-400 hover:text-red-300 text-sm"
+                  >
+                    Disconnect
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-gray-400">
+            <p>No Instagram accounts connected yet.</p>
+            <p className="text-sm mt-1">Click "Connect Instagram" to get started.</p>
+          </div>
+        )}
       </div>
 
       <div className="bg-gray-800 border border-gray-700 rounded-xl p-6 opacity-60">
