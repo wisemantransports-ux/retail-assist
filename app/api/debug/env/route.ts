@@ -1,42 +1,75 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from 'next/server';
 
 /**
- * DEBUG ENDPOINT - Environment Variables Status
- * Shows runtime availability of Supabase configuration
- * Safe for production - does not expose secrets
+ * Debug Endpoint: Environment Variables
+ *
+ * Route: GET /api/debug/env
+ *
+ * Purpose:
+ * - Verify Supabase environment variables at runtime
+ * - Check that Vercel deployment has correct env vars set
+ * - Useful for diagnosing authentication and API connectivity issues
+ *
+ * Returns:
+ * - SUPABASE_URL: Supabase project URL
+ * - SUPABASE_SERVICE_ROLE_KEY: Service role key (status only)
+ * - NEXT_PUBLIC_SUPABASE_URL: Public URL
+ * - NEXT_PUBLIC_SUPABASE_ANON_KEY: Anon key (status only)
+ * - NEXT_PUBLIC_USE_MOCK_SUPABASE: Mock Supabase flag
+ *
+ * Security:
+ * - Never exposes actual secret values
+ * - Only shows SET/NOT_SET status for secrets
+ * - Safe to use in development and production
+ *
+ * Usage:
+ * curl http://localhost:5000/api/debug/env
+ * curl https://retail-assist.vercel.app/api/debug/env
  */
 export async function GET() {
-  const envVars = {
-    // Private/Secret variables - only show if SET (never show value)
-    SUPABASE_URL: process.env.SUPABASE_URL ? 'SET' : 'NOT_SET',
-    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SET (secret)' : 'NOT_SET',
-    
-    // Public variables - safe to show value
-    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || 'NOT_SET',
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'SET' : 'NOT_SET',
-    NEXT_PUBLIC_USE_MOCK_SUPABASE: process.env.NEXT_PUBLIC_USE_MOCK_SUPABASE || 'NOT_SET',
+  try {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const publicUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const useMockSupabase = process.env.NEXT_PUBLIC_USE_MOCK_SUPABASE;
+
+    // Verify all critical vars are set
+    const allSet = !!supabaseUrl && !!serviceRoleKey && !!publicUrl && !!anonKey;
+
+    return NextResponse.json(
+      {
+        status: allSet ? 'OK' : 'INCOMPLETE',
+        environment: process.env.NODE_ENV,
+        timestamp: new Date().toISOString(),
+        variables: {
+          // Private/secret variables - only show SET/NOT_SET
+          SUPABASE_URL: supabaseUrl ? 'SET' : 'NOT_SET',
+          SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey ? 'SET (secret)' : 'NOT_SET',
+          // Public variables - safe to show
+          NEXT_PUBLIC_SUPABASE_URL: publicUrl || 'NOT_SET',
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: anonKey ? 'SET' : 'NOT_SET',
+          NEXT_PUBLIC_USE_MOCK_SUPABASE: useMockSupabase || 'NOT_SET',
+        },
+        checks: {
+          supabaseUrlSet: !!supabaseUrl,
+          serviceRoleKeySet: !!serviceRoleKey,
+          publicUrlSet: !!publicUrl,
+          anonKeySet: !!anonKey,
+          canConnectToSupabase: !!supabaseUrl && !!serviceRoleKey && !!anonKey,
+        },
+      },
+      { status: allSet ? 200 : 500 }
+    );
+  } catch (error) {
+    console.error('[/api/debug/env] Error:', error);
+    return NextResponse.json(
+      {
+        status: 'ERROR',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    );
   }
-
-  // Diagnostic: List all SUPABASE-related env keys
-  const supabaseEnvKeys = Object.keys(process.env)
-    .filter(k => k.toUpperCase().includes('SUPABASE'))
-    .sort()
-
-  return NextResponse.json({
-    message: 'Supabase Environment Variables Status',
-    status: {
-      hasUrl: !!process.env.SUPABASE_URL,
-      hasServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-      hasAnonKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      canConnectToSupabase: !!(
-        (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL) &&
-        process.env.SUPABASE_SERVICE_ROLE_KEY
-      ),
-    },
-    envVars,
-    allSupabaseEnvKeys: supabaseEnvKeys,
-    nodeEnv: process.env.NODE_ENV,
-    timestamp: new Date().toISOString(),
-  })
 }
 
