@@ -318,6 +318,14 @@ export default function IntegrationsPage() {
     );
   }
 
+  function togglePageSelection(pageId: string) {
+    setSelectedPages(prev => 
+      prev.includes(pageId) 
+        ? prev.filter(id => id !== pageId)
+        : [...prev, pageId]
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>

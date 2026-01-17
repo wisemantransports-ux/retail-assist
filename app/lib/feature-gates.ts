@@ -12,6 +12,7 @@ export interface UserSubscription {
   plan_type?: string;
   plan_limits?: {
     maxPages: number;
+    maxEmployees?: number;
     hasInstagram: boolean;
     hasAiResponses: boolean;
     commentToDmLimit: number;

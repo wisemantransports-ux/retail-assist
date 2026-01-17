@@ -63,18 +63,6 @@ export async function POST(request: NextRequest) {
 
     // Check if user is on a paid, active subscription
     if (userData.subscription_status !== 'active' || userData.payment_status !== 'paid') {
-      await supabase.from('logs').insert({
-        user_id: userData.id,
-        level: 'warn',
-        message: 'AI token request from non-active subscription',
-        meta: {
-          reason: 'subscription_inactive',
-          subscription_status: userData.subscription_status,
-          payment_status: userData.payment_status,
-          action,
-          requested_tokens: requestedTokens,
-        },
-      }).catch(err => console.error('[AI Token Validation] Logging error:', err));
 
       return NextResponse.json(
         {
@@ -137,21 +125,6 @@ export async function POST(request: NextRequest) {
 
     // Check if user has enough tokens
     if (remainingTokens < requestedTokens) {
-      // Log violation for audit
-      await supabase.from('logs').insert({
-        user_id: userData.id,
-        level: 'warn',
-        message: 'AI token limit violation: Insufficient tokens for requested action',
-        meta: {
-          reason: 'insufficient_tokens',
-          plan_type: planType,
-          monthly_limit: monthlyTokenLimit,
-          tokens_used: tokensUsedThisMonth,
-          remaining_tokens: remainingTokens,
-          requested_tokens: requestedTokens,
-          action,
-        },
-      }).catch(err => console.error('[AI Token Validation] Logging error:', err));
 
       console.warn(
         `[AI Token Validation] User ${userData.id} (${planType}) insufficient tokens: ` +
@@ -176,19 +149,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Log successful authorization
-    await supabase.from('logs').insert({
-      user_id: userData.id,
-      level: 'info',
-      message: 'AI action authorized - token check passed',
-      meta: {
-        plan_type: planType,
-        monthly_limit: monthlyTokenLimit,
-        tokens_used: tokensUsedThisMonth,
-        remaining_tokens: remainingTokens,
-        requested_tokens: requestedTokens,
-        action,
-      },
-    }).catch(err => console.error('[AI Token Validation] Logging error:', err));
+    console.log('[AI Token Validation] User', userData.id, 'authorized for', requestedTokens, 'tokens');
 
     return NextResponse.json({
       allowed: true,

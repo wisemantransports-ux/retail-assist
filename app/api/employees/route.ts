@@ -201,7 +201,7 @@ export async function POST(request: NextRequest) {
           workspace_id: workspace_id,
           invitee_email: email,
         },
-      }).catch(err => console.error('[/api/employees/invite POST] Logging error:', err));
+      });
 
       console.warn(`[/api/employees/invite POST] Plan limit violation: User ${user.id} workspace ${workspace_id} at limit (${planType}: ${maxEmployees} max, ${currentEmployeeCount} current)`);
       
@@ -235,19 +235,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Log successful action for audit trail
-    await supabase.from('logs').insert({
-      user_id: user.id,
-      level: 'info',
-      message: `Created employee invite: ${email}`,
-      meta: {
-        workspace_id: workspace_id,
-        plan_type: planType,
-        invitee_email: email,
-        current_employees: currentEmployeeCount,
-        max_employees: maxEmployees,
-      },
-    }).catch(err => console.error('[/api/employees/invite POST] Logging error:', err));
-
     console.log(`[/api/employees/invite POST] Admin ${user.id} created invite for ${email} in workspace ${workspace_id} (${planType}: ${currentEmployeeCount}/${maxEmployees})`);
 
     return NextResponse.json(
