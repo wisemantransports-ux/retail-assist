@@ -1,0 +1,51 @@
+
+> retail-assist-app@0.1.0 dev
+> next dev -H 0.0.0.0 -p 3000
+
+   ▲ Next.js 16.0.7 (Turbopack)
+   - Local:         http://localhost:3000
+   - Network:       http://0.0.0.0:3000
+   - Environments: .env.local
+   - Experiments (use with caution):
+     · serverActions
+
+ ✓ Starting...
+ ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+ ✓ Ready in 2.3s
+[Middleware] INVOKED for path: /dashboard
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+[Middleware] Session check: {
+  hasSession: true,
+  userId: '2f188791-47ac-43e0-b5f5-eae63fcb90f2',
+  error: 'none',
+  cookies: [ 'sb-dzrwxdjzgwvdmfbbfotn-auth-token', 'session_id' ]
+}
+[Middleware] Resolved role: super_admin
+[Middleware] Workspace ID: null
+[Middleware] Processing super_admin access
+[Middleware] Super admin attempted to access protected route: /dashboard - redirecting to /admin
+[Middleware] INVOKED for path: /admin
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+[Middleware] Session check: {
+  hasSession: true,
+  userId: '2f188791-47ac-43e0-b5f5-eae63fcb90f2',
+  error: 'none',
+  cookies: [ 'sb-dzrwxdjzgwvdmfbbfotn-auth-token', 'session_id' ]
+}
+[Middleware] Resolved role: super_admin
+[Middleware] Workspace ID: null
+[Middleware] Processing super_admin access
+ ○ Compiling /admin ...
+ GET /admin 200 in 4.8s (compile: 4.5s, proxy.ts: 185ms, render: 127ms)
+[Middleware] INVOKED for path: /employees/dashboard
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+[Middleware] Session check: {
+  hasSession: true,
+  userId: '2f188791-47ac-43e0-b5f5-eae63fcb90f2',
+  error: 'none',
+  cookies: [ 'sb-dzrwxdjzgwvdmfbbfotn-auth-token', 'session_id' ]
+}
+[Middleware] Resolved role: super_admin
+[Middleware] Workspace ID: null
+[Middleware] Processing super_admin access
+[Middleware] Super admin attempted to access protected route: /employees/dashboard - redirecting to /admin

@@ -1,6 +1,7 @@
 -- =============================================
 -- 029_fix_get_user_access.sql
--- Correct, schema-safe role resolution
+-- Schema-safe, authoritative role resolution
+-- Includes: super_admin, admin, employee, platform_staff
 -- =============================================
 
 create or replace function public.rpc_get_user_access()
@@ -17,7 +18,7 @@ as $$
     r.workspace_id,
     r.role
   from (
-    -- 1️⃣ Super Admin (platform-level, users table ONLY)
+    -- 1️⃣ Super Admin (platform-level, users table ONLY, workspace_id = NULL)
     select
       u.id as user_id,
       null::uuid as workspace_id,
@@ -29,28 +30,39 @@ as $$
 
     union all
 
-    -- 2️⃣ Client Admin & Super Admin (workspace-level, admin_access)
-    -- Super admin can have workspace_id = NULL (platform-wide access)
-    -- Client admin must have workspace_id != NULL (workspace-specific access)
+    -- 2️⃣ Platform Staff (workspace_id = 00000000-0000-0000-0000-000000000001)
     select
       aa.user_id,
-      aa.workspace_id,
-      'admin'::text as role,
+      '00000000-0000-0000-0000-000000000001'::uuid as workspace_id,
+      'platform_staff'::text as role,
       2 as priority
     from public.admin_access aa
     join public.users u on u.id = aa.user_id
     where u.auth_uid = auth.uid()
-      -- Accept both super admin (NULL workspace) and client admin (non-NULL workspace)
-      -- This allows super admin to function without a workspace
+      and aa.workspace_id = '00000000-0000-0000-0000-000000000001'
 
     union all
 
-    -- 3️⃣ Employee (only if not admin and not super_admin)
+    -- 3️⃣ Client Admin (workspace-level, admin_access with non-null workspace_id)
+    select
+      aa.user_id,
+      aa.workspace_id,
+      'admin'::text as role,
+      3 as priority
+    from public.admin_access aa
+    join public.users u on u.id = aa.user_id
+    where u.auth_uid = auth.uid()
+      and aa.workspace_id is not null
+      and aa.workspace_id != '00000000-0000-0000-0000-000000000001'
+
+    union all
+
+    -- 4️⃣ Employee (scoped to ONE workspace, only if not admin or super_admin)
     select
       e.user_id,
-      e.business_id as workspace_id,
+      e.workspace_id as workspace_id,
       'employee'::text as role,
-      3 as priority
+      4 as priority
     from public.employees e
     join public.users u on u.id = e.user_id
     where u.auth_uid = auth.uid()
@@ -70,6 +82,7 @@ as $$
   limit 1;
 $$;
 
+-- Lock down permissions
 revoke all on function public.rpc_get_user_access from public;
 grant execute on function public.rpc_get_user_access to authenticated;
 

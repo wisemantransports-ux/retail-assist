@@ -5,6 +5,9 @@ import { env } from '@/lib/env'
 import { resolveUserId, ensureInternalUser } from '@/lib/supabase/queries'
 import { sessionManager } from '@/lib/session'
 
+// Platform workspace ID for internal Retail Assist staff
+const PLATFORM_WORKSPACE_ID = '00000000-0000-0000-0000-000000000001';
+
 // Use mock mode to avoid calling Supabase in CI or while testing.
 // To go live, set NEXT_PUBLIC_USE_MOCK_SUPABASE=false and configure SUPABASE_* env vars.
 const useDev = env.useMockMode
@@ -47,15 +50,27 @@ export async function POST(request: Request) {
     }
     const internalUserId = ensured.id
 
-    // Fetch user role and workspace from RPC
+    // ===== ROLE-BASED ACCESS RESOLUTION =====
+    // Fetch user role and workspace from RPC (returns exactly one row)
+    // Possible roles:
+    //   - super_admin: workspace_id = NULL
+    //   - platform_staff: workspace_id = PLATFORM_WORKSPACE_ID
+    //   - admin (client): workspace_id = client workspace id
+    //   - employee: workspace_id = assigned workspace id
     const { data: userAccess, error: rpcError } = await supabase.rpc('rpc_get_user_access')
     if (rpcError) {
       console.error('[LOGIN] RPC error:', rpcError)
       return NextResponse.json({ error: 'Role resolution failed' }, { status: 500 })
     }
     const accessRecord = userAccess?.[0]
-    const role = accessRecord?.role || 'user'
-    const workspaceId = accessRecord?.workspace_id || null
+    const role = accessRecord?.role
+    const workspaceId = accessRecord?.workspace_id
+
+    // Role must be resolved
+    if (!role) {
+      console.error('[LOGIN] No role resolved for user:', data.user.id)
+      return NextResponse.json({ error: 'User role not found' }, { status: 403 })
+    }
 
     console.log('[LOGIN] Resolved role:', role)
     console.log('[LOGIN] Workspace ID:', workspaceId)
@@ -71,9 +86,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Session creation failed' }, { status: 500 })
     }
 
-    // Create final response with user data
+    // ===== RETURN ROLE AND WORKSPACE_ID FOR CLIENT-SIDE ROUTING =====
+    // Client will use role to determine post-login redirect:
+    //   - super_admin → /admin
+    //   - platform_staff → /admin/support
+    //   - admin → /dashboard
+    //   - employee → /employees/dashboard
     const finalRes = NextResponse.json(
-      { success: true, user: { id: internalUserId, email: data.user.email, role }, workspaceId },
+      { 
+        success: true, 
+        user: { 
+          id: internalUserId, 
+          email: data.user.email, 
+          role 
+        }, 
+        workspaceId 
+      },
       { status: 200 }
     )
 

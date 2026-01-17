@@ -5,6 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 
+// Platform workspace ID for internal Retail Assist staff
+const PLATFORM_WORKSPACE_ID = '00000000-0000-0000-0000-000000000001';
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -26,19 +29,43 @@ export default function LoginPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Login failed');
 
-      // Use role from API response
+      // ===== ROLE-BASED CLIENT-SIDE REDIRECT =====
+      // Use role and workspace_id from server-resolved auth
       const role = data.user?.role;
       const workspaceId = data.workspaceId;
+      
       console.log('[Login Page] Role from API:', role);
       console.log('[Login Page] Workspace ID from API:', workspaceId);
 
-      // Role-based redirect
-      let targetPath = '/dashboard'; // fallback
-      if (role === 'super_admin') targetPath = '/admin';
-      else if (role === 'admin') targetPath = '/dashboard';
-      else if (role === 'employee') targetPath = '/employees/dashboard';
+      // Determine redirect target based on role
+      let targetPath = '/unauthorized'; // default fallback
+      
+      if (role === 'super_admin') {
+        // Super admin always goes to /admin
+        // workspace_id should be NULL
+        targetPath = '/admin';
+        console.log('[Login Page] Super admin detected, redirecting to /admin');
+      } 
+      else if (role === 'platform_staff') {
+        // Platform staff always goes to /admin/support
+        // workspace_id should be PLATFORM_WORKSPACE_ID
+        targetPath = '/admin/support';
+        console.log('[Login Page] Platform staff detected, redirecting to /admin/support');
+      }
+      else if (role === 'admin') {
+        // Client admin always goes to /dashboard
+        // workspace_id should be client workspace id (not null, not platform workspace)
+        targetPath = '/dashboard';
+        console.log('[Login Page] Client admin detected, redirecting to /dashboard');
+      }
+      else if (role === 'employee') {
+        // Employee always goes to /employees/dashboard
+        // workspace_id should be assigned workspace id
+        targetPath = '/employees/dashboard';
+        console.log('[Login Page] Employee detected, redirecting to /employees/dashboard');
+      }
 
-      console.log('[Login Page] Redirecting to:', targetPath);
+      console.log('[Login Page] Final redirect target:', targetPath);
       router.push(targetPath);
     } catch (err: any) {
       setError(err.message || "Failed to log in");

@@ -103,15 +103,37 @@ function SignupForm() {
           throw new Error(signInError?.message || 'Sign in after signup failed');
         }
 
-        // Fetch role from RPC
+        // ===== ROLE-BASED CLIENT-SIDE REDIRECT AFTER SIGNUP =====
+        // Fetch role from RPC to determine redirect target
         const { data: userAccess } = await supabase.rpc('rpc_get_user_access');
         const role = userAccess?.[0]?.role;
-        console.log('Signup user role:', role);
+        const workspaceId = userAccess?.[0]?.workspace_id;
+        
+        console.log('[Signup] User role:', role);
+        console.log('[Signup] User workspace_id:', workspaceId);
 
-        // Role-based redirect
-        if (role === 'super_admin') router.push('/admin');
-        if (role === 'admin') router.push('/dashboard');
-        if (role === 'employee') router.push('/employees/dashboard');
+        // New signups will typically be client admins (admin role)
+        // But we handle all cases to be safe
+        let targetPath = '/unauthorized'; // default fallback
+        
+        if (role === 'super_admin') {
+          targetPath = '/admin';
+          console.log('[Signup] Super admin detected, redirecting to /admin');
+        } 
+        else if (role === 'platform_staff') {
+          targetPath = '/admin/support';
+          console.log('[Signup] Platform staff detected, redirecting to /admin/support');
+        }
+        else if (role === 'admin') {
+          targetPath = '/dashboard';
+          console.log('[Signup] Client admin detected, redirecting to /dashboard');
+        }
+        else if (role === 'employee') {
+          targetPath = '/employees/dashboard';
+          console.log('[Signup] Employee detected, redirecting to /employees/dashboard');
+        }
+        
+        router.push(targetPath);
       } catch (signErr: any) {
         // If client-side sign-in fails, surface an error but do not modify backend
         setError(signErr?.message || 'Failed to sign in after signup');

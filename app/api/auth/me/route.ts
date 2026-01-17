@@ -4,6 +4,9 @@ import { ensureInternalUser } from '@/lib/supabase/queries';
 import { env } from '@/lib/env';
 import { createServerClient } from '@/lib/supabase/server';
 
+// Platform workspace ID for internal Retail Assist staff
+const PLATFORM_WORKSPACE_ID = '00000000-0000-0000-0000-000000000001';
+
 export async function GET(request: NextRequest) {
   try {
     // Create response to capture cookie updates
@@ -58,28 +61,13 @@ export async function GET(request: NextRequest) {
     
     const planLimits = PLAN_LIMITS[user.plan_type] || PLAN_LIMITS['starter'];
     
-    // TASK B1: Fetch user's workspace ID for proper scoping
-    // Query workspace by owner_id (assumes 1:1 relationship for now)
-    let workspaceId = user.id; // fallback to user.id
-    try {
-      const { data: workspace } = await supabase
-        .from('workspaces')
-        .select('id')
-        .eq('owner_id', user.id)
-        .limit(1)
-        .single();
-      
-      if (workspace?.id) {
-        workspaceId = workspace.id;
-        console.info('[Auth Me] Workspace found:', workspaceId);
-      }
-    } catch (err: any) {
-      console.warn('[Auth Me] Workspace fetch failed, falling back to user.id:', err.message);
-      // Fallback to user.id if workspace lookup fails
-      workspaceId = user.id;
-    }
-    
-    // Fetch role from RPC
+    // ===== ROLE-BASED ACCESS RESOLUTION =====
+    // Fetch user role and workspace from RPC (returns exactly one row)
+    // Possible roles:
+    //   - super_admin: workspace_id = NULL
+    //   - platform_staff: workspace_id = PLATFORM_WORKSPACE_ID
+    //   - admin (client): workspace_id = client workspace id
+    //   - employee: workspace_id = assigned workspace id
     const { data: userAccess, error: rpcError } = await supabase.rpc('rpc_get_user_access');
     
     if (rpcError) {
@@ -88,13 +76,25 @@ export async function GET(request: NextRequest) {
     }
     
     const accessRecord = userAccess?.[0];
-    const role = accessRecord?.role || 'user';
+    const role = accessRecord?.role;
     const workspaceIdFromRpc = accessRecord?.workspace_id;
+    
+    // Role must be resolved
+    if (!role) {
+      console.error('[Auth Me] No role resolved for user:', authUser.id);
+      return NextResponse.json({ error: 'User role not found' }, { status: 403 });
+    }
     
     console.log('[Auth Me] Resolved role:', role);
     console.log('[Auth Me] Workspace ID from RPC:', workspaceIdFromRpc);
     
-    // Return response with proper session
+    // ===== USE WORKSPACE_ID FROM RPC FOR ROUTING =====
+    // RPC is the authoritative source for role and workspace_id
+    // Client will use these values to determine post-login redirect:
+    //   - super_admin (workspace_id = NULL) → /admin
+    //   - platform_staff (workspace_id = PLATFORM_WORKSPACE_ID) → /admin/support
+    //   - admin (workspace_id = client workspace id) → /dashboard
+    //   - employee (workspace_id = assigned workspace id) → /employees/dashboard
     const finalRes = NextResponse.json({
       user: {
         id: user.id,
@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
         plan_limits: planLimits,
         billing_end_date: user.billing_end_date,
         role: role,
-        workspace_id: workspaceId
+        workspace_id: workspaceIdFromRpc
       }
     }, { status: 200 });
     
