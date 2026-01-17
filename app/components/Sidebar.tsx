@@ -15,17 +15,12 @@ export default function Sidebar() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Extract workspaceId from pathname (e.g., /dashboard/[uuid]/employees -> [uuid])
+  // Extract workspaceId from pathname (e.g., /dashboard/uuid/employees -> uuid)
   const getWorkspaceId = (): string | null => {
     const parts = pathname.split("/");
-    // Check if we're in /dashboard/[workspaceId]/* route
-    if (parts[2] && parts[2] !== "analytics" && parts[2] !== "agents" && 
-        parts[2] !== "integrations" && parts[2] !== "billing" && 
-        parts[2] !== "settings" && parts[2] !== "inbox" && 
-        parts[2] !== "messages" && parts[2] !== "support-ai" &&
-        parts[2] !== "policy-ai" && parts[2] !== "inbox-automation" &&
-        parts[2] !== "website-integration" && parts[2] !== "visual-search" &&
-        !parts[2].startsWith("[")) {
+    // Check if parts[2] exists and looks like a UUID (contains hyphens)
+    // UUIDs have format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+    if (parts[2] && parts[2].includes("-")) {
       return parts[2];
     }
     return null;
