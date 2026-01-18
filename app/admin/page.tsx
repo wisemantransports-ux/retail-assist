@@ -52,7 +52,6 @@ export default function AdminDashboard() {
         return;
       }
       
-      // Role is already resolved server-side in /api/auth/me
       const role = data.user.role;
       const workspaceId = data.user.workspace_id;
       
@@ -119,7 +118,6 @@ export default function AdminDashboard() {
       router.push('/login');
     } catch (error) {
       console.error('[Admin] Logout error:', error);
-      // Still redirect even if logout fails
       router.push('/login');
     }
   }
@@ -159,6 +157,18 @@ export default function AdminDashboard() {
       </nav>
 
       <main className="p-6">
+        {/* QUICK ACTIONS */}
+        <div className="flex gap-4 mb-6">
+          <Link
+            href="/admin/platform-staff"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+          >
+            🏢 Employees
+          </Link>
+          {/* Add other quick action buttons here */}
+        </div>
+
+        {/* STATS GRID */}
         <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-8">
           <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
             <p className="text-gray-400 text-sm">Total Users</p>
@@ -186,6 +196,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        {/* USERS TABLE */}
         <div className="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
           <div className="p-4 border-b border-gray-700 flex justify-between items-center">
             <h2 className="text-lg font-semibold text-white">All Users</h2>
@@ -305,8 +316,10 @@ export default function AdminDashboard() {
               </tbody>
             </table>
           </div>
+
         </div>
 
+        {/* RECENT SIGNUPS */}
         <div className="mt-8 bg-gray-800 border border-gray-700 rounded-lg p-6">
           <h2 className="text-lg font-semibold text-white mb-4">Recent Signups</h2>
           <div className="space-y-3">
