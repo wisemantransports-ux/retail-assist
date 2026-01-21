@@ -147,9 +147,11 @@ function EmployeesContent() {
       await fetchEmployees();
       return true;
     } else {
-      // Show error toast
-      toast.error(`Failed to invite: ${result.error || 'Unknown error'}`, { duration: 4500 });
-      console.error('[EmployeesPage] Invite error:', result.error);
+      // Show the ACTUAL backend error, don't override with generic text
+      // Backend provides specific reasons: plan limit, auth, permissions, validation, etc.
+      const errorMessage = result.error;
+      toast.error(errorMessage, { duration: 4500 });
+      console.error('[EmployeesPage] Invite creation failed:', errorMessage);
       return false;
     }
   };

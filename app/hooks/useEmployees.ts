@@ -146,21 +146,37 @@ export function useEmployees(workspaceId: string | null = null) {
         const data = await response.json();
 
         if (!response.ok) {
+          // CRITICAL: Use the ACTUAL backend error message, not generic fallback
+          // Backend provides specific reasons: plan limit, auth, permissions, validation, etc.
+          const backendError = data.error;
+          
+          if (backendError) {
+            console.error('[useEmployees] Backend error (status', response.status + '):', backendError);
+            return { success: false, error: backendError };
+          }
+
+          // Only use status-code-based fallback if backend didn't provide error message
           if (response.status === 401) {
+            console.error('[useEmployees] Authentication error');
             return { success: false, error: 'You are not authenticated' };
           }
           if (response.status === 403) {
+            console.error('[useEmployees] Authorization error');
             return { success: false, error: 'You do not have permission to create employees' };
           }
           if (response.status === 400) {
-            return { success: false, error: data.error || 'Invalid request' };
+            console.error('[useEmployees] Validation error');
+            return { success: false, error: 'Invalid request format' };
           }
-          return { success: false, error: 'Failed to create employee invite' };
+
+          // Final fallback only if no error message and no specific status match
+          console.error('[useEmployees] Unexpected error (status', response.status + '):', data);
+          return { success: false, error: `Request failed with status ${response.status}` };
         }
 
         return { success: true, invite: data.invite };
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to create employee';
+        const message = err instanceof Error ? err.message : 'Network error';
         console.error('[useEmployees] Create error:', message);
         return { success: false, error: message };
       }

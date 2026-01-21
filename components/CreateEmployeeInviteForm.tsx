@@ -105,36 +105,39 @@ export const CreateEmployeeInviteForm: React.FC<CreateEmployeeInviteFormProps> =
       setIsLoading(true);
 
       try {
-        // Call the Supabase RPC function
-        const { data, error } = await supabase.rpc('rpc_create_employee_invite', {
-          p_email: formData.email.trim(),
-          p_role: formData.role,
-          p_workspace_id: workspaceId || null,
-          p_invited_by: invitedByUserId,
+        // AUTHORIZATION STRATEGY:
+        // Client-admins MUST use /api/employees endpoint
+        // API infers workspace_id from auth context
+        // Frontend sends ONLY email to prevent client-side auth bypasses
+
+        const response = await fetch('/api/employees', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: formData.email.trim(),
+          }),
         });
 
-        if (error) {
-          const rpcError: RPCError = {
-            message: error.message,
-            code: error.code,
-            details: error.details,
-          };
-          console.error('RPC Error:', rpcError);
-          toast.error(`Failed to create invite: ${rpcError.message}`);
-          return;
-        }
+        const data = await response.json();
 
-        const response: RPCResponse = data;
-
-        if (response?.error) {
-          console.error('Invite creation failed:', response.error);
-          toast.error(`Failed to create invite: ${response.error}`);
+        if (!response.ok) {
+          // CRITICAL: Use the ACTUAL backend error message
+          const backendError = data.error;
+          if (backendError) {
+            console.error('[CreateEmployeeInviteForm] Backend error (status', response.status + '):', backendError);
+            toast.error(backendError);
+            return;
+          }
+          
+          // Fallback only if backend didn't provide error message
+          console.error('[CreateEmployeeInviteForm] Unexpected error response:', data);
+          toast.error('Failed to create invite');
           return;
         }
 
         // Success feedback
         toast.success('Employee invite created successfully!');
-        console.log('Invite created with ID:', response?.invite_id);
+        console.log('[CreateEmployeeInviteForm] Invite created with ID:', data.invite?.id);
 
         // Reset form
         setFormData(DEFAULT_FORM_DATA);
@@ -145,13 +148,13 @@ export const CreateEmployeeInviteForm: React.FC<CreateEmployeeInviteFormProps> =
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : 'An unexpected error occurred';
-        console.error('Unexpected error:', err);
+        console.error('[CreateEmployeeInviteForm] Unexpected error:', err);
         toast.error(errorMessage);
       } finally {
         setIsLoading(false);
       }
     },
-    [formData, workspaceId, invitedByUserId, validateForm, onSuccess]
+    [formData, validateForm, onSuccess]
   );
 
   return (

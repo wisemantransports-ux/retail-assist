@@ -63,14 +63,30 @@ export function usePlatformEmployees() {
       const data = await response.json();
 
       if (!response.ok) {
-        if (response.status === 401) return { success: false, error: 'You are not authenticated' };
-        if (response.status === 403) return { success: false, error: 'You do not have permission to create platform staff' };
-        return { success: false, error: data.error || 'Failed to create invite' };
+        // CRITICAL: Use the ACTUAL backend error message
+        const backendError = data.error;
+        
+        if (backendError) {
+          console.error('[usePlatformEmployees] Backend error (status', response.status + '):', backendError);
+          return { success: false, error: backendError };
+        }
+
+        if (response.status === 401) {
+          console.error('[usePlatformEmployees] Authentication error');
+          return { success: false, error: 'You are not authenticated' };
+        }
+        if (response.status === 403) {
+          console.error('[usePlatformEmployees] Authorization error');
+          return { success: false, error: 'You do not have permission to create platform staff' };
+        }
+
+        console.error('[usePlatformEmployees] Unexpected error (status', response.status + '):', data);
+        return { success: false, error: `Request failed with status ${response.status}` };
       }
 
       return { success: true, invite: data.invite };
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to create platform staff invite';
+      const message = err instanceof Error ? err.message : 'Network error';
       console.error('[usePlatformEmployees] Create error:', message);
       return { success: false, error: message };
     }

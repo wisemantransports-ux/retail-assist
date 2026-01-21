@@ -12,9 +12,10 @@ interface ClientEmployeeInvite {
   id: string;
   email: string;
   status: string;
+  token?: string;  // Secure token for invitation acceptance
   created_at?: string;
   role?: string;
-  workspace_id: string;
+  workspace_id: string | null;
   invited_by: string;
   full_name?: string;
   phone?: string;
@@ -74,9 +75,9 @@ export const ClientEmployeeInvite: React.FC<ClientEmployeeInviteProps> = ({
   /**
    * Generates the invitation link for an invite token
    */
-  const generateInviteLink = useCallback((inviteId: string): string => {
+  const generateInviteLink = useCallback((token: string): string => {
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://yourapp.com';
-    return `${baseUrl}/invite?token=${inviteId}`;
+    return `${baseUrl}/invite/${token}`;
   }, []);
 
   /**
@@ -85,27 +86,36 @@ export const ClientEmployeeInvite: React.FC<ClientEmployeeInviteProps> = ({
   const fetchExistingInvites = useCallback(async () => {
     setIsFetching(true);
     try {
-      const { data, error: queryError } = await supabase
-        .from('employee_invites')
-        .select('*')
-        .eq('workspace_id', workspaceId)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
+      // Use appropriate endpoint based on admin type
+      const endpoint = isSuperAdmin
+        ? '/api/platform-employees/invites'  // Super-admin: fetch platform staff invites
+        : `/api/employees`;                    // Client-admin: fetch workspace invites (no endpoint, use table query)
 
-      if (queryError) {
-        console.error('[ClientEmployeeInvite] Fetch invites error:', queryError);
+      const response = await fetch(endpoint, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        console.error('[ClientEmployeeInvite] Fetch invites error:', response.statusText);
         toast.error('Failed to load existing invites');
         return;
       }
 
-      setInvites(data as ClientEmployeeInvite[] || []);
+      const data = await response.json();
+      const inviteList = isSuperAdmin ? (data.invites || []) : (data.employees || []);
+      
+      // Filter to pending invites only
+      const pendingInvites = inviteList.filter((inv: any) => inv.status === 'pending');
+      setInvites(pendingInvites as ClientEmployeeInvite[]);
     } catch (err) {
       console.error('[ClientEmployeeInvite] Unexpected error fetching invites:', err);
       toast.error('Failed to fetch invites');
     } finally {
       setIsFetching(false);
     }
-  }, [workspaceId]);
+  }, [isSuperAdmin]);
 
   /**
    * Fetch invites on component mount
@@ -146,78 +156,131 @@ export const ClientEmployeeInvite: React.FC<ClientEmployeeInviteProps> = ({
       setIsLoading(true);
 
       try {
-        // Build RPC parameters based on admin type
-        // Client Admin: Only p_email and p_invited_by (workspace inferred server-side)
-        // Super Admin: All parameters including p_role and p_workspace_id
-        const rpcParams: Record<string, any> = {
-          p_email: email.trim().toLowerCase(),
-          p_invited_by: adminId,
-        };
+      // AUTHORIZATION STRATEGY:
+      // - Client-Admin (isSuperAdmin=false): MUST use /api/employees
+      //   API infers workspace_id from auth context, prevents direct RPC calls
+      // - Super-Admin (isSuperAdmin=true): MUST use /api/platform-employees
+      //   RPC handles platform-wide invites (workspace_id=null)
 
-        if (isSuperAdmin) {
-          rpcParams.p_role = defaultRole;
-          rpcParams.p_workspace_id = workspaceId || null;
-        }
-
-        console.log('[ClientEmployeeInvite] Calling RPC with params:', {
-          ...rpcParams,
-          p_invited_by: '***HIDDEN***',
+      if (isSuperAdmin) {
+        // Super-Admin: Call API endpoint that handles platform staff invites
+        const response = await fetch('/api/platform-employees', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: email.trim().toLowerCase(),
+            role: defaultRole,
+          }),
         });
 
-        const { data, error: rpcError } = await supabase.rpc(
-          'rpc_create_employee_invite',
-          rpcParams
-        );
+        const data = await response.json();
 
-        if (rpcError) {
-          console.error('[ClientEmployeeInvite] RPC error:', rpcError);
-          const errorMsg =
-            rpcError.message ||
-            (typeof rpcError === 'object' ? JSON.stringify(rpcError) : String(rpcError));
-          setError(errorMsg);
-          toast.error(`Failed to create invite: ${errorMsg}`);
+        if (!response.ok) {
+          // CRITICAL: Use the ACTUAL backend error message
+          // Backend provides specific reasons: plan limit, auth, permissions, validation, etc.
+          const backendError = data.error;
+          if (backendError) {
+            console.error('[ClientEmployeeInvite] Super-admin invite error:', backendError);
+            setError(backendError);
+            toast.error(backendError);
+            return;
+          }
+          
+          // Fallback only if backend didn't provide error message
+          console.error('[ClientEmployeeInvite] Unexpected error response:', data);
+          setError('Failed to create invite');
+          toast.error('Failed to create invite');
           return;
         }
 
         // Success: add new invite to list
-        if (data && data.length > 0) {
+        if (data.invite) {
           const newInvite: ClientEmployeeInvite = {
-            id: data[0].id,
-            email: data[0].email,
-            status: data[0].status,
-            created_at: data[0].created_at,
-            role: data[0].role,
-            workspace_id: data[0].workspace_id,
-            invited_by: data[0].invited_by,
-            full_name: data[0].full_name,
-            phone: data[0].phone,
-            metadata: data[0].metadata,
+            id: data.invite.id,
+            email: data.invite.email,
+            status: 'pending',
+            token: data.invite.token,
+            role: defaultRole,
+            workspace_id: null,
+            invited_by: adminId,
           };
 
           setInvites((prev) => [newInvite, ...prev]);
           toast.success(`Invite sent to ${email}!`);
-          console.log('[ClientEmployeeInvite] Invite created successfully:', newInvite.id);
-
-          // Clear input field
+          console.log('[ClientEmployeeInvite] Super-admin invite created:', newInvite.id);
           setEmail('');
         }
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
-        console.error('[ClientEmployeeInvite] Unexpected error:', err);
-        setError(errorMessage);
-        toast.error(errorMessage);
-      } finally {
-        setIsLoading(false);
+      } else {
+        // Client-Admin: MUST call /api/employees
+        // API infers workspace_id from auth context and passes it to RPC
+        // Frontend sends ONLY email (workspace_id must not be sent from client)
+        const response = await fetch('/api/employees', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: email.trim().toLowerCase(),
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          // CRITICAL: Use the ACTUAL backend error message
+          const backendError = data.error;
+          if (backendError) {
+            console.error('[ClientEmployeeInvite] Client-admin invite error:', backendError);
+            setError(backendError);
+            toast.error(backendError);
+            return;
+          }
+          
+          // Fallback only if backend didn't provide error message
+          console.error('[ClientEmployeeInvite] Unexpected error response:', data);
+          setError('Failed to create invite');
+          toast.error('Failed to create invite');
+          return;
+        }
+
+        // Success: add new invite to list
+        if (data.invite) {
+          const newInvite: ClientEmployeeInvite = {
+            id: data.invite.id,
+            email: data.invite.email,
+            status: 'pending',
+            token: data.invite.token,
+            role: 'employee',
+            workspace_id: workspaceId,
+            invited_by: adminId,
+          };
+
+          setInvites((prev) => [newInvite, ...prev]);
+          toast.success(`Invite sent to ${email}!`);
+          console.log('[ClientEmployeeInvite] Client-admin invite created:', newInvite.id);
+          setEmail('');
+        }
       }
-    },
-    [email, adminId, isSuperAdmin, defaultRole]
-  );
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
+      console.error('[ClientEmployeeInvite] Unexpected error:', err);
+      setError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  },
+  [email, adminId, isSuperAdmin, defaultRole, workspaceId]
+);
 
   /**
    * Handles copy-to-clipboard for invite link
    */
   const handleCopyLink = useCallback(async (invite: ClientEmployeeInvite) => {
-    const inviteLink = generateInviteLink(invite.id);
+    if (!invite.token) {
+      toast.error('Invite token not available');
+      return;
+    }
+
+    const inviteLink = generateInviteLink(invite.token);
 
     try {
       await navigator.clipboard.writeText(inviteLink);

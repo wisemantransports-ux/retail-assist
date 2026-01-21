@@ -159,6 +159,11 @@ export async function POST(request: NextRequest) {
 
     // Admin must have workspace_id
     if (!workspace_id) {
+      console.error('[/api/employees/invite POST] Admin has no workspace_id:', {
+        user_id: user.id,
+        role,
+        roleData,
+      });
       return NextResponse.json({ error: 'Invalid admin state' }, { status: 403 });
     }
 
@@ -167,6 +172,9 @@ export async function POST(request: NextRequest) {
     // ============================================================================
     
     // Fetch workspace/user plan information to enforce limits
+    let planType: 'starter' | 'pro' | 'enterprise' = 'starter';
+    let maxEmployees = PLAN_LIMITS['starter'].maxEmployees;
+    
     const { data: workspaceData, error: workspaceError } = await supabase
       .from('workspaces')
       .select('plan_type')
@@ -174,13 +182,18 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (workspaceError || !workspaceData) {
-      console.error('[/api/employees/invite POST] Workspace lookup error:', workspaceError);
-      return NextResponse.json({ error: 'Failed to fetch workspace information' }, { status: 500 });
+      console.warn('[/api/employees/invite POST] Workspace lookup failed, using default plan:', {
+        workspace_id,
+        error: workspaceError?.message,
+        user_id: user.id,
+      });
+      // Fallback to starter plan if workspace lookup fails
+      // This can happen due to RLS policies or network issues
+      // The RPC will still validate authorization
+    } else {
+      planType = (workspaceData.plan_type || 'starter') as 'starter' | 'pro' | 'enterprise';
+      maxEmployees = PLAN_LIMITS[planType].maxEmployees;
     }
-
-    const planType = (workspaceData.plan_type || 'starter') as 'starter' | 'pro' | 'enterprise';
-    const planLimits = PLAN_LIMITS[planType];
-    const maxEmployees = planLimits.maxEmployees;
 
     // Count current active employees in workspace (only counting non-invites, actual employees)
     const { data: employees, error: countError } = await supabase
@@ -189,8 +202,14 @@ export async function POST(request: NextRequest) {
       .eq('workspace_id', workspace_id);
 
     if (countError) {
-      console.error('[/api/employees/invite POST] Employee count error:', countError);
-      return NextResponse.json({ error: 'Failed to check employee limit' }, { status: 500 });
+      console.error('[/api/employees/invite POST] Employee count error:', {
+        workspace_id,
+        error: countError?.message,
+        details: countError,
+      });
+      return NextResponse.json({ 
+        error: 'Failed to check employee limit',
+      }, { status: 500 });
     }
 
     const currentEmployeeCount = employees?.length || 0;
@@ -217,7 +236,7 @@ export async function POST(request: NextRequest) {
       
       return NextResponse.json(
         { 
-          error: `Your ${planLimits.name} plan allows only ${maxEmployees} employee(s). You currently have ${currentEmployeeCount}. Upgrade to add more.`,
+          error: `Your ${PLAN_LIMITS[planType].name} plan allows only ${maxEmployees} employee(s). You currently have ${currentEmployeeCount}. Upgrade to add more.`,
           plan: planType,
           limit: maxEmployees,
           current: currentEmployeeCount,
