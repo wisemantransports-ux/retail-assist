@@ -97,6 +97,16 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { email } = body;
 
+    // Reject any unexpected fields to prevent legacy data passing through
+    // Note: workspace_id is NOT accepted from client; it comes from authenticated user context
+    const allowedKeys = ['email'];
+    const providedKeys = Object.keys(body);
+    const unexpectedKeys = providedKeys.filter(key => !allowedKeys.includes(key));
+    if (unexpectedKeys.length > 0) {
+      console.warn(`[/api/employees POST] Rejected unexpected fields: ${unexpectedKeys.join(', ')}`);
+      return NextResponse.json({ error: `Unexpected fields: ${unexpectedKeys.join(', ')}` }, { status: 400 });
+    }
+
     // Validate email
     if (!email || typeof email !== 'string') {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 });
@@ -216,15 +226,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Call RPC to create invite (RPC validates authorization + creates scoped invite)
-    // AUTHORIZATION: RPC verifies admin is inviting to their own workspace
+    // Call RPC to create invite
+    // PARAMETERS (for client admins):
+    // - p_email: email address to invite
+    // - p_invited_by: current admin user ID (REQUIRED)
+    // - p_role: employee role (optional, will use default if not provided)
+    // - p_workspace_id: workspace UUID (inferred from admin context, passed for clarity)
+    //
+    // AUTHORIZATION: RPC validates admin is inviting to their own workspace
     const { data: invite, error: rpcError } = await supabase.rpc(
       'rpc_create_employee_invite',
       {
-        p_workspace_id: workspace_id,
         p_email: email,
-        p_invited_by: user.id,
         p_role: 'employee',
+        p_workspace_id: workspace_id,
+        p_invited_by: user.id,
       }
     );
 

@@ -130,16 +130,12 @@ export function useEmployees(workspaceId: string | null = null) {
         }
 
         // Build request payload
-        // For super_admin creating platform staff: workspace_id = null
-        // For admin creating workspace employees: workspace_id = their workspace_id
-        const payload: Record<string, any> = {
+        // IMPORTANT: Only send 'email' field
+        // The API endpoint rejects 'role' and 'workspace_id' fields
+        // Workspace context is inferred server-side from authenticated admin's access
+        const payload = {
           email,
-          role,
         };
-
-        if (workspaceId !== null) {
-          payload.workspace_id = workspaceId;
-        }
 
         const response = await fetch('/api/employees', {
           method: 'POST',

@@ -46,6 +46,20 @@ export async function POST(req: Request) {
 
     const newUser = authData.user;
 
+    // ===== SUPER ADMIN ELIGIBILITY CHECK =====
+    // Server-side logic: Determine if this signup should create a super_admin role
+    // Currently uses ENV flag: SUPER_ADMIN_EMAIL for hardcoded super admin email
+    // Future: Replace with more sophisticated eligibility logic (invite codes, API keys, etc.)
+    const superAdminEmail = process.env.SUPER_ADMIN_EMAIL || '';
+    const isSuperAdmin = email.toLowerCase() === superAdminEmail.toLowerCase() && superAdminEmail !== '';
+    
+    console.info('[SIGNUP] Super admin eligibility check:', {
+      email,
+      superAdminEmail,
+      isSuperAdmin,
+      envConfigured: !!process.env.SUPER_ADMIN_EMAIL
+    });
+
     // 2) Best-effort: attempt to create profile via RPC but do NOT fail the
     // entire signup flow if the RPC fails. We always create a session and
     // return success when the auth user is created.
@@ -59,6 +73,7 @@ export async function POST(req: Request) {
         p_phone: phone,
         p_full_name: full_name || null,
         p_plan_type: plan_type || 'starter',
+        p_is_super_admin: isSuperAdmin,
       });
 
       console.info('[SIGNUP] RPC raw response:', rpcCall);

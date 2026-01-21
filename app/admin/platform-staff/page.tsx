@@ -2,8 +2,11 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
-import { useEmployees, Employee } from '@/hooks/useEmployees';
+import { Employee } from '@/hooks/useEmployees';
+import { usePlatformEmployees } from '@/hooks/usePlatformEmployees';
+import { usePendingInvites } from '@/hooks/usePendingInvites';
 import EmployeeTable from '@/components/EmployeeTable';
+import PendingInvitesTable from '@/components/PendingInvitesTable';
 import InviteEmployeeModal from '@/components/InviteEmployeeModal';
 import EditEmployeeModal from '@/components/EditEmployeeModal';
 
@@ -44,7 +47,14 @@ function PlatformStaffContent() {
     createEmployee,
     updateEmployee,
     deleteEmployee,
-  } = useEmployees(null); // platform staff => workspace_id = null
+  } = usePlatformEmployees();
+
+  const {
+    invites: pendingInvites,
+    loading: invitesLoading,
+    error: invitesError,
+    fetchPendingInvites,
+  } = usePendingInvites();
 
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -72,7 +82,8 @@ function PlatformStaffContent() {
         console.log('[PlatformStaffPage] Workspace ID:', workspace_id);
 
         // Only super_admin may access
-        if (role !== 'super_admin') {
+        const canManageEmployees = role === "super_admin" || role === "client_admin";
+        if (!canManageEmployees) {
           console.warn('[PlatformStaffPage] Access denied for role:', role);
           router.push('/unauthorized');
           return;
@@ -80,6 +91,7 @@ function PlatformStaffContent() {
 
         setUserAccess({ role, workspace_id });
         fetchEmployees();
+        fetchPendingInvites();
       } catch (err) {
         console.error('[PlatformStaffPage] Auth check error:', err);
         router.push('/admin/login');
@@ -97,6 +109,7 @@ function PlatformStaffContent() {
 
     if (result.success) {
       await fetchEmployees();
+      await fetchPendingInvites();
       return true;
     }
 
@@ -192,13 +205,33 @@ function PlatformStaffContent() {
           </div>
         )}
 
-        <EmployeeTable
-          employees={employees}
-          loading={loading}
-          onEdit={handleEditClick}
-          onDelete={handleDeleteClick}
-          isDeleting={deleting}
-        />
+        {/* Pending Invites Section */}
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold text-foreground mb-4">Pending Invites</h2>
+          {invitesError && (
+            <div className="mb-4 p-4 bg-yellow-100 border border-yellow-200 rounded-lg text-yellow-800 text-sm">
+              {invitesError}
+            </div>
+          )}
+          <PendingInvitesTable 
+            platformEmployees={pendingInvites}
+            onInviteAction={(inviteId, action) => {
+              console.log(`[PlatformStaffPage] Invite action: ${action} for ${inviteId}`);
+            }}
+          />
+        </div>
+
+        {/* Active Employees Section */}
+        <div>
+          <h2 className="text-xl font-semibold text-foreground mb-4">Active Platform Staff</h2>
+          <EmployeeTable
+            employees={employees.filter(emp => emp.is_active)}
+            loading={loading}
+            onEdit={handleEditClick}
+            onDelete={handleDeleteClick}
+            isDeleting={deleting}
+          />
+        </div>
       </div>
 
       <InviteEmployeeModal

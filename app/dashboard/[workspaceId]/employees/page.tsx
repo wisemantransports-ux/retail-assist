@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import toast, { Toaster } from 'react-hot-toast';
 import { useEmployees, Employee } from '@/hooks/useEmployees';
 import EmployeeTable from '@/components/EmployeeTable';
 import InviteEmployeeModal from '@/components/InviteEmployeeModal';
@@ -55,6 +56,8 @@ function EmployeesContent() {
 
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showInviteLinkModal, setShowInviteLinkModal] = useState(false);
+  const [lastInvite, setLastInvite] = useState<{ id?: string; token?: string; email?: string } | null>(null);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [deleting, setDeleting] = useState<Record<string, boolean>>({});
   const [userAccess, setUserAccess] = useState<UserAccess | null>(null);
@@ -125,16 +128,27 @@ function EmployeesContent() {
 
   /**
    * Handle employee invite submission
-   * WORKSPACE SCOPING: workspace_id = admin's workspace is passed implicitly
+   * WORKSPACE SCOPING: workspace_id = admin's workspace is passed implicitly via RPC
    */
   const handleInviteSubmit = async (email: string, role: string): Promise<boolean> => {
-    const result = await createEmployee(email, role);
+    // Only send email from client — server infers workspace and invited_by
+    const result = await createEmployee(email);
 
     if (result.success) {
+      // Persist invite info locally and show link modal
+      setLastInvite(result.invite || null);
+      setShowInviteLinkModal(true);
+
+      toast.success(`Invite created for ${email}`, { duration: 3500 });
+
+      console.log('[EmployeesPage] Invite created:', result.invite);
+
       // Refresh employee list
       await fetchEmployees();
       return true;
     } else {
+      // Show error toast
+      toast.error(`Failed to invite: ${result.error || 'Unknown error'}`, { duration: 4500 });
       console.error('[EmployeesPage] Invite error:', result.error);
       return false;
     }
@@ -209,25 +223,29 @@ function EmployeesContent() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">
-            👥 Employee Management
-          </h1>
-          <p className="text-muted">
-            Manage employees and their access to your workspace
-          </p>
-        </div>
+    <div className="min-h-screen bg-background">
+      {/* Toast Notifications */}
+      <Toaster position="top-right" />
 
-        {/* Plan Limit Info */}
-        {userAccess && (
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-blue-900">
-                  Employee Limit: <span className="font-bold">{employees.length}</span> of{' '}
+      <div className="p-6 md:p-8">
+        <div className="max-w-6xl mx-auto">
+          {/* Header */}
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-foreground mb-2">
+              👥 Employee Management
+            </h1>
+            <p className="text-muted">
+              Manage employees and their access to your workspace
+            </p>
+          </div>
+
+          {/* Plan Limit Info */}
+          {userAccess && (
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-blue-900">
+                    Employee Limit: <span className="font-bold">{employees.length}</span> of{' '}
                   <span className="font-bold">
                     {userAccess.plan_limits?.maxEmployees === -1 ? 'Unlimited' : userAccess.plan_limits?.maxEmployees || 2}
                   </span>
@@ -247,89 +265,90 @@ function EmployeesContent() {
               )}
             </div>
           </div>
-        )}
+          )}
 
-        {/* Action Buttons */}
-        <div className="mb-6 flex gap-3 flex-wrap">
-          <button
-            onClick={() => setShowInviteModal(true)}
-            disabled={
-              loading ||
-              authLoading ||
-              (userAccess?.plan_limits?.maxEmployees !== -1 &&
-                employees.length >= (userAccess?.plan_limits?.maxEmployees || 2))
-            }
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition"
-            title={
-              userAccess?.plan_limits?.maxEmployees !== -1 &&
-              employees.length >= (userAccess?.plan_limits?.maxEmployees || 2)
-                ? `Your plan allows only ${userAccess?.plan_limits?.maxEmployees || 2} employee(s). Upgrade to add more.`
-                : 'Invite a new employee'
-            }
-          >
-            📧 Invite Employee
-          </button>
-          <button
-            onClick={() => fetchEmployees()}
-            disabled={loading}
-            className="px-6 py-2 border border-card-border rounded-lg text-foreground hover:bg-background font-medium text-sm disabled:opacity-50"
-          >
-            🔄 Refresh
-          </button>
-        </div>
+          {/* Action Buttons */}
+          <div className="mb-6 flex gap-3 flex-wrap">
+            <button
+              onClick={() => setShowInviteModal(true)}
+              disabled={
+                loading ||
+                authLoading ||
+                (userAccess?.plan_limits?.maxEmployees !== -1 &&
+                  employees.length >= (userAccess?.plan_limits?.maxEmployees || 2))
+              }
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              title={
+                userAccess?.plan_limits?.maxEmployees !== -1 &&
+                employees.length >= (userAccess?.plan_limits?.maxEmployees || 2)
+                  ? `Your plan allows only ${userAccess?.plan_limits?.maxEmployees || 2} employee(s). Upgrade to add more.`
+                  : 'Invite a new employee'
+              }
+            >
+              📧 Invite Employee
+            </button>
+            <button
+              onClick={() => fetchEmployees()}
+              disabled={loading}
+              className="px-6 py-2 border border-card-border rounded-lg text-foreground hover:bg-background font-medium text-sm disabled:opacity-50"
+            >
+              🔄 Refresh
+            </button>
+          </div>
 
-        {/* Limit Reached Warning */}
-        {userAccess &&
-          userAccess.plan_limits?.maxEmployees !== -1 &&
-          employees.length >= (userAccess.plan_limits?.maxEmployees || 2) && (
-            <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
-              <p className="text-sm text-orange-800">
-                🔒 <span className="font-medium">Employee limit reached</span> - Your{' '}
-                {userAccess.plan_limits?.maxEmployees === 5 ? 'Pro' : 'Starter'} plan allows only{' '}
-                {userAccess.plan_limits?.maxEmployees} employee(s). Upgrade to add more.
-              </p>
+          {/* Limit Reached Warning */}
+          {userAccess &&
+            userAccess.plan_limits?.maxEmployees !== -1 &&
+            employees.length >= (userAccess.plan_limits?.maxEmployees || 2) && (
+              <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                <p className="text-sm text-orange-800">
+                  🔒 <span className="font-medium">Employee limit reached</span> - Your{' '}
+                  {userAccess.plan_limits?.maxEmployees === 5 ? 'Pro' : 'Starter'} plan allows only{' '}
+                  {userAccess.plan_limits?.maxEmployees} employee(s). Upgrade to add more.
+                </p>
+              </div>
+            )}
+
+          {/* API Error */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-100 border border-red-200 rounded-lg text-red-800 text-sm">
+              ⚠ {error}
             </div>
           )}
 
-        {/* API Error */}
-        {error && (
-          <div className="mb-6 p-4 bg-red-100 border border-red-200 rounded-lg text-red-800 text-sm">
-            ⚠ {error}
-          </div>
-        )}
+          {/* Employee Table */}
+          <EmployeeTable
+            employees={employees}
+            loading={loading}
+            onEdit={handleEditClick}
+            onDelete={handleDeleteClick}
+            isDeleting={deleting}
+          />
 
-        {/* Employee Table */}
-        <EmployeeTable
-          employees={employees}
-          loading={loading}
-          onEdit={handleEditClick}
-          onDelete={handleDeleteClick}
-          isDeleting={deleting}
-        />
-
-        {/* Stats Footer */}
-        <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-card-bg rounded-lg border border-card-border p-4 text-center">
-            <div className="text-2xl font-bold text-foreground">{employees.length}</div>
-            <div className="text-sm text-muted">Total Employees</div>
-          </div>
-          <div className="bg-card-bg rounded-lg border border-card-border p-4 text-center">
-            <div className="text-2xl font-bold text-green-600">
-              {employees.filter((e) => e.is_active).length}
+          {/* Stats Footer */}
+          <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-card-bg rounded-lg border border-card-border p-4 text-center">
+              <div className="text-2xl font-bold text-foreground">{employees.length}</div>
+              <div className="text-sm text-muted">Total Employees</div>
             </div>
-            <div className="text-sm text-muted">Active</div>
-          </div>
-          <div className="bg-card-bg rounded-lg border border-card-border p-4 text-center">
-            <div className="text-2xl font-bold text-gray-600">
-              {employees.filter((e) => !e.is_active).length}
+            <div className="bg-card-bg rounded-lg border border-card-border p-4 text-center">
+              <div className="text-2xl font-bold text-green-600">
+                {employees.filter((e) => e.is_active).length}
+              </div>
+              <div className="text-sm text-muted">Active</div>
             </div>
-            <div className="text-sm text-muted">Inactive</div>
-          </div>
-          <div className="bg-card-bg rounded-lg border border-card-border p-4 text-center">
-            <div className="text-2xl font-bold text-blue-600">
-              {employees.filter((e) => e.role === 'admin').length}
+            <div className="bg-card-bg rounded-lg border border-card-border p-4 text-center">
+              <div className="text-2xl font-bold text-gray-600">
+                {employees.filter((e) => !e.is_active).length}
+              </div>
+              <div className="text-sm text-muted">Inactive</div>
             </div>
-            <div className="text-sm text-muted">Admins</div>
+            <div className="bg-card-bg rounded-lg border border-card-border p-4 text-center">
+              <div className="text-2xl font-bold text-blue-600">
+                {employees.filter((e) => e.role === 'admin').length}
+              </div>
+              <div className="text-sm text-muted">Admins</div>
+            </div>
           </div>
         </div>
       </div>
@@ -341,6 +360,60 @@ function EmployeesContent() {
         onSubmit={handleInviteSubmit}
         isPlatformStaff={false}
       />
+
+      {/* Invite Link Modal */}
+      {showInviteLinkModal && lastInvite && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-card-bg rounded-lg shadow-lg max-w-md w-full mx-4 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Invitation Link</h3>
+              <button onClick={() => setShowInviteLinkModal(false)} className="text-muted">✕</button>
+            </div>
+
+            <p className="text-sm text-muted mb-3">Share this link with the invited user. It will expire per workspace policy.</p>
+
+            <div className="mb-4">
+              <input
+                readOnly
+                value={
+                  lastInvite.token
+                    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/invite?token=${lastInvite.token}`
+                    : lastInvite.id
+                    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/invite?token=${lastInvite.id}`
+                    : ''
+                }
+                className="w-full px-4 py-2 border border-card-border rounded-lg bg-background text-foreground"
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  const link = lastInvite?.token
+                    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/invite?token=${lastInvite.token}`
+                    : lastInvite?.id
+                    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/invite?token=${lastInvite.id}`
+                    : '';
+                  if (link) {
+                    navigator.clipboard.writeText(link).then(() => {
+                      toast.success('Copied invite link to clipboard');
+                    });
+                  }
+                }}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium text-sm"
+              >
+                Copy Link
+              </button>
+              <button
+                onClick={() => setShowInviteLinkModal(false)}
+                className="flex-1 px-4 py-2 border border-card-border rounded-lg text-foreground hover:bg-background font-medium text-sm"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <EditEmployeeModal
         isOpen={showEditModal}

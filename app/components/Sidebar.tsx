@@ -58,50 +58,15 @@ export default function Sidebar() {
     fetchUserData();
   }, []);
 
-  // Determine which Employees link to show based on role
-  const getEmployeesLink = (): NavLink | null => {
-    if (!user) return null;
-
-    // CASE 1: super_admin - Always show Employees link to /admin/employees
-    // (super_admin is on /admin routes, not /dashboard routes)
-    if (user.role === "super_admin") {
-      console.log("[Sidebar] super_admin detected: showing Employees link to /admin/employees");
-      return { href: "/admin/employees", label: "Employees", icon: "👥" };
-    }
-
-    // CASE 2: admin (client_admin) - Show Employees link only if workspaceId exists
-    // (client_admin is on /dashboard/[workspaceId] routes)
-    if (user.role === "admin" && workspaceId) {
-      console.log("[Sidebar] client_admin detected with workspace:", {
-        workspace_id: workspaceId,
-        employees_route: `/dashboard/${workspaceId}/employees`
-      });
-      return {
-        href: `/dashboard/${workspaceId}/employees`,
-        label: "Employees",
-        icon: "👥"
-      };
-    }
-
-    if (user.role === "admin" && !workspaceId) {
-      console.log("[Sidebar] client_admin detected but NO workspaceId found in pathname");
-      return null;
-    }
-
-    // CASE 3: Other roles (employee, agent) - Don't show Employees link
-    console.log("[Sidebar] Role", user.role, "does not have access to Employees link");
-    return null;
-  };
-
-  const employeesLink = getEmployeesLink();
+  // ARCHITECTURE DECISION: Employees management is accessible via Quick Actions only
+  // NOT via Sidebar navigation. Sidebar must never show Employees for any role.
 
   // Debug logging
   console.log("[Sidebar] Render state:", {
     pathname,
     workspaceId,
     userRole: user?.role,
-    employeesLinkShown: !!employeesLink,
-    employeesHref: employeesLink?.href,
+    note: "Employees link removed - accessible via Quick Actions only",
     loading
   });
 
@@ -115,14 +80,8 @@ export default function Sidebar() {
     { href: "/dashboard/settings", label: "Settings", icon: "⚙️" }
   ];
 
-  // Build final links array: insert Employees link after Billing if applicable
-  const links: NavLink[] = employeesLink
-    ? [
-        ...baseLinks.slice(0, 5), // Dashboard, Analytics, Agents, Integrations, Billing
-        employeesLink, // Employees (conditional)
-        ...baseLinks.slice(5) // Settings
-      ]
-    : baseLinks;
+  // Build final links array - no Employees link (available via Quick Actions only)
+  const links: NavLink[] = baseLinks;
 
   return (
     <aside className="w-64 bg-card-bg border-r border-card-border p-6 hidden md:flex flex-col h-screen sticky top-0">

@@ -79,6 +79,9 @@ export default function EmployeeTable({
                 Email
               </th>
               <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                Phone
+              </th>
+              <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
                 Role
               </th>
               <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
@@ -100,6 +103,9 @@ export default function EmployeeTable({
                 </td>
                 <td className="px-6 py-3 text-sm text-muted">
                   {employee.email || 'No email'}
+                </td>
+                <td className="px-6 py-3 text-sm text-muted">
+                  {employee.phone || '—'}
                 </td>
                 <td className="px-6 py-3 text-sm text-foreground">
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
@@ -154,6 +160,11 @@ export default function EmployeeTable({
                 <div className="text-xs text-muted mt-1">
                   {employee.email || 'No email'}
                 </div>
+                {employee.phone && (
+                  <div className="text-xs text-muted mt-1">
+                    📞 {employee.phone}
+                  </div>
+                )}
               </div>
               <span
                 className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
