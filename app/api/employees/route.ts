@@ -141,6 +141,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Resolve auth user to internal users.id using auth_uid
+    // This is required for FK constraint: employee_invites.invited_by -> users.id
+    const { data: internalUser, error: userLookupError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('auth_uid', user.id)
+      .maybeSingle();
+
+    if (userLookupError || !internalUser) {
+      console.error('[/api/employees/invite POST] Failed to resolve internal user ID:', {
+        auth_uid: user.id,
+        error: userLookupError?.message,
+      });
+      return NextResponse.json({ error: 'Unable to resolve user profile' }, { status: 401 });
+    }
+
+    const internal_user_id = internalUser.id;
+
     // Get user's role and workspace from RPC
     const { data: roleData, error: roleError } = await supabase
       .rpc('rpc_get_user_access')
@@ -248,20 +266,33 @@ export async function POST(request: NextRequest) {
     // Call RPC to create invite
     // PARAMETERS (for client admins):
     // - p_email: email address to invite
-    // - p_invited_by: current admin user ID (REQUIRED)
+    // - p_invited_by: current admin's internal user ID from public.users (REQUIRED)
     // - p_role: employee role (optional, will use default if not provided)
     // - p_workspace_id: workspace UUID (inferred from admin context, passed for clarity)
     //
     // AUTHORIZATION: RPC validates admin is inviting to their own workspace
+    console.log('[/api/employees/invite POST] Calling RPC to create invite:', {
+      p_email: email,
+      p_role: 'employee',
+      p_workspace_id: workspace_id,
+      p_invited_by: internal_user_id,
+    });
+
     const { data: invite, error: rpcError } = await supabase.rpc(
       'rpc_create_employee_invite',
       {
         p_email: email,
         p_role: 'employee',
         p_workspace_id: workspace_id,
-        p_invited_by: user.id,
+        p_invited_by: internal_user_id,
       }
     );
+
+    console.log('[/api/employees/invite POST] RPC response:', {
+      error: rpcError?.message,
+      data_length: Array.isArray(invite) ? invite.length : 'not_array',
+      first_row: invite?.[0],
+    });
 
     if (rpcError) {
       console.error('[/api/employees/invite POST] RPC error:', rpcError);
@@ -269,8 +300,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: rpcError.message || 'Failed to create invite' }, { status: 400 });
     }
 
+    if (!invite || !Array.isArray(invite) || invite.length === 0) {
+      console.error('[/api/employees/invite POST] RPC returned empty result:', invite);
+      return NextResponse.json({ error: 'Failed to create invite - no result returned' }, { status: 400 });
+    }
+
     // Log successful action for audit trail
     console.log(`[/api/employees/invite POST] Admin ${user.id} created invite for ${email} in workspace ${workspace_id} (${planType}: ${currentEmployeeCount}/${maxEmployees})`);
+    console.log('[/api/employees/invite POST] Invite created with token:', {
+      invite_id: invite[0]?.invite_id,
+      token: invite[0]?.token?.substring(0, 16) + '...',
+      token_length: invite[0]?.token?.length,
+    });
 
     return NextResponse.json(
       {

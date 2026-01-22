@@ -77,7 +77,7 @@ export const ClientEmployeeInvite: React.FC<ClientEmployeeInviteProps> = ({
    */
   const generateInviteLink = useCallback((token: string): string => {
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://yourapp.com';
-    return `${baseUrl}/invite/${token}`;
+    return `${baseUrl}/invite?token=${token}`;
   }, []);
 
   /**

@@ -88,18 +88,36 @@ export async function POST(request: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    // Resolve auth user to internal users.id using auth_uid
+    // This is required for FK constraint: employee_invites.invited_by -> users.id
+    const { data: internalUser, error: userLookupError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('auth_uid', user.id)
+      .maybeSingle();
+
+    if (userLookupError || !internalUser) {
+      console.error('[/api/platform-employees POST] Failed to resolve internal user ID:', {
+        auth_uid: user.id,
+        error: userLookupError?.message,
+      });
+      return NextResponse.json({ error: 'Unable to resolve user profile' }, { status: 401 });
+    }
+
+    const internal_user_id = internalUser.id;
+
     // Role check
     const { data: roleData, error: roleError } = await supabase.rpc('rpc_get_user_access').single();
     if (roleError || !roleData) return NextResponse.json({ error: 'Unable to determine user role' }, { status: 403 });
     if ((roleData as any).role !== 'super_admin') return NextResponse.json({ error: 'Super admins only' }, { status: 403 });
 
     // Create invite via RPC scoped to platform (workspace_id = null)
-    // Pass the authenticated super_admin user ID as the inviter
+    // Pass the authenticated super_admin's internal user ID as the inviter
     const { data: invite, error: rpcError } = await supabase.rpc('rpc_create_employee_invite', {
       p_email: email,
       p_role: role || 'employee',
       p_workspace_id: null,
-      p_invited_by: user.id,
+      p_invited_by: internal_user_id,
     });
 
     if (rpcError) {
