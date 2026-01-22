@@ -292,6 +292,7 @@ export async function POST(request: NextRequest) {
     console.log('[/api/employees/accept-invite POST] Step 4: ✅ Email matches');
 
     // Step 4: Verify inviter is a client-admin (not super-admin)
+    // Check both users table role and admin_access for workspace membership
     const { data: inviterData, error: inviterError } = await supabase
       .from('users')
       .select('id, role')
@@ -314,18 +315,43 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Step 5: Verify inviter is admin of this workspace
+    // Step 5: Verify inviter has 'client_admin' role (either via users.role or admin_access role)
+    // First check admin_access table
     const { data: adminAccessData, error: adminAccessError } = await supabase
       .from('admin_access')
-      .select('id')
+      .select('id, role')
       .eq('user_id', inviteData.invited_by)
       .eq('workspace_id', inviteData.workspace_id)
-      .single();
+      .maybeSingle();
 
-    if (adminAccessError || !adminAccessData) {
-      console.error('[/api/employees/accept-invite POST] Admin access verification failed:', adminAccessError);
+    if (adminAccessError) {
+      console.error('[/api/employees/accept-invite POST] Admin access lookup error:', adminAccessError);
       return NextResponse.json(
-        { success: false, error: 'Inviter does not have access to this workspace' },
+        { success: false, error: 'Failed to verify inviter access' },
+        { status: 500 }
+      );
+    }
+
+    // Inviter must have admin_access record for this workspace
+    if (!adminAccessData) {
+      console.error('[/api/employees/accept-invite POST] Inviter has no admin access to workspace', {
+        inviter_id: inviteData.invited_by,
+        workspace_id: inviteData.workspace_id
+      });
+      return NextResponse.json(
+        { success: false, error: 'Inviter must be a client admin to invite employees' },
+        { status: 403 }
+      );
+    }
+
+    // Verify inviter has admin role (not just a member)
+    if (adminAccessData.role !== 'admin' && adminAccessData.role !== 'super_admin') {
+      console.error('[/api/employees/accept-invite POST] Inviter does not have admin role', {
+        inviter_id: inviteData.invited_by,
+        inviter_role: adminAccessData.role
+      });
+      return NextResponse.json(
+        { success: false, error: 'Inviter must have admin role to invite employees' },
         { status: 403 }
       );
     }
