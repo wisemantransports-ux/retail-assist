@@ -160,9 +160,11 @@ export async function POST(request: NextRequest) {
     console.log('[/api/employees/accept-invite POST] Step 1: Token lookup starting...');
     
     // Use service role key to bypass RLS for unauthenticated users
+    // Note: expires_at column doesn't exist yet in production DB, so we query without it
+    // Expiration will be checked based on created_at timestamp (30 days)
     const { data: tokenCheckData, error: tokenCheckError } = await supabaseService
       .from('employee_invites')
-      .select('id, workspace_id, email, invited_by, status, expires_at, token')
+      .select('id, workspace_id, email, invited_by, status, created_at, token')
       .eq('token', token)
       .maybeSingle();
 
@@ -246,25 +248,27 @@ export async function POST(request: NextRequest) {
     console.log('[/api/employees/accept-invite POST] Step 2: ✅ Status is pending');
 
     console.log('[/api/employees/accept-invite POST] Step 3: Expiration check...');
-    // Expiration check
-    if (inviteData.expires_at) {
-      const expiresAt = new Date(inviteData.expires_at);
-      const now = new Date();
-      
-      console.log('[/api/employees/accept-invite POST] Expiration details:', {
-        expires_at: expiresAt.toISOString(),
-        now: now.toISOString(),
-        is_expired: expiresAt < now,
-        time_remaining_ms: expiresAt.getTime() - now.getTime(),
-      });
-      
-      if (expiresAt < now) {
-        console.error('[/api/employees/accept-invite POST] Step 3: ❌ Invite expired');
-        return NextResponse.json(
-          { success: false, error: 'This invite has expired' },
-          { status: 400 }
-        );
-      }
+    // Expiration check: invites expire 30 days after creation
+    // Using created_at since expires_at column doesn't exist in production DB yet
+    const createdAt = new Date(inviteData.created_at);
+    const now = new Date();
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+    const expiresAt = new Date(createdAt.getTime() + thirtyDaysMs);
+    
+    console.log('[/api/employees/accept-invite POST] Expiration details:', {
+      created_at: createdAt.toISOString(),
+      expires_at: expiresAt.toISOString(),
+      now: now.toISOString(),
+      is_expired: expiresAt < now,
+      time_remaining_ms: expiresAt.getTime() - now.getTime(),
+    });
+    
+    if (expiresAt < now) {
+      console.error('[/api/employees/accept-invite POST] Step 3: ❌ Invite expired');
+      return NextResponse.json(
+        { success: false, error: 'This invite has expired' },
+        { status: 400 }
+      );
     }
     console.log('[/api/employees/accept-invite POST] Step 3: ✅ Not expired');
 
