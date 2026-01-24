@@ -64,8 +64,9 @@ export default function AdminMessagesPage() {
     }
 
     // ===== WORKSPACE VALIDATION =====
-    // Admin must have a workspace_id (not NULL, not platform workspace)
-    if (!user.workspace_id || user.workspace_id === '00000000-0000-0000-0000-000000000001') {
+    // Admin must have a workspace_id (not NULL)
+    // Server-side API will enforce workspace scoping
+    if (!user.workspace_id) {
       setError('Invalid workspace assignment');
       return;
     }

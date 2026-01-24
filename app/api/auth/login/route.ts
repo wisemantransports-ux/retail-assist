@@ -4,9 +4,7 @@ import { db } from '@/lib/db'
 import { env } from '@/lib/env'
 import { resolveUserId, ensureInternalUser } from '@/lib/supabase/queries'
 import { sessionManager } from '@/lib/session'
-
-// Platform workspace ID for internal Retail Assist staff
-const PLATFORM_WORKSPACE_ID = '00000000-0000-0000-0000-000000000001';
+import { PLATFORM_WORKSPACE_ID } from '@/lib/config/workspace';
 
 export async function POST(request: Request) {
   try {

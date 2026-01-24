@@ -25,8 +25,13 @@ export default function InboxPage() {
           const authRes = await fetch('/api/auth/me');
           if (authRes.ok) {
             const authData = await authRes.json();
-            // Use user ID as workspace ID for simplicity (assuming 1:1 relationship)
-            setWorkspaceId(authData.user.id);
+            // Use the user's workspace_id from auth context
+            // This ensures workspace scoping is maintained
+            const workspace = authData.user.workspace_id;
+            if (!workspace) {
+              throw new Error('User is not assigned to a workspace');
+            }
+            setWorkspaceId(workspace);
           } else {
             throw new Error('Unable to authenticate');
           }

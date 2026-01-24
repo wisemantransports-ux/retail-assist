@@ -274,7 +274,8 @@ export const db = {
     },
 
     async getAll() {
-      const s = supabase()
+      // Use admin client to bypass RLS - super_admin needs global access
+      const s = createAdminSupabaseClient()
       const { data, error } = await s.from('users').select('*')
       if (error) throw error
       return data.map(migrateUser)

@@ -1,6 +1,8 @@
 import { createServerClient } from '@supabase/ssr';
+import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'crypto';
 
 /**
  * GET /api/platform-employees
@@ -25,8 +27,9 @@ export async function GET(request: NextRequest) {
     if (roleError || !roleData) return NextResponse.json({ error: 'Unable to determine user role' }, { status: 403 });
     if ((roleData as any).role !== 'super_admin') return NextResponse.json({ error: 'Super admins only' }, { status: 403 });
 
-    // Fetch platform employees with joined email from auth.users
-    const { data: employees, error: queryError } = await supabase
+    // Fetch platform employees with admin client to bypass RLS
+    const admin = createAdminSupabaseClient();
+    const { data: employees, error: queryError } = await admin
       .from('employees')
       .select(`
         id,
@@ -88,9 +91,10 @@ export async function POST(request: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    // Resolve auth user to internal users.id using auth_uid
+    // Resolve auth user to internal users.id using auth_uid with admin client
     // This is required for FK constraint: employee_invites.invited_by -> users.id
-    const { data: internalUser, error: userLookupError } = await supabase
+    const admin = createAdminSupabaseClient();
+    const { data: internalUser, error: userLookupError } = await admin
       .from('users')
       .select('id')
       .eq('auth_uid', user.id)
@@ -111,8 +115,11 @@ export async function POST(request: NextRequest) {
     if (roleError || !roleData) return NextResponse.json({ error: 'Unable to determine user role' }, { status: 403 });
     if ((roleData as any).role !== 'super_admin') return NextResponse.json({ error: 'Super admins only' }, { status: 403 });
 
-    // Create invite via RPC scoped to platform (workspace_id = null)
-    // Pass the authenticated super_admin's internal user ID as the inviter
+    // STEP 1: Generate token EXACTLY ONCE
+    const inviteToken = randomUUID();
+    console.log('[INVITE CREATE] Generated token:', inviteToken);
+
+    // STEP 2: Create invite via RPC scoped to platform (workspace_id = null)
     const { data: invite, error: rpcError } = await supabase.rpc('rpc_create_employee_invite', {
       p_email: email,
       p_role: role || 'employee',
@@ -121,19 +128,85 @@ export async function POST(request: NextRequest) {
     });
 
     if (rpcError) {
-      console.error('[/api/platform-employees POST] RPC error:', rpcError);
+      console.error('[INVITE CREATE] RPC error:', rpcError);
       return NextResponse.json({ error: rpcError.message || 'Failed to create invite' }, { status: 400 });
     }
 
-    return NextResponse.json({
+    console.log('[INVITE CREATE] RPC response:', {
+      response_length: invite?.length,
+      first_row: invite?.[0],
+    });
+
+    const inviteId = invite[0]?.id;
+    if (!inviteId) {
+      console.error('[INVITE CREATE] RPC returned no invite ID:', {
+        invite_data: invite,
+      });
+      return NextResponse.json({ error: 'Failed to create invite - no ID returned' }, { status: 500 });
+    }
+
+    // STEP 3: Insert token into employee_invites using admin client
+    const { error: updateError } = await admin
+      .from('employee_invites')
+      .update({ token: inviteToken })
+      .eq('id', inviteId);
+
+    if (updateError) {
+      console.error('[INVITE CREATE] Failed to insert token:', {
+        invite_id: inviteId,
+        token: inviteToken,
+        error: updateError.message,
+      });
+      return NextResponse.json({ error: 'Failed to create invite token' }, { status: 500 });
+    }
+
+    // Verify token was inserted
+    const { data: verifyInvite, error: verifyError } = await admin
+      .from('employee_invites')
+      .select('id, token, status')
+      .eq('id', inviteId)
+      .single();
+
+    if (verifyError || !verifyInvite) {
+      console.error('[INVITE CREATE] Verification failed:', {
+        invite_id: inviteId,
+        verify_error: verifyError?.message,
+      });
+      return NextResponse.json({ error: 'Invite verification failed' }, { status: 500 });
+    }
+
+    console.log('[INVITE CREATE] Token verified in database:', {
+      invite_id: inviteId,
+      token_in_db: verifyInvite.token,
+      token_generated: inviteToken,
+      match: verifyInvite.token === inviteToken ? 'YES' : 'NO',
+      status: verifyInvite.status,
+    });
+
+    console.log('[INVITE CREATE] Inserted token:', {
+      invite_id: inviteId,
+      token: inviteToken,
+      email,
+    });
+
+    // STEP 4: Return response with token
+    const responsePayload = {
       success: true,
       message: 'Invite created successfully',
       invite: {
-        id: invite[0]?.invite_id,
-        token: invite[0]?.token,
+        id: inviteId,
+        token: inviteToken,
         email,
       },
-    }, { status: 201 });
+    };
+
+    console.log('[INVITE CREATE] Returned token:', {
+      invite_id: inviteId,
+      token: inviteToken,
+      matches: inviteToken === responsePayload.invite.token ? 'YES' : 'NO',
+    });
+
+    return NextResponse.json(responsePayload, { status: 201 });
 
   } catch (error) {
     console.error('[/api/platform-employees POST] Unexpected error:', error);

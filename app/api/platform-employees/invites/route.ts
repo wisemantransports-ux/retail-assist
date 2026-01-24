@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr';
+import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -24,8 +25,9 @@ export async function GET(request: NextRequest) {
     if (roleError || !roleData) return NextResponse.json({ error: 'Unable to determine user role' }, { status: 403 });
     if ((roleData as any).role !== 'super_admin') return NextResponse.json({ error: 'Super admins only' }, { status: 403 });
 
-    // Fetch pending invites for platform staff (workspace_id = null)
-    const { data: invites, error: queryError } = await supabase
+    // Fetch pending invites for platform staff with admin client to bypass RLS
+    const admin = createAdminSupabaseClient();
+    const { data: invites, error: queryError } = await admin
       .from('employee_invites')
       .select('*')
       .is('workspace_id', null)

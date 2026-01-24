@@ -2,10 +2,8 @@ import { NextResponse, NextRequest } from 'next/server';
 import { db, PLAN_LIMITS } from '@/lib/db';
 import { ensureInternalUser } from '@/lib/supabase/queries';
 import { env } from '@/lib/env';
-import { createServerClient } from '@/lib/supabase/server';
-
-// Platform workspace ID for internal Retail Assist staff
-const PLATFORM_WORKSPACE_ID = '00000000-0000-0000-0000-000000000001';
+import { createServerClient, createAdminSupabaseClient } from '@/lib/supabase/server';
+import { PLATFORM_WORKSPACE_ID } from '@/lib/config/workspace';
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,25 +28,28 @@ export async function GET(request: NextRequest) {
     const authUser = userData.user;
     console.info('[Auth Me] auth user id:', authUser.id);
     
-    // Look up user in database
-    const { data: userDataFromDb, error: userError } = await supabase.from('users').select('*').eq('auth_uid', authUser.id).single();
-    console.info('[Auth Me] user lookup:', userDataFromDb ? 'FOUND' : 'NOT_FOUND', userError ? `Error: ${userError.message}` : '');
-    
-    if (userError && userError.code !== 'PGRST116') { // PGRST116 is "not found"
+    // Use admin client for user lookups to avoid RLS/policy recursion
+    const admin = createAdminSupabaseClient();
+
+    // Look up user in database using admin client
+    const { data: userDataFromDb, error: userError } = await admin.from('users').select('*').eq('auth_uid', authUser.id).single();
+    console.info('[Auth Me] user lookup (admin):', userDataFromDb ? 'FOUND' : 'NOT_FOUND', userError ? `Error: ${userError.message}` : '');
+
+    if (userError && (userError as any).code !== 'PGRST116') { // PGRST116 is "not found"
       console.error('[Auth Me] user lookup error:', userError);
       return NextResponse.json({ error: 'Database error' }, { status: 500 });
     }
-    
+
     let user = userDataFromDb;
     if (!user) {
-      // Ensure user exists
+      // Ensure user exists (ensureInternalUser uses admin client internally)
       const ensured = await ensureInternalUser(authUser.id);
       if (!ensured.id) {
         console.error('[Auth Me] failed to ensure user');
         return NextResponse.json({ error: 'User creation failed' }, { status: 500 });
       }
-      // Fetch again
-      const { data: newUser } = await supabase.from('users').select('*').eq('auth_uid', authUser.id).single();
+      // Fetch again via admin client
+      const { data: newUser } = await admin.from('users').select('*').eq('auth_uid', authUser.id).single();
       user = newUser;
     }
     
@@ -96,6 +97,10 @@ export async function GET(request: NextRequest) {
     //   - admin (workspace_id = client workspace id) → /dashboard
     //   - employee (workspace_id = assigned workspace id) → /employees/dashboard
     const finalRes = NextResponse.json({
+      session: { user: authUser }, // Include session for compatibility with useAuth
+      access: accessRecord, // Include full access record
+      role, // Include role for easier access
+      workspaceId: workspaceIdFromRpc, // Include workspaceId
       user: {
         id: user.id,
         email: user.email,

@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr';
+import { createAdminSupabaseClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -20,8 +21,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (roleError || !roleData) return NextResponse.json({ error: 'Unable to determine user role' }, { status: 403 });
   if ((roleData as any).role !== 'super_admin') return NextResponse.json({ error: 'Super admins only' }, { status: 403 });
 
-  // Fetch single platform employee with email join
-  const { data: employee, error: queryError } = await supabase
+  // Fetch single platform employee with admin client to bypass RLS
+  const admin = createAdminSupabaseClient();
+  const { data: employee, error: queryError } = await admin
     .from('employees')
     .select(`
       id,
@@ -81,8 +83,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   if (is_active !== undefined) updateData.is_active = is_active;
   updateData.updated_at = new Date().toISOString();
 
-  // Update platform employee (workspace_id must be null)
-  const { data: employee, error: updateError } = await supabase
+  // Update platform employee with admin client to bypass RLS (workspace_id must be null)
+  const admin = createAdminSupabaseClient();
+  const { data: employee, error: updateError } = await admin
     .from('employees')
     .update(updateData)
     .eq('id', employeeId)
@@ -128,8 +131,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   if (roleError || !roleData) return NextResponse.json({ error: 'Unable to determine user role' }, { status: 403 });
   if ((roleData as any).role !== 'super_admin') return NextResponse.json({ error: 'Super admins only' }, { status: 403 });
 
-  // Delete platform employee (workspace_id must be null)
-  const { error: deleteError } = await supabase
+  // Delete platform employee with admin client to bypass RLS (workspace_id must be null)
+  const admin = createAdminSupabaseClient();
+  const { error: deleteError } = await admin
     .from('employees')
     .delete()
     .eq('id', employeeId)

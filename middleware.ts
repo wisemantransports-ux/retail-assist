@@ -1,8 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, NextRequest } from 'next/server';
-
-// Platform workspace ID for internal Retail Assist staff
-const PLATFORM_WORKSPACE_ID = '00000000-0000-0000-0000-000000000001';
+import { PLATFORM_WORKSPACE_ID } from '@/lib/config/workspace';
 
 export async function middleware(request: NextRequest) {
   console.log('[Middleware] INVOKED for path:', request.nextUrl.pathname);
@@ -30,19 +28,19 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Get current session - MUST read from Supabase Auth via cookies
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  // Get current user - Validates JWT server-side (secure)
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
   
-  console.log('[Middleware] Session check:', {
-    hasSession: !!session,
-    userId: session?.user?.id || 'none',
-    error: sessionError?.message || 'none',
+  console.log('[Middleware] User check:', {
+    hasUser: !!user,
+    userId: user?.id || 'none',
+    error: userError?.message || 'none',
     cookies: request.cookies.getAll().map(c => c.name)
   });
 
-  // If no session, redirect to login
-  if (!session || sessionError) {
-    console.warn('[Middleware] No valid session found, redirecting to /login');
+  // If no user, redirect to login
+  if (!user || userError) {
+    console.warn('[Middleware] No valid user found, redirecting to /login');
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
@@ -112,7 +110,7 @@ export async function middleware(request: NextRequest) {
     }
     
     // Block platform staff from accessing other routes
-    if (pathname === '/admin' || pathname.startsWith('/admin/') && !pathname.startsWith('/admin/support') ||
+    if (pathname === '/admin' || (pathname.startsWith('/admin/') && !pathname.startsWith('/admin/support')) ||
         pathname === '/dashboard' || pathname.startsWith('/dashboard/') ||
         pathname === '/employees' || pathname.startsWith('/employees/')) {
       console.warn('[Middleware] Platform staff attempted to access protected route:', pathname, '- redirecting to /admin/support');
