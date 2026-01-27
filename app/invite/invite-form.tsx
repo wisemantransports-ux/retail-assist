@@ -47,6 +47,11 @@ export default function InviteForm() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
+    // Prevent double submission
+    if (loading) {
+      return;
+    }
+
     // Validate inputs
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email || !emailRegex.test(email)) {
@@ -67,26 +72,14 @@ export default function InviteForm() {
     setLoading(true);
 
     try {
-      console.log('[InviteForm] Token from URL:', { 
+      console.log('[InviteForm] Submitting invite acceptance:', { 
         token: token?.substring(0, 8) + '...', 
-        token_length: token?.length,
-        param_name: searchParams.has('token') ? 'token' : searchParams.has('invite') ? 'invite' : 'none',
+        email 
       });
-      console.log('[InviteForm] Submitting invite acceptance:', { token: token?.substring(0, 8) + '...', email, first_name: firstName });
 
       // Token goes in the URL query string, NOT in the request body
       const acceptUrl = `/api/employees/accept-invite?token=${encodeURIComponent(token)}`;
-      console.log('[InviteForm] POST URL:', acceptUrl);
-      console.log('[InviteForm] Request payload:', {
-        token_in_url: token,
-        token_length: token?.length,
-        body: {
-          email: email.toLowerCase(),
-          first_name: firstName.trim(),
-          last_name: lastName.trim() || null,
-          password_length: password.length,
-        },
-      });
+      console.log('[InviteForm] POST to:', acceptUrl);
 
       const response = await fetch(acceptUrl, {
         method: 'POST',
@@ -101,77 +94,89 @@ export default function InviteForm() {
         }),
       });
 
-      console.log('[InviteForm] Request sent with token in URL:', {
-        token_in_url: token?.substring(0, 8) + '...',
-        token_length: token?.length,
-        body_contains_token: false,
-        email_sent: email.toLowerCase(),
-      });
-
       console.log('[InviteForm] Response status:', response.status);
-      console.log('[InviteForm] Response content-type:', response.headers.get('content-type'));
 
       // Safely parse JSON response
-      let data = null;
+      let data: any = null;
       const responseText = await response.text();
-      console.log('[InviteForm] Response body length:', responseText.length);
-      console.log('[InviteForm] Response body:', responseText);
 
       if (responseText) {
         try {
           data = JSON.parse(responseText);
-          console.log('[InviteForm] Parsed response:', data);
         } catch (parseError) {
           console.error('[InviteForm] JSON parse error:', parseError);
-          console.error('[InviteForm] Response text was:', responseText);
-          data = { success: false, error: 'Invalid server response' };
+          data = {};
         }
-      } else {
-        console.warn('[InviteForm] Response body is empty!');
-        data = { success: false, error: 'Empty server response' };
       }
 
-      // Check if request failed
+      // ===== HANDLE ERROR RESPONSES =====
+      
+      // 400/401: Invalid or expired invite token
+      if (response.status === 400 || response.status === 401) {
+        const errorMsg = data?.error || 'Invalid or expired invite';
+        console.error('[InviteForm] Invalid invite:', errorMsg);
+        toast.error(errorMsg);
+        setLoading(false);
+        return;
+      }
+
+      // 409: Duplicate (treat as idempotent success - user might already have accepted)
+      if (response.status === 409) {
+        console.log('[InviteForm] User already accepted (409 Conflict) - treating as success');
+        toast.success('Invite already accepted! Redirecting...');
+        // Still redirect to dashboard after a brief delay
+        setTimeout(() => {
+          router.push('/employees/dashboard');
+        }, 1500);
+        return;
+      }
+
+      // 500: Server error - show generic message, no raw error text
+      if (response.status === 500) {
+        console.error('[InviteForm] Server error:', data?.error);
+        toast.error('Something went wrong. Please try again later.');
+        setLoading(false);
+        return;
+      }
+
+      // ===== HANDLE SUCCESS (200) =====
+      
+      // For idempotent behavior: success means either new or existing user
       if (!response.ok) {
-        const errorMessage = data?.error || `Server error: ${response.status}`;
-        console.error('[InviteForm] Error accepting invite:', errorMessage);
-        toast.error(errorMessage);
+        const errorMsg = data?.error || `Server error: ${response.status}`;
+        console.error('[InviteForm] Request failed:', errorMsg);
+        toast.error(errorMsg);
+        setLoading(false);
         return;
       }
 
       // Verify success response has required fields
       if (!data?.success) {
-        const errorMessage = data?.error || 'Failed to accept invite';
-        console.error('[InviteForm] Invite not accepted:', errorMessage);
-        toast.error(errorMessage);
+        const errorMsg = data?.error || 'Failed to accept invite';
+        console.error('[InviteForm] Invite acceptance failed:', errorMsg);
+        toast.error(errorMsg);
+        setLoading(false);
         return;
       }
 
-      // Verify workspace_id is present
-      if (!data?.workspace_id) {
-        console.error('[InviteForm] No workspace_id in success response:', data);
-        toast.error('Invalid server response: missing workspace information');
+      // Success: use backend-provided redirect URL
+      if (data?.next) {
+        console.log('[InviteForm] Invite accepted, redirecting to:', data.next);
+        toast.success('Invite accepted! Redirecting to login...');
+        setTimeout(() => {
+          router.push(data.next);
+        }, 1000);
         return;
       }
 
-      // Success!
-      const workspaceId = data.workspace_id;
-      const role = data.role || 'employee';
-      console.log('[InviteForm] Invite accepted successfully:', { workspaceId, role });
-
-      toast.success('Invite accepted! Redirecting to your dashboard...');
-
-      // Redirect to employee dashboard
-      setTimeout(() => {
-        const redirectUrl = `/employee/dashboard`;
-        console.log('[InviteForm] Redirecting to:', redirectUrl);
-        router.push(redirectUrl);
-      }, 1500);
+      // Fallback if next not provided (shouldn't happen)
+      console.error('[InviteForm] No next URL provided by backend');
+      toast.error('Invalid server response');
+      setLoading(false);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
       console.error('[InviteForm] Caught error:', error);
       toast.error(errorMessage);
-    } finally {
       setLoading(false);
     }
   };

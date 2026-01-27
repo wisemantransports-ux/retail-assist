@@ -1,0 +1,29 @@
+import { createAdminSupabaseClient } from './scripts/lib/admin-client.ts';
+import * as dotenv from 'dotenv';
+
+dotenv.config({ path: '.env.local' });
+
+const admin = createAdminSupabaseClient();
+
+const superAdminAuthId = '2f188791-47ac-43e0-b5f5-eae63fcb90f2';
+const superAdminEmail = 'samuelhelp80@gmail.com';
+
+console.log('Creating super admin user entry...\n');
+
+const { data, error } = await admin
+  .from('users')
+  .insert({
+    auth_uid: superAdminAuthId,
+    email: superAdminEmail,
+    full_name: 'Samuel Help Admin',
+    role: 'super_admin',
+  })
+  .select();
+
+if (error) {
+  console.log('❌ Error:', error.message);
+  console.log('Full error:', JSON.stringify(error, null, 2));
+} else {
+  console.log('✅ Successfully created user:');
+  console.log(JSON.stringify(data, null, 2));
+}

@@ -380,8 +380,6 @@ function EmployeesContent() {
                 value={
                   lastInvite.token
                     ? `${typeof window !== 'undefined' ? window.location.origin : ''}/invite?token=${lastInvite.token}`
-                    : lastInvite.id
-                    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/invite?token=${lastInvite.id}`
                     : ''
                 }
                 className="w-full px-4 py-2 border border-card-border rounded-lg bg-background text-foreground"
@@ -393,8 +391,6 @@ function EmployeesContent() {
                 onClick={() => {
                   const link = lastInvite?.token
                     ? `${typeof window !== 'undefined' ? window.location.origin : ''}/invite?token=${lastInvite.token}`
-                    : lastInvite?.id
-                    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/invite?token=${lastInvite.id}`
                     : '';
                   if (link) {
                     navigator.clipboard.writeText(link).then(() => {

@@ -63,22 +63,54 @@ export async function GET(request: NextRequest) {
     const planLimits = PLAN_LIMITS[user.plan_type] || PLAN_LIMITS['starter'];
     
     // ===== ROLE-BASED ACCESS RESOLUTION =====
-    // Fetch user role and workspace from RPC (returns exactly one row)
-    // Possible roles:
-    //   - super_admin: workspace_id = NULL
-    //   - platform_staff: workspace_id = PLATFORM_WORKSPACE_ID
-    //   - admin (client): workspace_id = client workspace id
-    //   - employee: workspace_id = assigned workspace id
-    const { data: userAccess, error: rpcError } = await supabase.rpc('rpc_get_user_access');
+    // Use direct table queries instead of RPC (more reliable)
+    // Priority: super_admin → admin → employee
+    let role = null;
+    let workspaceIdFromRpc = null;
     
-    if (rpcError) {
-      console.error('[Auth Me] RPC error:', rpcError.message);
-      return NextResponse.json({ error: 'Role resolution failed' }, { status: 500 });
+    // Check if super_admin (role in users table)
+    const { data: superAdminCheck } = await admin
+      .from('users')
+      .select('id, role')
+      .eq('id', user.id)
+      .eq('role', 'super_admin')
+      .maybeSingle();
+    
+    if (superAdminCheck) {
+      role = 'super_admin';
+      workspaceIdFromRpc = null;
+      console.log('[Auth Me] Resolved role: super_admin (from users table)');
     }
     
-    const accessRecord = userAccess?.[0];
-    const role = accessRecord?.role;
-    const workspaceIdFromRpc = accessRecord?.workspace_id;
+    // Check if admin (admin_access table)
+    if (!role) {
+      const { data: adminCheck } = await admin
+        .from('admin_access')
+        .select('id, workspace_id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (adminCheck) {
+        role = 'admin';
+        workspaceIdFromRpc = adminCheck.workspace_id;
+        console.log('[Auth Me] Resolved role: admin (from admin_access table)');
+      }
+    }
+    
+    // Check if employee (employees table)
+    if (!role) {
+      const { data: employeeCheck } = await admin
+        .from('employees')
+        .select('id, workspace_id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (employeeCheck) {
+        role = 'employee';
+        workspaceIdFromRpc = employeeCheck.workspace_id;
+        console.log('[Auth Me] Resolved role: employee (from employees table)');
+      }
+    }
     
     // Role must be resolved
     if (!role) {
@@ -86,19 +118,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User role not found' }, { status: 403 });
     }
     
-    console.log('[Auth Me] Resolved role:', role);
-    console.log('[Auth Me] Workspace ID from RPC:', workspaceIdFromRpc);
+    console.log('[Auth Me] Final role:', role);
+    console.log('[Auth Me] Workspace ID:', workspaceIdFromRpc);
     
-    // ===== USE WORKSPACE_ID FROM RPC FOR ROUTING =====
-    // RPC is the authoritative source for role and workspace_id
+    // Copy any Supabase cookies to response to maintain session
     // Client will use these values to determine post-login redirect:
     //   - super_admin (workspace_id = NULL) → /admin
-    //   - platform_staff (workspace_id = PLATFORM_WORKSPACE_ID) → /admin/support
     //   - admin (workspace_id = client workspace id) → /dashboard
     //   - employee (workspace_id = assigned workspace id) → /employees/dashboard
     const finalRes = NextResponse.json({
       session: { user: authUser }, // Include session for compatibility with useAuth
-      access: accessRecord, // Include full access record
       role, // Include role for easier access
       workspaceId: workspaceIdFromRpc, // Include workspaceId
       user: {

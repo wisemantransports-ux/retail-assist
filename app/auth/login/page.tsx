@@ -35,13 +35,37 @@ export default function LoginPage() {
       console.log('[Login Page] Waiting for auth context to initialize...');
 
       // Call /api/auth/me to ensure backend validates and auth context syncs
-      const meResponse = await fetch('/api/auth/me', {
-        method: 'GET',
-        credentials: 'include',
-      });
+      // Retry up to 3 times with delays to ensure auth is ready
+      let meResponse = null;
+      let lastError: Error | null = null;
+      
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          meResponse = await fetch('/api/auth/me', {
+            method: 'GET',
+            credentials: 'include',
+          });
+          
+          if (meResponse.ok) {
+            console.log('[Login Page] Auth validation succeeded on attempt', attempt);
+            break;
+          }
+          
+          console.warn('[Login Page] Auth validation failed on attempt', attempt, '- retrying...');
+          
+          if (attempt < 3) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+          }
+        } catch (err) {
+          lastError = err as Error;
+          if (attempt < 3) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+          }
+        }
+      }
 
-      if (!meResponse.ok) {
-        throw new Error('Auth validation failed after login');
+      if (!meResponse?.ok) {
+        throw new Error(`Auth validation failed after login${lastError ? ': ' + lastError.message : ''}`);
       }
 
       const meData = await meResponse.json();

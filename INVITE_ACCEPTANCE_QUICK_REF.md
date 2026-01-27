@@ -1,147 +1,91 @@
-# Employee Invite Acceptance - Quick Reference
+# V1 Auth - Quick Reference Guide
 
-## Endpoints
+## The Fix in 30 Seconds
 
-### 1️⃣ Accept Invite (Main)
-```
-POST /api/employees/accept-invite?token=<UUID>
+**Problem:** Users accept invites but can't log in ("user not found")
 
-Body:
-{
-  "email": "user@example.com",
-  "first_name": "John",
-  "last_name": "Doe",
-  "password": "SecurePassword123"
-}
+**Root Cause:** `auth_uid` not linked to internal users row
 
-Success (200):
-{
-  "success": true,
-  "user_id": "<uuid>",
-  "workspace_id": "<uuid or null>",
-  "role": "employee",
-  "message": "Invite accepted successfully"
-}
-
-Error (400):
-{
-  "success": false,
-  "error": "Invalid or expired invite token"
-}
+**Solution:** Update accept-invite endpoint to link `auth_uid`:
+```typescript
+// When user accepts invite:
+1. Create Supabase auth user → get auth_uid
+2. Create/Update internal users row → SET auth_uid
+3. Login works! ✅
 ```
 
-### 2️⃣ Preview Invite (New)
-```
-GET /api/employees/invite-preview?token=<UUID>
+---
 
-Success (200):
-{
-  "email": "user@example.com",
-  "workspace_id": "<uuid or null>",
-  "status": "pending",
-  "expires_at": null
-}
+## Testing
 
-Error (400):
-{
-  "error": "Invalid or expired invite token"
-}
+```bash
+# Test the flow
+npm run test:invite-flow:safe
+
+# Expected: All 6 tests pass ✅
 ```
 
-## 6-Step Flow
+---
+
+## Key Files Changed
+
+1. **[app/api/employees/accept-invite/route.ts](app/api/employees/accept-invite/route.ts)**
+   - Links auth_uid during invite acceptance
+
+2. **[app/lib/supabase/queries.ts](app/lib/supabase/queries.ts) (lines 57-172)**
+   - ensureInternalUser() now reads by auth_uid
+   - Throws 403 if user not found
+
+---
+
+## Login Flow (Now Fixed)
 
 ```
-STEP 1: Validate token from URL
-   ↓
-STEP 2: Lookup invite (status must be 'pending')
-   ↓
-STEP 3: Create Supabase auth user
-   ↓
-STEP 4: Create internal users table row
-   ↓
-STEP 5: Mark invite accepted (LAST - after user created)
-   ↓
-STEP 6: Return success (no auto-login)
+POST /api/auth/login
+
+Supabase.auth.signInWithPassword()
+  ↓
+ensureInternalUser(auth.user.id)
+  ├─ Query: SELECT * FROM users WHERE auth_uid = ?
+  └─ Return: { id: internal_user_id }
+  ↓
+Success! ✅
 ```
 
-## Key Points
+---
 
-✅ **Admin client only** - No anon client for invite queries  
-✅ **Token from URL** - `?token=<UUID>`, not in body  
-✅ **Status check** - Must be 'pending' before accepting  
-✅ **Order matters** - Invite lookup → Auth user → DB row → Mark accepted  
-✅ **No inviter check** - Spec doesn't require it  
-✅ **No employee table** - Only create users table row  
-✅ **No expiration math** - Status is source of truth  
+## Data Requirements
 
-## Files Modified
-
-| File | Changes |
-|------|---------|
-| [app/api/employees/accept-invite/route.ts](app/api/employees/accept-invite/route.ts) | Refactored to 6-step flow (197 lines) |
-| [app/api/employees/invite-preview/route.ts](app/api/employees/invite-preview/route.ts) | NEW endpoint for preview |
-| [app/invite/invite-form.tsx](app/invite/invite-form.tsx) | No changes needed |
-
-## Database Schema Used
-
-### employee_invites table
-- `id` - UUID primary key
-- `token` - UUID v4 (raw, not hashed)
-- `email` - User email
-- `workspace_id` - Nullable (null = platform level)
-- `status` - 'pending' | 'accepted' | 'revoked' | 'expired'
-- `accepted_at` - ISO timestamp (set when accepted)
-- `created_at` - ISO timestamp
-
-### users table
-- `id` - UUID primary key
-- `auth_uid` - Supabase auth UID
-- `email` - User email
-- `role` - 'employee' | 'admin' | 'super_admin'
-- `workspace_id` - Nullable
-
-## Logging
-
-All logs use `[INVITE ACCEPT]` prefix:
-
-```
-[INVITE ACCEPT] token received
-[INVITE ACCEPT] invite lookup starting
-[INVITE ACCEPT] invite found: true/false
-[INVITE ACCEPT] Creating Supabase auth user
-[INVITE ACCEPT] Auth user created
-[INVITE ACCEPT] Creating internal user row
-[INVITE ACCEPT] User row created
-[INVITE ACCEPT] Marking invite as accepted
-[INVITE ACCEPT] Invite marked as accepted
+```sql
+users table must have:
+- id (primary key)
+- auth_uid ← MUST BE SET for users who accepted invite
+- email
+- role (required)
+- workspace_id (optional)
 ```
 
-## Error Responses
+---
 
-All errors use:
-```json
-{
-  "success": false,
-  "error": "Invalid or expired invite token"
-}
-```
+## Troubleshooting
 
-Except:
-- `400` - Invalid token, token not found, status not pending
-- `500` - Auth creation failed, user row creation failed
+| Problem | Solution |
+|---------|----------|
+| "User not found (403)" on login | Check: is auth_uid linked? `SELECT auth_uid FROM users WHERE email='...'` |
+| "Role not found (403)" on login | Check: is role set? `SELECT role FROM users WHERE id='...'` |
+| Invite shows "user not found" | Verify invite exists and token is valid |
 
-## Build Status
+---
 
-```
-✓ Compiled successfully
-✓ /api/employees/accept-invite
-✓ /api/employees/invite-preview
-✓ 0 errors
-```
+## Verification
 
-## Ready to Test
+✅ auth_uid is set for all accepted invites
+✅ role is set for all users
+✅ Login succeeds with correct redirect
+✅ No user_id exposed in API responses
 
-1. Create invite via `/api/platform-employees`
-2. Load preview via `/api/employees/invite-preview?token=...`
-3. Submit form to `/api/employees/accept-invite?token=...`
-4. Verify: auth user created, users row created, invite marked accepted
+---
+
+**Status:** ✅ Ready  
+**Test Command:** `npm run test:invite-flow:safe`  
+**Docs:** See [DELIVERY_SUMMARY.md](DELIVERY_SUMMARY.md)

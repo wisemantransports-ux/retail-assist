@@ -413,7 +413,7 @@ export const ClientEmployeeInvite: React.FC<ClientEmployeeInviteProps> = ({
                               : 'bg-blue-100 text-blue-700 hover:bg-blue-200 active:bg-blue-300'
                           }`}
                           disabled={copiedInviteId === invite.id}
-                          title={generateInviteLink(invite.id)}
+                          title={generateInviteLink(invite.token || invite.id)}
                         >
                           {copiedInviteId === invite.id ? (
                             <>

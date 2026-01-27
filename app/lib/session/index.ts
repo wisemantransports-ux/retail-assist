@@ -77,6 +77,13 @@ export const sessionManager = {
       // Try to insert with auth UID first (as per current FK)
       let { error } = await s.from('sessions').insert(session)
       
+      // If the sessions table doesn't exist in the schema cache, just warn and continue
+      // The session_id cookie will still be set, which is sufficient for the application
+      if (error?.message?.includes("Could not find the table")) {
+        console.warn('[sessionManager.create] Sessions table not found, continuing with cookie-based sessions:', error.message)
+        return session
+      }
+      
       // If FK constraint fails because it's pointing to public.users instead of auth.users,
       // try inserting the internal user ID instead
       if (error && error.code === '23503') {

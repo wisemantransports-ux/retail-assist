@@ -17,25 +17,29 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create response to hold Supabase cookies
+    // Create response to properly capture Supabase logout cookies
     const res = NextResponse.json({ success: true })
     
-    // Create Supabase client with cookie handling to ensure we clear auth cookies properly
+    // Use createServerClient with request/response for proper session cookie handling
+    // This ensures Supabase session is properly cleared on the client
     // @ts-ignore
     const supabase = createServerClient(request, res as any)
+    
+    // Call Supabase signOut to clear auth session
     const { error } = await supabase.auth.signOut()
 
     if (error) {
       console.warn('[LOGOUT] Supabase signOut error:', error.message)
     }
 
-    // Clear the session_id cookie
+    // Clear the custom session_id cookie
     res.cookies.delete('session_id')
     console.log('[LOGOUT] session_id cookie cleared')
 
     console.log('[LOGOUT] User signed out successfully')
     
-    // Return response with cleared Supabase cookies
+    // Return response with cleared Supabase auth cookies
+    // Supabase cookies are automatically cleared through the SSR client
     return res
   } catch (error: any) {
     console.error('[Auth Logout] Error:', error?.message || error)

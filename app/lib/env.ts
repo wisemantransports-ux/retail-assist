@@ -26,11 +26,11 @@ export const env = {
     }
   },
 
-  // Mock mode flag — keep enabled by default until you explicitly go-live with Supabase.
-  // Set NEXT_PUBLIC_USE_MOCK_SUPABASE = "false" in your environment to disable mock mode.
+  // Mock mode flag — disabled by default. Set NEXT_PUBLIC_USE_MOCK_SUPABASE = "true" in your environment to enable mock mode.
+  // When not set, defaults to false to use real Supabase.
   get useMockMode() {
     const val = getEnvVar('NEXT_PUBLIC_USE_MOCK_SUPABASE')
-    return (typeof val !== 'undefined' && val !== '') ? val === 'true' : true
+    return (typeof val !== 'undefined' && val !== '') ? val === 'true' : false
   },
 
   // OpenAI (server-side only)
@@ -40,10 +40,11 @@ export const env = {
     }
   },
 
-  // Mock payments flag — enabled by default while in mock mode. Set NEXT_PUBLIC_USE_MOCK_PAYMENTS=false to enable live payments.
+  // Mock payments flag — disabled by default. Set NEXT_PUBLIC_USE_MOCK_PAYMENTS=true to enable mock payments.
+  // When not set, defaults to false to use real payment processors.
   get useMockPayments() {
     const val = getEnvVar('NEXT_PUBLIC_USE_MOCK_PAYMENTS')
-    return (typeof val !== 'undefined' && val !== '') ? val === 'true' : true
+    return (typeof val !== 'undefined' && val !== '') ? val === 'true' : false
   },
 
   // Meta/Facebook (server-side only)

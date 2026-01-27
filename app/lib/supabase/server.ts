@@ -60,7 +60,10 @@ export function createServerSupabaseClient(): SupabaseClient {
   
   if (!adminClient) {
     adminClient = createClient(url!, serviceRoleKey!, {
-      auth: { persistSession: false }
+      auth: { 
+        autoRefreshToken: false,
+        persistSession: false 
+      }
     })
   }
   return adminClient

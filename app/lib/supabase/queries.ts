@@ -64,6 +64,16 @@ export async function resolveUserId(candidateId: string | null | undefined, crea
 // - `public.users.id` is the canonical internal user id used across application tables.
 // - Supabase Auth UIDs (auth.users.id) must be resolved to the internal id before
 //   persisting into FK columns like `sessions.user_id`, `workspace_members.user_id`, etc.
+//
+// v1 AUTH REQUIREMENT:
+// - This function is READ-ONLY. It must NOT auto-create users, roles, or workspaces.
+// - User rows must be created during invite acceptance (accept-invite endpoint).
+// - If a user is not found for the given auth_uid, throws an error (403).
+// - Clients must have a valid, previously-created internal user row with:
+//   * auth_uid linked to their Supabase auth UID
+//   * role assigned (employee, super_admin, etc.)
+//   * workspace_id set (if applicable)
+//
 // See: INTERNAL_USER_ID_CONTRACT.md for details and guidance.
 export async function ensureInternalUser(candidateId: string | null | undefined): Promise<{ id: string | null }> {
     if (!candidateId) return { id: null }
@@ -90,125 +100,121 @@ export async function ensureInternalUser(candidateId: string | null | undefined)
             
             // Check if user already exists by id
             if (dbRaw.users[candidateId]) {
+                const user = dbRaw.users[candidateId]
+                if (!user.role) {
+                    console.error('[ensureInternalUser] mock: User found but role missing:', { user_id: candidateId })
+                    throw new Error(`User found but role is missing for id: ${candidateId}`)
+                }
+                console.info('[ensureInternalUser] mock: Found user by id:', candidateId, 'role:', user.role)
                 return { id: candidateId }
             }
             
-            // Check if user exists by auth_uid (shouldn't happen in dev but check anyway)
+            // Check if user exists by auth_uid
             for (const [id, user] of Object.entries(dbRaw.users)) {
                 if ((user as any).auth_uid === candidateId) {
+                    if (!(user as any).role) {
+                        console.error('[ensureInternalUser] mock: User found but role missing:', { auth_uid: candidateId, user_id: id })
+                        throw new Error(`User found but role is missing for auth_uid: ${candidateId}`)
+                    }
+                    console.info('[ensureInternalUser] mock: Found user by auth_uid:', candidateId, '-> id:', id, 'role:', (user as any).role)
                     return { id }
                 }
             }
             
-            // Create new user record
-            const now = new Date().toISOString()
-            const newUser = {
-                id: candidateId,
-                auth_uid: candidateId,
-                email: '',
-                role: 'user',
-                plan_type: 'starter',
-                payment_status: 'unpaid',
-                subscription_status: 'pending',
-                business_name: '',
-                phone: '',
-                created_at: now,
-                updated_at: now,
+            // In mock mode, check Supabase as fallback before throwing error
+            // This handles the case where invite accepts in Supabase but login runs in mock mode
+            try {
+                const sb = createServerClient()
+                const { data: sbUser } = await sb
+                    .from('users')
+                    .select('id, auth_uid, role, workspace_id')
+                    .eq('auth_uid', candidateId)
+                    .limit(1)
+                    .single()
+                
+                if (sbUser) {
+                    if (!sbUser.role) {
+                        console.error('[ensureInternalUser] mock: Supabase user found but role missing:', { auth_uid: candidateId, user_id: sbUser.id })
+                        throw new Error(`User found in Supabase but role is missing for auth_uid: ${candidateId}`)
+                    }
+                    console.info('[ensureInternalUser] mock: Found user in Supabase (fallback):', sbUser.id, 'role:', sbUser.role)
+                    // Sync to mock database
+                    dbRaw.users[sbUser.id] = {
+                        id: sbUser.id,
+                        auth_uid: sbUser.auth_uid,
+                        role: sbUser.role,
+                        workspace_id: sbUser.workspace_id,
+                        email: '',
+                        plan_type: 'starter',
+                        payment_status: 'unpaid',
+                        subscription_status: 'pending',
+                        business_name: '',
+                        phone: '',
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString(),
+                    }
+                    fs.mkdirSync(path.dirname(P), { recursive: true })
+                    fs.writeFileSync(P, JSON.stringify(dbRaw, null, 2))
+                    return { id: sbUser.id }
+                }
+            } catch (e: any) {
+                // Supabase check failed, re-throw if it's a role validation error
+                if (e.message?.includes('role is missing')) {
+                    throw e
+                }
+                // Otherwise log and continue to error throw
+                console.debug('[ensureInternalUser] mock: Supabase fallback skipped:', e.message)
             }
             
-            dbRaw.users[candidateId] = newUser
-            
-            // Write back to file
-            fs.mkdirSync(path.dirname(P), { recursive: true })
-            fs.writeFileSync(P, JSON.stringify(dbRaw, null, 2))
-            
-            console.info('[ensureInternalUser] Created dev-seed user:', candidateId)
-            return { id: candidateId }
+            // v1: User must exist by this point. If not found, throw 403 (no auto-creation)
+            console.error('[ensureInternalUser] mock: User not found for auth_uid:', candidateId)
+            throw new Error(`User not found for auth_uid: ${candidateId} (403)`)
         } catch (e: any) {
-            console.error('[ensureInternalUser] mock mode error:', e)
-            return { id: null }
+            console.error('[ensureInternalUser] mock mode error:', e?.message)
+            throw e
         }
     }
     
-    // In Supabase mode, use database queries
+    // In Supabase mode, use database queries (READ-ONLY - do NOT create/upsert)
+    // v1: Login must NEVER create users, roles, or workspaces
     const db = admin()
+    
+    console.log('[ensureInternalUser] Starting Supabase lookup for:', candidateId)
 
-    // If candidateId already matches an internal id, return it
-    const { data: byId } = await db.from('users').select('id').eq('id', candidateId).maybeSingle()
+    // 1) If candidateId is an internal id, look it up directly
+    const { data: byId } = await db.from('users').select('id, role, auth_uid').eq('id', candidateId).maybeSingle()
+    console.log('[ensureInternalUser] Lookup by id:', { found: !!byId, id: candidateId })
     if (byId && (byId as any).id) {
-        console.info('[ensureInternalUser] Found by id:', candidateId)
+        if (!(byId as any).role) {
+            console.error('[ensureInternalUser] User found by id but role missing:', { user_id: candidateId })
+            throw new Error(`User found but role is missing for id: ${candidateId} (403)`)
+        }
+        console.info('[ensureInternalUser] Found user by id:', candidateId, 'role:', (byId as any).role)
         return { id: (byId as any).id }
     }
 
-    // If there's already a user with auth_uid, return it
-    const { data: byAuth } = await db.from('users').select('id').eq('auth_uid', candidateId).maybeSingle()
+    // 2) If candidateId is an auth_uid, look it up by auth_uid
+    const { data: byAuth } = await db.from('users').select('id, role, auth_uid').eq('auth_uid', candidateId).maybeSingle()
+    console.log('[ensureInternalUser] Lookup by auth_uid:', { found: !!byAuth, auth_uid: candidateId, result: byAuth })
     if (byAuth && (byAuth as any).id) {
-        console.info('[ensureInternalUser] Found by auth_uid:', candidateId, '-> id:', (byAuth as any).id)
+        if (!(byAuth as any).role) {
+            console.error('[ensureInternalUser] User found by auth_uid but role missing:', { auth_uid: candidateId, user_id: (byAuth as any).id })
+            throw new Error(`User found but role is missing for auth_uid: ${candidateId} (403)`)
+        }
+        console.info('[ensureInternalUser] Found user by auth_uid:', candidateId, '-> id:', (byAuth as any).id, 'role:', (byAuth as any).role)
         return { id: (byAuth as any).id }
     }
-
-    // The auth trigger should have created a user row by now. If not, wait briefly and retry.
-    // This handles race conditions where the trigger hasn't fired yet.
-    console.warn('[ensureInternalUser] Auth trigger did not create row for auth_uid:', candidateId, '. Retrying after 500ms...')
-    await new Promise(resolve => setTimeout(resolve, 500))
     
-    const { data: byAuthRetry } = await db.from('users').select('id').eq('auth_uid', candidateId).maybeSingle()
-    if (byAuthRetry && (byAuthRetry as any).id) {
-        console.info('[ensureInternalUser] Found by auth_uid after retry:', candidateId, '-> id:', (byAuthRetry as any).id)
-        return { id: (byAuthRetry as any).id }
-    }
-    
-    console.warn('[ensureInternalUser] Still no row after retry. Attempting to create one...')
-
-    // Create/upsert a full user record with sensible defaults
-    const now = new Date().toISOString()
-    const record: any = {
-        auth_uid: candidateId,
-        email: '',
-        role: 'user',
-        plan_type: 'starter',
-        payment_status: 'unpaid',
-        subscription_status: 'pending',
-        created_at: now,
-        updated_at: now,
-    }
-
-    try {
-		// Insert a deterministic internal user row so that `public.users.id` == auth UID
-		// This ensures sessions.user_id (FK) can reference the internal users.id deterministically.
-		// We attempt to insert with `id = candidateId`. If the DB already contains a row
-		// with that id or auth_uid, the subsequent select will return it.
-		const insertRecord = { id: candidateId, ...record }
-		const { data, error } = await db.from('users').insert(insertRecord).select('id').maybeSingle()
-		if (error) {
-			console.warn('[ensureInternalUser] insert with deterministic id failed:', (error as any)?.message || error)
-			// If direct insert fails (conflict, constraint), fall back to upsert by auth_uid
-			const { data: upsertData, error: upsertErr } = await db.from('users').upsert(record, { onConflict: 'auth_uid' }).select('id').maybeSingle()
-			if (upsertErr) console.error('[ensureInternalUser] upsert error:', upsertErr)
-			if (upsertData && (upsertData as any).id) {
-				console.info('[ensureInternalUser] Created via upsert:', (upsertData as any).id)
-				return { id: (upsertData as any).id }
-			}
-			// continue to final fallback
-		}
-		if (data && (data as any).id) {
-			console.info('[ensureInternalUser] Created via insert:', (data as any).id)
-			return { id: (data as any).id }
-		}
-
-		// Final fallback: select by auth_uid again
-		const { data: sel } = await db.from('users').select('id').eq('auth_uid', candidateId).maybeSingle()
-		if (sel && (sel as any).id) {
-			console.info('[ensureInternalUser] Found after insert/upsert fallback:', (sel as any).id)
-			return { id: (sel as any).id }
-		}
-		
-		console.error('[ensureInternalUser] Could not create or find user for auth_uid:', candidateId)
-    } catch (e: any) {
-        console.error('[ensureInternalUser] unexpected error:', e)
-    }
-
-    return { id: null }
+    // 3) v1: User must exist in public.users by this point. If not found, throw 403 error (no auto-creation allowed).
+    // Do not retry waiting for triggers. User must be properly invited and acceptance completed first.
+    // This means the user either:
+    // - Never accepted an invite (and thus no internal user was created), OR
+    // - The invite acceptance failed to link auth_uid, OR
+    // - The user has not yet been created via proper onboarding flow
+    console.error('[ensureInternalUser] User not found for auth_uid:', candidateId, 'Checked:')
+    console.error('[ensureInternalUser]   - Lookup by id (internal id):', byId ? 'FOUND' : 'NOT FOUND')
+    console.error('[ensureInternalUser]   - Lookup by auth_uid:', byAuth ? 'FOUND' : 'NOT FOUND')
+    throw new Error(`User not found for auth_uid: ${candidateId} (403)`)
 }
 
 // -----------------------------

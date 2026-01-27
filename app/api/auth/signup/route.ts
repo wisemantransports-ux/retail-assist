@@ -1,12 +1,12 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 import { getSupabaseAdmin } from '../../../lib/supabaseAdmin';
 import { sessionManager } from '../../../lib/session';
 import { ensureInternalUser } from '@/lib/supabase/queries';
 
-export async function POST(req: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const body = await req.json()
+    const body = await request.json()
     const {
       email,
       password,
@@ -115,29 +115,17 @@ export async function POST(req: Request) {
       rpcWarning: rpcError ? (rpcError.message || String(rpcError)) : null,
     });
 
+    // Set custom session cookie if session was created
     if (session?.id) {
-      try {
-        const cookieStore = await cookies();
-        cookieStore.set('session_id', session.id, { path: '/', httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 })
-      } catch (e) {
-        console.warn('[SIGNUP] Could not set cookie via cookies():', e)
-      }
-
-      // Also set `Set-Cookie` header directly as a fallback for environments
-      // where the cookie store does not attach headers to the response object.
-      try {
-        const maxAge = 7 * 24 * 60 * 60
-        const secureFlag = process.env.NODE_ENV === 'production' ? '; Secure' : ''
-        const cookieValue = `session_id=${session.id}; Path=/; HttpOnly; Max-Age=${maxAge}; SameSite=Lax${secureFlag}`
-        try {
-          response.headers.set('Set-Cookie', cookieValue)
-        } catch (e) {
-          // Some runtimes may not allow mutating headers this way; ignore silently.
-          console.warn('[SIGNUP] Could not set Set-Cookie header directly:', e)
-        }
-      } catch (e) {
-        console.warn('[SIGNUP] Failed to build/set fallback Set-Cookie header:', e)
-      }
+      const maxAge = 7 * 24 * 60 * 60
+      response.cookies.set('session_id', session.id, {
+        path: '/',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: maxAge
+      })
+      console.log('[SIGNUP] Session cookie set:', session.id)
     }
 
     return response;

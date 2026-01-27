@@ -1,0 +1,15 @@
+{
+  "timestamp": "2026-01-25T09:50:12.557Z",
+  "testResults": [
+    {
+      "step": "Create admin user",
+      "status": "failure",
+      "message": "null value in column \"auth_uid\" of relation \"admin_access\" violates not-null constraint"
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "passed": 0,
+    "failed": 1
+  }
+}

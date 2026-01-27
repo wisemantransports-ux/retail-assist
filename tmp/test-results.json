@@ -1,0 +1,63 @@
+{
+  "timestamp": "2026-01-25T05:12:06.768Z",
+  "admin": {
+    "email": "dev-super-admin@retail-assist.test"
+  },
+  "testResults": [
+    {
+      "step": "Using existing user",
+      "status": "success",
+      "message": "2c0f3a11-ec08-45c1-8982-adff3995894e"
+    },
+    {
+      "step": "Created invite",
+      "status": "success",
+      "message": "b0d23f83-d4ee-44ec-ab65-abf85f22d7cb"
+    },
+    {
+      "step": "Token verified in database\n\n✅ Step 5",
+      "status": "success",
+      "message": "Verifying user in auth.users..."
+    },
+    {
+      "step": "User found in auth.users\n   Auth UID",
+      "status": "success",
+      "message": "2c0f3a11-ec08-45c1-8982-adff3995894e"
+    },
+    {
+      "step": "Deleted invite\n   ✅ Deleted internal user\n   ✅ Deleted auth user\n\n════════════════════════════════════════════════════════════\n📊 TEST SUMMARY\n════════════════════════════════════════════════════════════\n✅ Create Auth User",
+      "status": "success",
+      "message": "Using auth user: 2c0f3a11-ec08-45c1-8982-adff3995894e"
+    },
+    {
+      "step": "Create Internal User",
+      "status": "success",
+      "message": "Internal user ready: 8eb22272-55d3-4a1a-b261-6c836fc1f62b"
+    },
+    {
+      "step": "Create Employee Invite",
+      "status": "success",
+      "message": "Invite created: b0d23f83-d4ee-44ec-ab65-abf85f22d7cb"
+    },
+    {
+      "step": "Verify Token in Database",
+      "status": "success",
+      "message": "Token found and verified"
+    },
+    {
+      "step": "Verify Auth User",
+      "status": "success",
+      "message": "User verified in auth.users"
+    },
+    {
+      "step": "Cleanup",
+      "status": "success",
+      "message": "All test data cleaned up"
+    }
+  ],
+  "summary": {
+    "total": 10,
+    "passed": 10,
+    "failed": 0
+  }
+}

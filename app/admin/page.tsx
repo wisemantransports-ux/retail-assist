@@ -52,8 +52,9 @@ export default function AdminDashboard() {
         return;
       }
       
-      const role = data.user.role;
-      const workspaceId = data.user.workspace_id;
+      // Role is at top level, user data is nested
+      const role = data.role || data.user?.role;
+      const workspaceId = data.workspaceId || data.user?.workspace_id;
       
       console.log('[Admin Page] Resolved role:', role);
       console.log('[Admin Page] Workspace ID:', workspaceId);
