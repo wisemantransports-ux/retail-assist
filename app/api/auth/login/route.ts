@@ -5,7 +5,8 @@ import { db } from '@/lib/db'
 import { env } from '@/lib/env'
 import { resolveUserId, ensureInternalUser } from '@/lib/supabase/queries'
 import { sessionManager } from '@/lib/session'
-import { PLATFORM_WORKSPACE_ID } from '@/lib/config/workspace';
+import { PLATFORM_WORKSPACE_ID } from '@/lib/config/workspace'
+import { ensureWorkspaceForUser } from '@/lib/supabase/ensureWorkspaceForUser';
 
 export async function POST(request: NextRequest) {
   try {
@@ -97,7 +98,7 @@ export async function POST(request: NextRequest) {
       workspaceId = null
       console.log('[LOGIN] Resolved role: super_admin (from users table)')
     } else {
-      // 2) Check admin_access table
+      // 2) Check admin_access table for admin access records
       const { data: adminAccessCheck } = await adminClient
         .from('admin_access')
         .select('user_id, workspace_id, role')
@@ -109,17 +110,32 @@ export async function POST(request: NextRequest) {
         workspaceId = adminAccessCheck.workspace_id
         console.log('[LOGIN] Resolved role:', role, 'workspace:', workspaceId)
       } else {
-        // 3) Check employees table
-        const { data: employeeCheck } = await adminClient
-          .from('employees')
-          .select('user_id, workspace_id')
-          .eq('user_id', internalUserId)
+        // 3) Check if user has client_admin role in users table (but no admin_access yet)
+        // This is a transitional state during onboarding
+        const { data: clientAdminCheck } = await adminClient
+          .from('users')
+          .select('id, role')
+          .eq('id', internalUserId)
+          .eq('role', 'client_admin')
           .maybeSingle()
         
-        if (employeeCheck) {
-          role = 'employee'
-          workspaceId = employeeCheck.workspace_id
-          console.log('[LOGIN] Resolved role: employee, workspace:', workspaceId)
+        if (clientAdminCheck) {
+          role = 'admin'  // Treat client_admin as admin role
+          workspaceId = null  // Will be created during onboarding
+          console.log('[LOGIN] Resolved role: admin (from users table as client_admin)')
+        } else {
+          // 4) Check employees table
+          const { data: employeeCheck } = await adminClient
+            .from('employees')
+            .select('user_id, workspace_id')
+            .eq('user_id', internalUserId)
+            .maybeSingle()
+          
+          if (employeeCheck) {
+            role = 'employee'
+            workspaceId = employeeCheck.workspace_id
+            console.log('[LOGIN] Resolved role: employee, workspace:', workspaceId)
+          }
         }
       }
     }
@@ -130,6 +146,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ 
         error: 'User role not found - onboarding incomplete. Please contact support.' 
       }, { status: 403 })
+    }
+
+    // ===== CLIENT ADMIN ONBOARDING COMPLETION =====
+    // For client_admin role: Create workspace if missing, return workspaceId
+    if (role === 'admin' && !workspaceId) {
+      console.log('[LOGIN] Client admin without workspace detected - initiating onboarding completion');
+      
+      try {
+        const result = await ensureWorkspaceForUser(data.user.id);
+        
+        if (result.error) {
+          console.error('[LOGIN] Workspace creation failed:', result.error);
+          return NextResponse.json({ 
+            error: 'Failed to create workspace: ' + result.error 
+          }, { status: 500 });
+        }
+        
+        workspaceId = result.workspaceId;
+        console.log('[LOGIN] ✓ Workspace created/assigned for client_admin:', workspaceId);
+      } catch (err: any) {
+        console.error('[LOGIN] Workspace provisioning error:', err.message);
+        return NextResponse.json({ 
+          error: 'Workspace provisioning failed' 
+        }, { status: 500 });
+      }
     }
 
     // workspace_id is optional only for super_admin and platform_staff

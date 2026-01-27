@@ -1,12 +1,4 @@
-/**
- * Workspace Provisioning Utility
- * Ensures every authenticated user has a default workspace and membership
- * 
- * Call this after signup/login to guarantee workspace exists
- * Safe to call multiple times (uses INSERT ... ON CONFLICT)
- */
-
-import { createServerClient } from './server';
+import { createClient } from '@supabase/supabase-js';
 import { ensureInternalUser } from './queries';
 
 export interface EnsureWorkspaceResult {
@@ -24,6 +16,8 @@ export interface EnsureWorkspaceResult {
  * 3. If not, creates a default workspace and adds user as owner
  * 4. Ensures user has membership record
  * 
+ * Uses service role client to bypass RLS policies.
+ * Creates fresh client instances to avoid schema cache issues.
  * Safe to call multiple times (idempotent via CONFLICT handling)
  */
 export async function ensureWorkspaceForUser(userId: string): Promise<EnsureWorkspaceResult> {
@@ -32,7 +26,17 @@ export async function ensureWorkspaceForUser(userId: string): Promise<EnsureWork
       return { workspaceId: '', created: false, error: 'Missing userId' };
     }
 
-    const supabase = await createServerClient();
+    // Create fresh service role clients (bypass schema cache issues)
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    
+    if (!supabaseUrl || !serviceRoleKey) {
+      return { 
+        workspaceId: '', 
+        created: false, 
+        error: 'Supabase configuration missing' 
+      };
+    }
 
     // Ensure there is an internal users.id for this auth UID (create if missing)
     const ensured = await ensureInternalUser(userId)
@@ -41,8 +45,13 @@ export async function ensureWorkspaceForUser(userId: string): Promise<EnsureWork
       return { workspaceId: '', created: false, error: 'Failed to ensure internal user record' }
     }
 
+    // Create a fresh admin client for checking existing memberships
+    const adminCheckClient = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
+
     // Check if user has any workspace membership
-    const { data: existingMemberships } = await supabase
+    const { data: existingMemberships } = await adminCheckClient
       .from('workspace_members')
       .select('workspace_id')
       .eq('user_id', internalUserId)
@@ -56,31 +65,86 @@ export async function ensureWorkspaceForUser(userId: string): Promise<EnsureWork
       };
     }
 
-    // Create default workspace
-    const { data: newWorkspace, error: createWorkspaceError } = await supabase
+    // Create a fresh admin client for workspace creation
+    const adminCreateClient = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
+
+    // Attempt to create default workspace
+    const workspaceName = `My Workspace`;
+    let newWorkspace = null;
+    let createdNewWorkspace = false;
+
+    const { data: createResult, error: createWorkspaceError } = await adminCreateClient
       .from('workspaces')
       .insert([
         {
           owner_id: internalUserId,
-          name: `My Workspace`,
-          plan_type: 'starter',
-          subscription_status: 'pending',
-          payment_status: 'unpaid',
+          name: workspaceName,
         },
       ])
       .select()
       .single();
 
-    if (createWorkspaceError || !newWorkspace) {
+    // Handle workspace creation result
+    if (createResult) {
+      // Successfully created a new workspace
+      newWorkspace = createResult;
+      createdNewWorkspace = true;
+    } else if (createWorkspaceError) {
+      // Check if error is due to duplicate workspace name
+      const errorMessage = createWorkspaceError?.message || '';
+      const isDuplicateNameError = 
+        errorMessage.includes('duplicate') || 
+        errorMessage.includes('unique') ||
+        errorMessage.includes('violates');
+
+      if (isDuplicateNameError) {
+        // Workspace with this name already exists - fetch it
+        console.log('[ensureWorkspaceForUser] Duplicate workspace name detected, fetching existing...');
+        const { data: existingWorkspace } = await adminCreateClient
+          .from('workspaces')
+          .select('*')
+          .eq('name', workspaceName)
+          .single();
+
+        if (existingWorkspace) {
+          newWorkspace = existingWorkspace;
+          createdNewWorkspace = false;
+          console.log('[ensureWorkspaceForUser] Reusing existing workspace:', newWorkspace.id);
+        } else {
+          return {
+            workspaceId: '',
+            created: false,
+            error: `Workspace creation failed and could not find existing workspace with name "${workspaceName}"`,
+          };
+        }
+      } else {
+        // Other creation error
+        return {
+          workspaceId: '',
+          created: false,
+          error: `Failed to create workspace: ${createWorkspaceError.message}`,
+        };
+      }
+    }
+
+    if (!newWorkspace) {
       return {
         workspaceId: '',
         created: false,
-        error: `Failed to create workspace: ${createWorkspaceError?.message || 'Unknown error'}`,
+        error: 'Failed to create or locate workspace',
       };
     }
 
-    // Add user as admin member
-    const { error: memberError } = await supabase
+    // Create a fresh admin client for membership operations
+    const adminMemberClient = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
+
+    // Add user as admin member (idempotent - ignore if already exists)
+    console.log('[ensureWorkspaceForUser] Inserting workspace_members: user_id=', internalUserId, 'workspace_id=', newWorkspace.id);
+    const { error: memberError } = await adminMemberClient
       .from('workspace_members')
       .insert([
         {
@@ -88,20 +152,77 @@ export async function ensureWorkspaceForUser(userId: string): Promise<EnsureWork
           user_id: internalUserId,
           role: 'admin',
         },
-      ])
-      .select();
+      ], { 
+        // Ignore unique constraint violations (user already a member)
+        ignoreDuplicates: true 
+      });
 
+    // Only treat as error if it's NOT a duplicate key error
     if (memberError) {
-      return {
-        workspaceId: newWorkspace.id,
-        created: true,
-        error: `Workspace created but failed to add membership: ${memberError.message}`,
-      };
+      console.log('[ensureWorkspaceForUser] memberError details:', memberError);
+      const isDuplicateError = 
+        memberError.message?.includes('duplicate') || 
+        memberError.message?.includes('unique');
+      
+      if (!isDuplicateError) {
+        console.error('[ensureWorkspaceForUser] Failed to add membership:', memberError.message);
+        return {
+          workspaceId: newWorkspace.id,
+          created: createdNewWorkspace,
+          error: `Workspace created but failed to add membership: ${memberError.message}`,
+        };
+      }
+      // If it's a duplicate, that's fine - user is already a member
+      console.log('[ensureWorkspaceForUser] User already a member of workspace, continuing...');
+    } else {
+      console.log('[ensureWorkspaceForUser] ✓ workspace_members entry created/confirmed');
     }
 
+    // Create a fresh admin client for admin_access operations
+    const adminAccessClient = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
+
+    // Create admin_access entry so user can access as admin (idempotent)
+    console.log('[ensureWorkspaceForUser] Inserting admin_access: user_id=', internalUserId, 'workspace_id=', newWorkspace.id);
+    const { error: adminAccessError } = await adminAccessClient
+      .from('admin_access')
+      .insert([
+        {
+          workspace_id: newWorkspace.id,
+          user_id: internalUserId,
+          role: 'admin',
+        },
+      ], { 
+        // Ignore unique constraint violations (already an admin)
+        ignoreDuplicates: true 
+      });
+
+    // Only treat as error if it's NOT a duplicate key error
+    if (adminAccessError) {
+      console.log('[ensureWorkspaceForUser] adminAccessError details:', adminAccessError);
+      const isDuplicateError = 
+        adminAccessError.message?.includes('duplicate') || 
+        adminAccessError.message?.includes('unique');
+      
+      if (!isDuplicateError) {
+        console.error('[ensureWorkspaceForUser] Failed to add admin access:', adminAccessError.message);
+        return {
+          workspaceId: newWorkspace.id,
+          created: createdNewWorkspace,
+          error: `Workspace created but failed to add admin access: ${adminAccessError.message}`,
+        };
+      }
+      // If it's a duplicate, that's fine - user already has admin access
+      console.log('[ensureWorkspaceForUser] User already has admin access, continuing...');
+    } else {
+      console.log('[ensureWorkspaceForUser] ✓ admin_access entry created/confirmed');
+    }
+
+    console.log('[ensureWorkspaceForUser] ✓ Workspace provisioning complete for workspace_id:', newWorkspace.id);
     return {
       workspaceId: newWorkspace.id,
-      created: true,
+      created: createdNewWorkspace,
     };
   } catch (err: any) {
     return {

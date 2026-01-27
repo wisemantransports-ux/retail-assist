@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { getSupabaseAdmin } from '../../../lib/supabaseAdmin';
 import { sessionManager } from '../../../lib/session';
 import { ensureInternalUser } from '@/lib/supabase/queries';
+import { ensureWorkspaceForUser } from '@/lib/supabase/ensureWorkspaceForUser';
 
 export async function POST(request: NextRequest) {
   try {
@@ -89,6 +90,7 @@ export async function POST(request: NextRequest) {
     // 3) Ensure internal users row exists and create server session so user can access dashboard immediately
     let session: any = null;
     let internalUserId: string | null = null
+    let workspaceId: string | null = null
     try {
       console.info('[SIGNUP] Calling ensureInternalUser with auth UID:', newUser.id)
       const ensured = await ensureInternalUser(newUser.id)
@@ -105,12 +107,31 @@ export async function POST(request: NextRequest) {
       console.error('[SIGNUP] Failed to create session (non-fatal):', sessionErr);
     }
 
+    // ===== CLIENT ADMIN ONBOARDING COMPLETION =====
+    // For new signups (not super_admin): Create workspace if needed
+    if (internalUserId && !isSuperAdmin) {
+      try {
+        console.info('[SIGNUP] Client admin signup detected - provisioning workspace');
+        const workspaceResult = await ensureWorkspaceForUser(newUser.id);
+        
+        if (workspaceResult.error) {
+          console.warn('[SIGNUP] Workspace provisioning failed (non-fatal):', workspaceResult.error);
+        } else {
+          workspaceId = workspaceResult.workspaceId;
+          console.info('[SIGNUP] ✓ Workspace provisioned for client_admin:', workspaceId, 'created:', workspaceResult.created);
+        }
+      } catch (err: any) {
+        console.warn('[SIGNUP] Workspace provisioning error (non-fatal):', err.message);
+      }
+    }
+
     // Build the JSON response and attach the session cookie so the client
     // receives the cookie in the same response that indicates success.
     const response = NextResponse.json({
       success: true,
       user: profile,
       internalUserId: internalUserId,
+      workspaceId: workspaceId,
       message: 'Account created successfully.',
       rpcWarning: rpcError ? (rpcError.message || String(rpcError)) : null,
     });

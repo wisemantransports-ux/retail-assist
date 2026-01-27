@@ -80,41 +80,8 @@ export function useAuth(): AuthState {
     initInProgressRef.current = true;
 
     try {
-      // ===== STEP 0: Try backend API first (most reliable after login) =====
-      console.log('[useAuth] Step 0: Checking backend /api/auth/me...');
-      const meResponse = await fetch('/api/auth/me', {
-        method: 'GET',
-        credentials: 'include', // Include cookies in request
-      });
-
-      if (meResponse.ok) {
-        const meData = await meResponse.json();
-        console.log('[useAuth] Backend auth successful:', meData);
-        
-        // Backend validated user and RPC succeeded
-        setState((prev) => ({
-          ...prev,
-          session: meData.session || {},
-          access: meData.access || null,
-          role: meData.role || null,
-          workspaceId: meData.workspaceId || null,
-          isLoading: false,
-          isError: false,
-          errorMessage: null,
-        }));
-        
-        hasInitialized.current = true;
-        initInProgressRef.current = false;
-        return;
-      }
-
-      // Backend returned error - fall back to direct Supabase auth
-      console.log('[useAuth] Backend auth failed, falling back to Supabase.auth.getSession()');
-
+      // ===== STEP 0: Check if we have a session first =====
       const supabase = createBrowserSupabaseClient();
-
-      // ===== STEP 1: Get session =====
-      console.log('[useAuth] Step 1: Checking session...');
       const {
         data: { session },
         error: sessionError,
@@ -128,6 +95,8 @@ export function useAuth(): AuthState {
           isError: true,
           errorMessage: `Session error: ${sessionError.message}`,
         }));
+        hasInitialized.current = true;
+        initInProgressRef.current = false;
         return;
       }
 
@@ -144,36 +113,22 @@ export function useAuth(): AuthState {
           isError: false,
           errorMessage: null,
         }));
+        hasInitialized.current = true;
+        initInProgressRef.current = false;
         return;
       }
 
+      // ===== STEP 1: Session confirmed - fetch user access via backend API =====
       console.log('[useAuth] Session confirmed for user:', session.user.id);
+      console.log('[useAuth] Step 1: Fetching user access via /api/auth/me...');
+      const meResponse = await fetch('/api/auth/me', {
+        method: 'GET',
+        credentials: 'include', // Include cookies in request
+      });
 
-      // ===== STEP 2: Call RPC to get access =====
-      console.log('[useAuth] Step 2: Fetching user access via RPC...');
-      const {
-        data: userAccess,
-        error: rpcError,
-      } = await supabase.rpc('rpc_get_user_access');
-
-      if (rpcError) {
-        console.error('[useAuth] RPC error:', rpcError.message);
-        setState((prev) => ({
-          ...prev,
-          session,
-          isLoading: false,
-          isError: true,
-          errorMessage: `Failed to fetch access: ${rpcError.message}`,
-        }));
-        return;
-      }
-
-      // ===== STEP 3: Check RPC result =====
-      // RPC returns exactly one row or empty
-      const accessRecord = userAccess?.[0];
-
-      if (!accessRecord) {
-        console.warn('[useAuth] RPC returned no rows - user is unauthorized');
+      // Handle 401/403 as unauthenticated (no role assigned yet)
+      if (meResponse.status === 401 || meResponse.status === 403) {
+        console.log('[useAuth] /api/auth/me returned', meResponse.status, '- user role not found');
         setState((prev) => ({
           ...prev,
           session,
@@ -182,40 +137,58 @@ export function useAuth(): AuthState {
           workspaceId: null,
           isLoading: false,
           isError: true,
-          errorMessage: 'User access not found - unauthorized',
+          errorMessage: `User role not found - ensure user is properly onboarded`,
         }));
+        hasInitialized.current = true;
+        initInProgressRef.current = false;
         return;
       }
 
-      const { role, workspace_id } = accessRecord;
-
-      // Validate role is one of the allowed roles
-      const validRoles = ['super_admin', 'admin', 'employee'];
-      if (!validRoles.includes(role)) {
-        console.error('[useAuth] Invalid role from RPC:', role);
+      // Server errors (500+) are real errors
+      if (!meResponse.ok) {
+        let meError: any = {};
+        try {
+          meError = await meResponse.json();
+        } catch (e) {
+          try {
+            const text = await meResponse.text();
+            meError = { error: text };
+          } catch (e2) {
+            meError = { error: 'Unknown error' };
+          }
+        }
+        console.error('[useAuth] /api/auth/me server error (', meResponse.status, '):', meError);
         setState((prev) => ({
           ...prev,
           session,
           isLoading: false,
           isError: true,
-          errorMessage: `Invalid role: ${role}`,
+          errorMessage: `Server error (${meResponse.status}): ${meError.error || 'Unknown error'}`,
         }));
+        hasInitialized.current = true;
+        initInProgressRef.current = false;
         return;
       }
 
-      console.log('[useAuth] User authenticated with role:', role, 'workspace:', workspace_id);
-
-      // ===== SUCCESS: Update state =====
+      // Success - user has a role
+      const meData = await meResponse.json();
+      console.log('[useAuth] Backend auth successful:', meData);
+      
+      // Backend validated user and role lookup succeeded
       setState((prev) => ({
         ...prev,
-        session,
-        access: accessRecord,
-        role,
-        workspaceId: workspace_id,
+        session: meData.session || {},
+        access: meData.access || null,
+        role: meData.role || null,
+        workspaceId: meData.workspaceId || null,
         isLoading: false,
         isError: false,
         errorMessage: null,
       }));
+      
+      hasInitialized.current = true;
+      initInProgressRef.current = false;
+      return;
     } catch (err: any) {
       console.error('[useAuth] Unexpected error:', err);
       setState((prev) => ({

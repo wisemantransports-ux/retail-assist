@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
     
     // ===== ROLE-BASED ACCESS RESOLUTION =====
     // Use direct table queries instead of RPC (more reliable)
-    // Priority: super_admin → admin → employee
+    // Priority: super_admin → admin_access (admin) → client_admin (admin) → employee
     let role = null;
     let workspaceIdFromRpc = null;
     
@@ -94,6 +94,34 @@ export async function GET(request: NextRequest) {
         role = 'admin';
         workspaceIdFromRpc = adminCheck.workspace_id;
         console.log('[Auth Me] Resolved role: admin (from admin_access table)');
+      }
+    }
+    
+    // Check if client_admin (users table, but no admin_access yet)
+    if (!role) {
+      const { data: clientAdminCheck } = await admin
+        .from('users')
+        .select('id, role')
+        .eq('id', user.id)
+        .eq('role', 'client_admin')
+        .maybeSingle();
+      
+      if (clientAdminCheck) {
+        role = 'admin';  // Treat client_admin as admin role
+        
+        // Try to find workspace_id from workspace_members
+        const { data: membershipCheck } = await admin
+          .from('workspace_members')
+          .select('workspace_id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        
+        if (membershipCheck) {
+          workspaceIdFromRpc = membershipCheck.workspace_id;
+          console.log('[Auth Me] Resolved role: admin (from users table as client_admin) with workspace:', workspaceIdFromRpc);
+        } else {
+          console.log('[Auth Me] Resolved role: admin (from users table as client_admin) but no workspace_members entry yet');
+        }
       }
     }
     
@@ -154,9 +182,10 @@ export async function GET(request: NextRequest) {
     
     return finalRes;
   } catch (error: any) {
-    console.error('[Auth Me] Error:', error.message);
+    console.error('[Auth Me] Unexpected error:', error?.message || error);
+    console.error('[Auth Me] Error stack:', error?.stack);
     return NextResponse.json(
-      { error: 'Failed to get user' },
+      { error: 'Internal server error', details: error?.message },
       { status: 500 }
     );
   }

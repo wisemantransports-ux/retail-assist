@@ -22,7 +22,9 @@ function isAllowedWithoutWorkspace(pathname: string): boolean {
 }
 
 export async function middleware(request: NextRequest) {
-  console.log('[Middleware] INVOKED for path:', request.nextUrl.pathname);
+  const pathname = request.nextUrl.pathname;
+  
+  console.log('[Middleware] INVOKED for path:', pathname);
   
   let response = NextResponse.next({
     request: {
@@ -47,14 +49,14 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Get current user - Validates JWT server-side (secure)
+  // ===== STEP 1: RESOLVE SUPABASE AUTH USER =====
+  // Validates JWT server-side (secure). This checks if auth session is valid.
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   
   console.log('[Middleware] User check:', {
     hasUser: !!user,
     userId: user?.id || 'none',
-    error: userError?.message || 'none',
-    cookies: request.cookies.getAll().map(c => c.name)
+    error: userError?.message || 'none'
   });
 
   // If no user, redirect to login
@@ -63,13 +65,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // Fetch user role and workspace from tables (replaces deleted RPC)
-  // Priority: users (super_admin) → admin_access (admin) → employees (employee)
+  // ===== STEP 2: RESOLVE ROLE FROM public.users TABLE =====
+  // Fetch user role and workspace from tables
+  // Priority: users.role='super_admin' → admin_access (admin) → users.role='client_admin' + workspace_members → employees (employee)
   let role = null;
-  let workspaceId = null;
+  let workspaceId: string | null = null;
 
-  // Check super_admin role first (no workspace)
-  const { data: superAdminData, error: superAdminError } = await supabase
+  // Check super_admin role first (super_admin does NOT have workspace_id)
+  const { data: superAdminData } = await supabase
     .from('users')
     .select('id, role')
     .eq('auth_uid', user.id)
@@ -79,207 +82,191 @@ export async function middleware(request: NextRequest) {
   if (superAdminData) {
     role = 'super_admin';
     workspaceId = null;
-    console.log('[Middleware] Resolved as super_admin');
+    console.log('[Middleware] ✓ Resolved as super_admin (no workspace required)');
   }
 
-  // Check admin role (with workspace)
+  // Check admin role via admin_access table (with workspace_id)
   if (!role) {
-    const { data: adminData, error: adminError } = await supabase
+    const { data: adminData } = await supabase
       .from('admin_access')
       .select('workspace_id')
       .eq('user_id', user.id)
       .maybeSingle();
 
-    if (adminData) {
+    if (adminData?.workspace_id) {
       role = 'admin';
       workspaceId = adminData.workspace_id;
-      console.log('[Middleware] Resolved as admin for workspace:', workspaceId);
+      console.log('[Middleware] ✓ Resolved as admin for workspace:', workspaceId);
     }
   }
 
-  // Check employee role (with workspace)
+  // Check client_admin role (users.role='client_admin' without admin_access entry yet)
+  // This handles the new signup flow where workspace_members is populated but admin_access might not be
   if (!role) {
-    const { data: employeeData, error: employeeError } = await supabase
+    const { data: clientAdminData } = await supabase
+      .from('users')
+      .select('id, role')
+      .eq('auth_uid', user.id)
+      .eq('role', 'client_admin')
+      .maybeSingle();
+
+    if (clientAdminData) {
+      // User has client_admin role, now find their workspace from workspace_members
+      const { data: membershipData } = await supabase
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', clientAdminData.id)
+        .maybeSingle();
+
+      if (membershipData?.workspace_id) {
+        role = 'admin';  // Treat client_admin as admin role
+        workspaceId = membershipData.workspace_id;
+        console.log('[Middleware] ✓ Resolved as admin (client_admin via workspace_members) for workspace:', workspaceId);
+      } else {
+        console.warn('[Middleware] ⚠ Client admin found but no workspace membership yet');
+      }
+    }
+  }
+
+  // Check employee role (with workspace_id)
+  if (!role) {
+    const { data: employeeData } = await supabase
       .from('employees')
       .select('workspace_id')
       .eq('user_id', user.id)
       .maybeSingle();
 
-    if (employeeData) {
+    if (employeeData?.workspace_id) {
       role = 'employee';
       workspaceId = employeeData.workspace_id;
-      console.log('[Middleware] Resolved as employee for workspace:', workspaceId);
+      console.log('[Middleware] ✓ Resolved as employee for workspace:', workspaceId);
     }
   }
 
-  console.log('[Middleware] Resolved role:', role);
-  console.log('[Middleware] Workspace ID:', workspaceId);
+  console.log('[Middleware] Role resolution complete:', { role, workspaceId });
 
-  // If RPC returns no role, redirect to unauthorized
+  // If no role found, redirect to unauthorized
   if (!role) {
     console.warn('[Middleware] No role found for user, redirecting to /unauthorized');
     return NextResponse.redirect(new URL('/unauthorized', request.url));
   }
 
+  // ===== AUTHORIZATION LOGIC BY ROLE =====
   const url = request.nextUrl.clone();
-  const pathname = url.pathname;
 
-  // ===== 1️⃣ SUPER ADMIN ROLE (workspace_id = NULL) =====
-  // Route: /admin only (and /admin/platform-staff for onboarding)
+  // ===== 1️⃣ SUPER ADMIN ROLE (workspace_id = NULL - NOT REQUIRED) =====
+  // Super admin: No workspace required. Can access /admin and no-workspace routes.
+  // CRITICAL: NEVER redirect authenticated super_admin back to login (prevent loops)
   if (role === 'super_admin') {
-    console.log('[Middleware] Processing super_admin access');
+    console.log('[Middleware] Processing super_admin authorization');
     
-    // Verify super admin never has a workspace_id
-    if (workspaceId !== null && workspaceId !== undefined) {
-      console.error('[Middleware] Super admin has workspace_id set - unauthorized state');
+    // ✓ Super admin MUST NOT have a workspace_id
+    if (workspaceId) {
+      console.error('[Middleware] ✗ Super admin has workspace_id set - unauthorized state');
       return NextResponse.redirect(new URL('/unauthorized', request.url));
     }
     
-    // Allow super_admin to access no-workspace routes (like /invite for onboarding)
+    // ✓ Allow super admin to access no-workspace routes (onboarding, invites, etc.)
     if (isAllowedWithoutWorkspace(pathname)) {
-      console.log('[Middleware] Super admin accessing no-workspace route:', pathname);
+      console.log('[Middleware] ✓ Super admin allowed on no-workspace route:', pathname);
       return response;
     }
     
-    // Block super admin from accessing client dashboards or employee routes
+    // ✗ Block super admin from client-specific routes
     if (pathname === '/dashboard' || pathname.startsWith('/dashboard/') || 
-        pathname === '/employees' || pathname.startsWith('/employees/') ||
-        pathname === '/admin/support' || pathname.startsWith('/admin/support/')) {
-      console.warn('[Middleware] Super admin attempted to access protected route:', pathname, '- redirecting to /admin');
-      url.pathname = '/admin';
-      return NextResponse.redirect(url);
-    }
-    
-    // Redirect to admin if not already there
-    if (!pathname.startsWith('/admin')) {
-      url.pathname = '/admin';
-      console.log('[Middleware] Redirecting super_admin to /admin');
-      return NextResponse.redirect(url);
-    }
-    
-    return response;
-  }
-
-  // ===== 2️⃣ PLATFORM STAFF ROLE (workspace_id = PLATFORM_WORKSPACE_ID) =====
-  // Route: /admin/support only
-  if (role === 'platform_staff') {
-    console.log('[Middleware] Processing platform_staff access for workspace:', workspaceId);
-    
-    // Allow platform staff to access no-workspace routes (like /invite for onboarding)
-    if (isAllowedWithoutWorkspace(pathname)) {
-      console.log('[Middleware] Platform staff accessing no-workspace route:', pathname);
-      return response;
-    }
-    
-    // Verify platform staff has the correct workspace_id
-    if (workspaceId !== PLATFORM_WORKSPACE_ID) {
-      console.error('[Middleware] Platform staff has incorrect workspace_id:', workspaceId, 'expected:', PLATFORM_WORKSPACE_ID);
-      return NextResponse.redirect(new URL('/unauthorized', request.url));
-    }
-    
-    // Block platform staff from accessing other routes
-    if (pathname === '/admin' || (pathname.startsWith('/admin/') && !pathname.startsWith('/admin/support')) ||
-        pathname === '/dashboard' || pathname.startsWith('/dashboard/') ||
         pathname === '/employees' || pathname.startsWith('/employees/')) {
-      console.warn('[Middleware] Platform staff attempted to access protected route:', pathname, '- redirecting to /admin/support');
-      url.pathname = '/admin/support';
+      console.warn('[Middleware] ✗ Super admin cannot access client route:', pathname);
+      url.pathname = '/admin';
       return NextResponse.redirect(url);
     }
     
-    // Redirect to admin/support if not already there
-    if (!pathname.startsWith('/admin/support')) {
-      url.pathname = '/admin/support';
-      console.log('[Middleware] Redirecting platform_staff to /admin/support');
-      return NextResponse.redirect(url);
-    }
-    
-    return response;
-  }
-
-  // ===== 3️⃣ CLIENT ADMIN ROLE (workspace_id != NULL and != PLATFORM_WORKSPACE_ID) =====
-  // Route: /dashboard only
-  if (role === 'admin') {
-    console.log('[Middleware] Processing client_admin access for workspace:', workspaceId);
-    
-    // Allow admins to access no-workspace routes (like /invite for onboarding)
-    if (isAllowedWithoutWorkspace(pathname)) {
-      console.log('[Middleware] Admin accessing no-workspace route:', pathname);
+    // ✓ Allow /admin and its sub-routes
+    if (pathname === '/admin' || pathname.startsWith('/admin/')) {
+      console.log('[Middleware] ✓ Super admin allowed on /admin routes');
       return response;
     }
     
-    // Client admin MUST have a workspace_id (unless accessing allowed no-workspace routes, handled above)
-    if (!workspaceId || workspaceId === PLATFORM_WORKSPACE_ID) {
-      console.error('[Middleware] Client admin has invalid workspace_id:', workspaceId);
+    // ✗ Not on /admin? Redirect there
+    console.log('[Middleware] Redirecting super_admin to /admin from:', pathname);
+    url.pathname = '/admin';
+    return NextResponse.redirect(url);
+  }
+
+
+  // ===== 2️⃣ CLIENT ADMIN ROLE (workspace_id REQUIRED) =====
+  // Admin: MUST have workspace_id. Can access /dashboard only.
+  if (role === 'admin') {
+    console.log('[Middleware] Processing client_admin authorization');
+    
+    // ✗ Client admin MUST have a workspace_id
+    if (!workspaceId) {
+      console.error('[Middleware] ✗ Client admin missing required workspace_id');
       return NextResponse.redirect(new URL('/unauthorized', request.url));
     }
     
-    // Block admin from accessing admin or employee routes
+    // ✓ Allow admin to access no-workspace routes (onboarding, invites, etc.)
+    if (isAllowedWithoutWorkspace(pathname)) {
+      console.log('[Middleware] ✓ Admin allowed on no-workspace route:', pathname);
+      return response;
+    }
+    
+    // ✗ Block admin from /admin or /employees routes
     if (pathname === '/admin' || pathname.startsWith('/admin/') || 
         pathname === '/employees' || pathname.startsWith('/employees/')) {
-      console.warn('[Middleware] Client admin attempted to access protected route:', pathname, '- redirecting to /dashboard');
+      console.warn('[Middleware] ✗ Admin cannot access protected route:', pathname);
       url.pathname = '/dashboard';
       return NextResponse.redirect(url);
     }
     
-    // Redirect to dashboard if not already there
-    if (!pathname.startsWith('/dashboard')) {
-      url.pathname = '/dashboard';
-      console.log('[Middleware] Redirecting client_admin to /dashboard');
-      return NextResponse.redirect(url);
-    }
-    
-    return response;
-  }
-
-  // ===== 4️⃣ EMPLOYEE ROLE =====
-  // Route: /employees/dashboard only
-  // Employees are client business staff scoped to exactly ONE workspace
-  if (role === 'employee') {
-    console.log('[Middleware] Processing employee access for workspace:', workspaceId);
-    
-    // Allow employees to access no-workspace routes (like /invite for onboarding, /dashboard setup)
-    if (isAllowedWithoutWorkspace(pathname)) {
-      console.log('[Middleware] Employee accessing no-workspace route:', pathname);
+    // ✓ Allow /dashboard routes
+    if (pathname === '/dashboard' || pathname.startsWith('/dashboard/')) {
+      console.log('[Middleware] ✓ Admin allowed on /dashboard routes');
       return response;
     }
     
-    // ===== CRITICAL: Employees MUST have a workspace_id to access workspace routes =====
-    // This ensures employee scoping is enforced - each employee belongs to EXACTLY ONE workspace
+    // ✗ Not on /dashboard? Redirect there
+    console.log('[Middleware] Redirecting admin to /dashboard from:', pathname);
+    url.pathname = '/dashboard';
+    return NextResponse.redirect(url);
+  }
+
+
+  // ===== 3️⃣ EMPLOYEE ROLE (workspace_id REQUIRED) =====
+  // Employee: MUST have workspace_id. Can access /employees/dashboard only.
+  // Each employee belongs to EXACTLY ONE workspace (enforced at DB level).
+  if (role === 'employee') {
+    console.log('[Middleware] Processing employee authorization');
+    
+    // ✗ Employee MUST have a workspace_id
     if (!workspaceId) {
-      console.error('[Middleware] INVALID STATE: Employee without workspace_id attempting to access workspace route:', pathname);
+      console.error('[Middleware] ✗ Employee missing required workspace_id - invalid state');
       return NextResponse.redirect(new URL('/invite', request.url));
     }
     
-    // ===== BLOCK: Employees cannot access admin or client dashboards =====
-    // - /admin is for super_admin only (platform owner)
-    // - /admin/support is for platform_staff only (Retail Assist internal staff)
-    // - /dashboard is for client admin only (business owner)
-    // - /employees/dashboard is the ONLY route for employees (client business staff)
+    // ✓ Allow employees to access no-workspace routes (onboarding, invites, etc.)
+    if (isAllowedWithoutWorkspace(pathname)) {
+      console.log('[Middleware] ✓ Employee allowed on no-workspace route:', pathname);
+      return response;
+    }
+    
+    // ✗ Block employees from /admin, /admin/support, or /dashboard routes
     if (pathname === '/admin' || pathname.startsWith('/admin/') || 
         pathname === '/dashboard' || pathname.startsWith('/dashboard/')) {
-      console.warn('[Middleware] Employee attempted to access protected route:', pathname, '- redirecting to /employees/dashboard');
+      console.warn('[Middleware] ✗ Employee cannot access protected route:', pathname);
       url.pathname = '/employees/dashboard';
       return NextResponse.redirect(url);
     }
     
-    // ===== ROUTE: Redirect to employee dashboard if not already there =====
-    // After login or session check, employees must go to their dashboard
-    if (!pathname.startsWith('/employees/dashboard')) {
-      url.pathname = '/employees/dashboard';
-      console.log('[Middleware] Redirecting employee to /employees/dashboard');
-      return NextResponse.redirect(url);
+    // ✓ Allow /employees/dashboard routes
+    if (pathname === '/employees/dashboard' || pathname.startsWith('/employees/dashboard/')) {
+      console.log('[Middleware] ✓ Employee allowed on /employees/dashboard routes');
+      return response;
     }
     
-    // ===== WORKSPACE SCOPING =====
-    // At this point, we know:
-    // - User is employee
-    // - User has exactly one workspace_id
-    // - User is accessing /employees/dashboard/*
-    // The /employees/dashboard/* endpoints MUST verify the user's workspace_id
-    // matches the workspace they're trying to access (via query params or route)
-    // This is enforced at the API layer, not middleware
-    
-    return response;
+    // ✗ Not on /employees/dashboard? Redirect there
+    console.log('[Middleware] Redirecting employee to /employees/dashboard from:', pathname);
+    url.pathname = '/employees/dashboard';
+    return NextResponse.redirect(url);
   }
 
   // ===== UNKNOWN ROLE =====
