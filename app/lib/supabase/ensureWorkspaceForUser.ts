@@ -152,17 +152,15 @@ export async function ensureWorkspaceForUser(userId: string): Promise<EnsureWork
           user_id: internalUserId,
           role: 'admin',
         },
-      ], { 
-        // Ignore unique constraint violations (user already a member)
-        ignoreDuplicates: true 
-      });
+      ]);
 
     // Only treat as error if it's NOT a duplicate key error
     if (memberError) {
       console.log('[ensureWorkspaceForUser] memberError details:', memberError);
       const isDuplicateError = 
         memberError.message?.includes('duplicate') || 
-        memberError.message?.includes('unique');
+        memberError.message?.includes('unique') ||
+        memberError.code === '23505'; // PostgreSQL unique violation
       
       if (!isDuplicateError) {
         console.error('[ensureWorkspaceForUser] Failed to add membership:', memberError.message);
@@ -193,17 +191,15 @@ export async function ensureWorkspaceForUser(userId: string): Promise<EnsureWork
           user_id: internalUserId,
           role: 'admin',
         },
-      ], { 
-        // Ignore unique constraint violations (already an admin)
-        ignoreDuplicates: true 
-      });
+      ]);
 
     // Only treat as error if it's NOT a duplicate key error
     if (adminAccessError) {
       console.log('[ensureWorkspaceForUser] adminAccessError details:', adminAccessError);
       const isDuplicateError = 
         adminAccessError.message?.includes('duplicate') || 
-        adminAccessError.message?.includes('unique');
+        adminAccessError.message?.includes('unique') ||
+        adminAccessError.code === '23505'; // PostgreSQL unique violation
       
       if (!isDuplicateError) {
         console.error('[ensureWorkspaceForUser] Failed to add admin access:', adminAccessError.message);

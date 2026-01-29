@@ -32,15 +32,12 @@ CREATE FUNCTION public.rpc_create_employee_invite(
 RETURNS TABLE (
   id UUID,
   workspace_id UUID,
-  email TEXT,
-  full_name TEXT,
-  phone TEXT,
-  role TEXT,
   invited_by UUID,
+  email TEXT,
+  token TEXT,
   status TEXT,
   created_at TIMESTAMP WITH TIME ZONE,
-  updated_at TIMESTAMP WITH TIME ZONE,
-  metadata JSONB
+  updated_at TIMESTAMP WITH TIME ZONE
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -48,8 +45,10 @@ SET search_path = public
 AS $$
 DECLARE
   v_new_id UUID;
+  v_new_token TEXT;
   v_role_value TEXT;
   v_invited_by_value UUID;
+  v_workspace_id_value UUID;
 BEGIN
   -- ========================================================================
   -- Input Validation
@@ -84,17 +83,16 @@ BEGIN
 
   -- Use provided invited_by value
   v_invited_by_value := p_invited_by;
+  
+  -- Use provided workspace_id (can be NULL for platform employees)
+  v_workspace_id_value := p_workspace_id;
 
   -- ========================================================================
-  -- Access Control: Platform Staff Restriction
+  -- Generate UUID for ID and random token
   -- ========================================================================
-
-  -- Platform staff (workspace_id = NULL) can only be invited by super_admin
-  -- This is validated above, but documenting the restriction here
-  IF p_workspace_id IS NULL THEN
-    -- Platform staff can only be created by super_admin (already verified above)
-    NULL;
-  END IF;
+  
+  v_new_id := gen_random_uuid();
+  v_new_token := encode(gen_random_bytes(16), 'hex');
 
   -- ========================================================================
   -- Insert the Employee Invite
@@ -106,49 +104,38 @@ BEGIN
     role,
     workspace_id,
     invited_by,
+    token,
     status,
     created_at,
     updated_at
   ) VALUES (
-    gen_random_uuid(),                    -- id: Generate new UUID
-    LOWER(TRIM(p_email)),                 -- email: Normalize to lowercase and trim
-    v_role_value,                         -- role: Use processed role value
-    p_workspace_id,                       -- workspace_id: Can be null for platform staff
-    v_invited_by_value,                   -- invited_by: Cannot be null (required)
-    'pending',                            -- status: Always start with 'pending'
-    NOW() AT TIME ZONE 'UTC',            -- created_at: Current timestamp
-    NOW() AT TIME ZONE 'UTC'             -- updated_at: Current timestamp
-  )
-  RETURNING
-    employee_invites.id,
-    employee_invites.workspace_id,
-    employee_invites.email,
-    employee_invites.full_name,
-    employee_invites.phone,
-    employee_invites.role,
-    employee_invites.invited_by,
-    employee_invites.status,
-    employee_invites.created_at,
-    employee_invites.updated_at,
-    employee_invites.metadata
-  INTO
-    id,
-    workspace_id,
-    email,
-    full_name,
-    phone,
-    role,
-    invited_by,
-    status,
-    created_at,
-    updated_at,
-    metadata;
+    v_new_id,                            -- id: Generated UUID
+    LOWER(TRIM(p_email)),                -- email: Normalize to lowercase and trim
+    v_role_value,                        -- role: Use processed role value
+    v_workspace_id_value,                -- workspace_id: Can be null for platform staff
+    v_invited_by_value,                  -- invited_by: Cannot be null (required)
+    v_new_token,                         -- token: Random hex string
+    'pending',                           -- status: Always start with 'pending'
+    NOW() AT TIME ZONE 'UTC',           -- created_at: Current timestamp
+    NOW() AT TIME ZONE 'UTC'            -- updated_at: Current timestamp
+  );
 
   -- ========================================================================
   -- Return the Created Row
   -- ========================================================================
 
-  RETURN NEXT;
+  RETURN QUERY
+  SELECT
+    employee_invites.id,
+    employee_invites.workspace_id,
+    employee_invites.invited_by,
+    employee_invites.email,
+    employee_invites.token,
+    employee_invites.status,
+    employee_invites.created_at,
+    employee_invites.updated_at
+  FROM public.employee_invites
+  WHERE employee_invites.id = v_new_id;
 
 EXCEPTION WHEN OTHERS THEN
   -- Log the error with context
@@ -214,8 +201,17 @@ Security:
 - Only super_admin users can execute this function via RLS policy
 - Validates that invited_by user exists and has super_admin role
 - Email is normalized to lowercase
+- Token is generated as random hex string
 
-Returns: Full employee_invites row with all columns populated
+Returns: Full employee_invites row with all columns:
+- id (UUID)
+- workspace_id (UUID, can be NULL)
+- invited_by (UUID)
+- email (TEXT)
+- token (TEXT)
+- status (TEXT)
+- created_at (TIMESTAMP WITH TIME ZONE)
+- updated_at (TIMESTAMP WITH TIME ZONE)
 
 Raises exceptions if:
 - Email is missing or empty

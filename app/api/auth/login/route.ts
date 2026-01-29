@@ -44,8 +44,76 @@ export async function POST(request: NextRequest) {
 
     console.log('[LOGIN] Auth signIn successful, user ID:', data.user.id, 'email:', data.user.email)
 
-    console.log('[LOGIN] Auth signIn successful, user ID:', data.user.id, 'email:', data.user.email)
+    // ===== CRITICAL: CHECK EMPLOYEES FIRST =====
+    // If user is an employee, skip all admin logic and redirect directly
+    const { createAdminSupabaseClient } = await import('@/lib/supabase/server')
+    const adminCheckClient = createAdminSupabaseClient()
+    
+    const { data: employeeDirectCheck } = await adminCheckClient
+      .from('employees')
+      .select('id, workspace_id, invited_by_role, auth_uid')
+      .eq('auth_uid', data.user.id)
+      .maybeSingle()
+    
+    if (employeeDirectCheck) {
+      console.log('[LOGIN] ✓ Employee detected directly by auth_uid - skipping admin logic, role: employee')
+      
+      // Create session for employee
+      let sessionId: string
+      try {
+        const session = await sessionManager.create(data.user.id)
+        sessionId = session.id
+        console.log('[LOGIN] Created employee session:', sessionId)
+      } catch (sessionErr: any) {
+        console.error('[LOGIN] Employee session creation failed:', sessionErr.message || sessionErr)
+        return NextResponse.json({ 
+          error: 'Session creation failed',
+          message: sessionErr.message 
+        }, { status: 500 })
+      }
 
+      // Return employee response - no admin rows should exist
+      const finalRes = NextResponse.json(
+        { 
+          success: true, 
+          user: { 
+            id: employeeDirectCheck.id, 
+            email: data.user.email, 
+            role: 'employee'
+          }, 
+          workspaceId: employeeDirectCheck.workspace_id
+        },
+        { status: 200 }
+      )
+
+      // Copy all Supabase session cookies from the auth response
+      const res = NextResponse.json({})
+      res.cookies.getAll().forEach((cookie) => {
+        finalRes.cookies.set(cookie.name, cookie.value, cookie)
+      })
+
+      // Set the custom session_id cookie for application session management
+      const cookieStore = await cookies()
+      const maxAge = 7 * 24 * 60 * 60 // 7 days
+      
+      finalRes.cookies.set('session_id', sessionId, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: maxAge,
+        path: '/'
+      })
+      console.log('[LOGIN] Employee session established with cookies:', sessionId)
+
+      return finalRes
+    }
+
+    // ===== CRITICAL GUARD: NO EMPLOYEE SHOULD REACH HERE =====
+    // Employee check above should have returned already
+    // This is a safety check to prevent any employee from reaching admin flow
+    console.log('[LOGIN] Proceeding with admin flow (employee already checked above)')
+
+    // ===== ADMIN FLOW (NOT AN EMPLOYEE) =====
     // Ensure there is a deterministic internal users row for this auth UID
     let internalUserId: string
     let internalUser: any
@@ -53,6 +121,7 @@ export async function POST(request: NextRequest) {
       console.log('[LOGIN] Calling ensureInternalUser with auth UID:', data.user.id)
       const ensured = await ensureInternalUser(data.user.id)
       console.log('[LOGIN] ensureInternalUser returned:', ensured)
+      
       if (!ensured || !ensured.id) {
         console.error('[LOGIN] ensureInternalUser returned no id for auth UID:', data.user.id)
         return NextResponse.json({ error: 'User profile not found - please accept an invite first' }, { status: 403 })
@@ -61,6 +130,12 @@ export async function POST(request: NextRequest) {
     } catch (ensureErr: any) {
       // v1: If user doesn't exist after invite, login fails (no auto-creation)
       const errMessage = ensureErr?.message || 'Unknown error'
+      
+      // Check if it's an employee error (should have been caught above, but extra safety)
+      if (errMessage.includes('employee')) {
+        console.error('[LOGIN] Employee reached ensureInternalUser - this should not happen:', errMessage)
+        return NextResponse.json({ error: 'Authentication error - please try again' }, { status: 500 })
+      }
       
       // Check if it's a role missing error
       if (errMessage.includes('role is missing')) {
@@ -77,13 +152,17 @@ export async function POST(request: NextRequest) {
     }
 
     // ===== ROLE-BASED ACCESS RESOLUTION =====
-    // Fetch user role and workspace - check super_admin role first
-    // Use admin client to bypass RLS policies
-    const { createAdminSupabaseClient } = await import('@/lib/supabase/server')
+    // STRICT Priority order (DETERMINISTIC):
+    // 1) users.role = 'super_admin'
+    // 2) users.role = 'client_admin'
+    // 3) employees table (employee role)
+    // CRITICAL: employees NEVER misidentified as client_admin
+    // Use admin client to bypass RLS policies (reusing import from line 49)
     const adminClient = createAdminSupabaseClient()
     
     let role: string | null = null
     let workspaceId: string | null = null
+    let employeeScope: 'super_admin' | 'client_admin' | null = null
     
     // 1) Check if user has super_admin role in users table
     const { data: superAdminCheck } = await adminClient
@@ -96,53 +175,42 @@ export async function POST(request: NextRequest) {
     if (superAdminCheck) {
       role = 'super_admin'
       workspaceId = null
-      console.log('[LOGIN] Resolved role: super_admin (from users table)')
+      console.log('[LOGIN] ✓ Resolved role: super_admin (priority 1), auth_uid:', data.user.id)
     } else {
-      // 2) Check admin_access table for admin access records
-      const { data: adminAccessCheck } = await adminClient
-        .from('admin_access')
-        .select('user_id, workspace_id, role')
-        .eq('user_id', internalUserId)
+      // 2) Check if user has client_admin role in users table
+      const { data: clientAdminCheck } = await adminClient
+        .from('users')
+        .select('id, role')
+        .eq('id', internalUserId)
+        .eq('role', 'client_admin')
         .maybeSingle()
       
-      if (adminAccessCheck) {
-        role = adminAccessCheck.role || 'admin'
-        workspaceId = adminAccessCheck.workspace_id
-        console.log('[LOGIN] Resolved role:', role, 'workspace:', workspaceId)
-      } else {
-        // 3) Check if user has client_admin role in users table (but no admin_access yet)
-        // This is a transitional state during onboarding
-        const { data: clientAdminCheck } = await adminClient
-          .from('users')
-          .select('id, role')
-          .eq('id', internalUserId)
-          .eq('role', 'client_admin')
+      if (clientAdminCheck) {
+        role = 'admin'  // Treat client_admin as admin role
+        
+        // Find workspace_id from workspace_members
+        const { data: membershipCheck } = await adminClient
+          .from('workspace_members')
+          .select('workspace_id')
+          .eq('user_id', internalUserId)
           .maybeSingle()
         
-        if (clientAdminCheck) {
-          role = 'admin'  // Treat client_admin as admin role
-          workspaceId = null  // Will be created during onboarding
-          console.log('[LOGIN] Resolved role: admin (from users table as client_admin)')
+        if (membershipCheck?.workspace_id) {
+          workspaceId = membershipCheck.workspace_id
+          console.log('[LOGIN] ✓ Resolved role: admin (client_admin, priority 2), workspace:', workspaceId, ', auth_uid:', data.user.id)
         } else {
-          // 4) Check employees table
-          const { data: employeeCheck } = await adminClient
-            .from('employees')
-            .select('user_id, workspace_id')
-            .eq('user_id', internalUserId)
-            .maybeSingle()
-          
-          if (employeeCheck) {
-            role = 'employee'
-            workspaceId = employeeCheck.workspace_id
-            console.log('[LOGIN] Resolved role: employee, workspace:', workspaceId)
-          }
+          console.log('[LOGIN] ✓ Resolved role: admin (client_admin, priority 2) but no workspace yet, auth_uid:', data.user.id)
         }
+      } else {
+        // 3) This should not reach here since employees were checked above
+        // But if somehow we get here, all roles should be resolved in users table
+        console.error('[LOGIN] ✗ No admin role found for internal user (employee check should have caught this)')
       }
     }
 
-    // v1: Role and workspace_id are required
+    // Role must be resolved
     if (!role) {
-      console.error('[LOGIN] No role resolved for user:', data.user.id)
+      console.error('[LOGIN] ✗ No role resolved for user:', data.user.id)
       return NextResponse.json({ 
         error: 'User role not found - onboarding incomplete. Please contact support.' 
       }, { status: 403 })
@@ -173,14 +241,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // workspace_id is optional only for super_admin and platform_staff
-    if (workspaceId === undefined && role !== 'super_admin' && role !== 'platform_staff') {
-      console.error('[LOGIN] No workspace_id for role:', role, 'user:', data.user.id)
+    // workspace_id is optional only for super_admin
+    if (workspaceId === undefined && role !== 'super_admin') {
+      console.error('[LOGIN] ✗ No workspace_id for role:', role, 'user:', data.user.id)
       return NextResponse.json({ error: 'User workspace not assigned' }, { status: 403 })
     }
 
-    console.log('[LOGIN] Resolved role:', role)
-    console.log('[LOGIN] Workspace ID:', workspaceId)
+    console.log('[LOGIN] ✓ Role resolution complete:', { role, workspaceId, employeeScope })
 
     // Create custom session in database
     let sessionId: string

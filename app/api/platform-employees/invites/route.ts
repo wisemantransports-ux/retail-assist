@@ -16,14 +16,24 @@ export async function GET(request: NextRequest) {
       { cookies: { getAll: () => cookieStore.getAll(), setAll: (c) => c.forEach(({ name, value, options }) => cookieStore.set(name, value, options)) } }
     );
 
-    // Auth
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Auth & role check via trusted /api/auth/me endpoint
+    const authMeRes = await fetch('http://localhost:3000/api/auth/me', {
+      headers: { 'Cookie': request.headers.get('cookie') || '' }
+    });
+    if (!authMeRes.ok) return NextResponse.json({ error: 'Unauthorized' }, { status: authMeRes.status });
+    const authMe = await authMeRes.json();
 
-    // Role check
-    const { data: roleData, error: roleError } = await supabase.rpc('rpc_get_user_access').single();
-    if (roleError || !roleData) return NextResponse.json({ error: 'Unable to determine user role' }, { status: 403 });
-    if ((roleData as any).role !== 'super_admin') return NextResponse.json({ error: 'Super admins only' }, { status: 403 });
+    const resolvedRole = authMe.role;
+    const authUser = authMe.user;
+
+    if (resolvedRole !== 'super_admin') {
+      return NextResponse.json(
+        { error: 'Super admins only' },
+        { status: 403 }
+      );
+    }
+
+    console.log('[platform-employees/invites] authorized super_admin:', authUser?.id);
 
     // Fetch pending invites for platform staff with admin client to bypass RLS
     const admin = createAdminSupabaseClient();

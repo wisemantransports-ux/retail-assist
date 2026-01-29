@@ -112,6 +112,39 @@ export async function POST(request: NextRequest) {
     // v1: workspace_id is optional (null for platform-level invites)
     // super_admins and platform employees may not have a workspace assigned at invite time
 
+    // ===== CRITICAL: ROLE CONFLICT CHECK =====
+    // Employees cannot use emails already registered as super_admin or client_admin
+    console.log('[INVITE ACCEPT] Checking for role conflicts with reserved admin roles:', invite.email);
+    
+    const { data: reservedRoleCheck, error: reservedCheckError } = await admin
+      .from('users')
+      .select('id, email, role')
+      .eq('email', invite.email)
+      .in('role', ['super_admin', 'client_admin']);
+
+    if (reservedRoleCheck && reservedRoleCheck.length > 0) {
+      const reservedUser = reservedRoleCheck[0];
+      console.warn('[INVITE ACCEPT] Email is reserved for admin role - cannot accept as employee', {
+        email: invite.email,
+        reserved_role: reservedUser.role,
+        user_id: reservedUser.id,
+      });
+      return NextResponse.json(
+        { success: false, error: 'This email is reserved for client admins' },
+        { status: 409 }
+      );
+    }
+
+    if (reservedCheckError) {
+      console.error('[INVITE ACCEPT] Error checking role conflicts:', reservedCheckError);
+      return NextResponse.json(
+        { success: false, error: 'Failed to validate email role' },
+        { status: 500 }
+      );
+    }
+
+    console.log('[INVITE ACCEPT] Role conflict check passed - email is available for employee');
+
     // ============================================================
     // STEP 3: CHECK IF USER ALREADY EXISTS BY EMAIL
     // ============================================================
@@ -136,6 +169,19 @@ export async function POST(request: NextRequest) {
       }
 
       const existingUser = existingUsers[0];
+      
+      // CRITICAL: Reject if user is super_admin or client_admin - they cannot be employees
+      if (existingUser.role === 'super_admin' || existingUser.role === 'client_admin') {
+        console.log('[INVITE ACCEPT] User is admin - cannot accept employee invite', {
+          email: invite.email,
+          existing_role: existingUser.role,
+        });
+        return NextResponse.json(
+          { success: false, error: 'Admins cannot become employees. Use a different email.' },
+          { status: 400 }
+        );
+      }
+
       userId = existingUser.id;
       authUid = existingUser.auth_uid;
 
@@ -169,62 +215,22 @@ export async function POST(request: NextRequest) {
           user_id: userId,
           auth_uid: authUid,
         });
-      } else {
-        console.log('[INVITE ACCEPT] User already has auth_uid, no new auth user needed');
-      }
 
-      // Update existing user: preserve role and workspace, only update if not already set
-      const updatePayload: any = {};
-      
-      // Only set workspace_id if the invite provides one (not null)
-      if (invite.workspace_id) {
-        updatePayload.workspace_id = invite.workspace_id;
-      }
-      
-      // Only set auth_uid if we just created it or if it was missing
-      if (authUid && !existingUser.auth_uid) {
-        updatePayload.auth_uid = authUid;
-      }
-
-      // If user has no role, set it from the invite
-      if (!existingUser.role && invite.role) {
-        updatePayload.role = invite.role;
-        console.log('[INVITE ACCEPT] Existing user has no role, setting from invite:', {
-          user_id: userId,
-          role: invite.role,
-        });
-      } else if (!existingUser.role && !invite.role) {
-        // Default to 'employee' if neither invite nor user has a role
-        updatePayload.role = 'employee';
-        console.log('[INVITE ACCEPT] Existing user has no role and invite has no role, defaulting to employee:', {
-          user_id: userId,
-        });
-      }
-
-      if (Object.keys(updatePayload).length > 0) {
+        // Update existing user with auth_uid (only if missing)
         const { error: updateError } = await admin
           .from('users')
-          .update(updatePayload)
+          .update({ auth_uid: authUid })
           .eq('id', userId);
 
         if (updateError) {
-          console.error('[INVITE ACCEPT] Failed to update existing user:', updateError?.message);
+          console.error('[INVITE ACCEPT] Failed to link auth_uid:', updateError?.message);
           return NextResponse.json(
-            { success: false, error: 'Failed to update user profile' },
+            { success: false, error: 'Failed to link user account' },
             { status: 500 }
           );
         }
-
-        console.log('[INVITE ACCEPT] Existing user updated:', {
-          user_id: userId,
-          auth_uid: authUid,
-          updates: updatePayload,
-        });
       } else {
-        console.log('[INVITE ACCEPT] No updates needed for existing user:', {
-          user_id: userId,
-          auth_uid: authUid,
-        });
+        console.log('[INVITE ACCEPT] User already has auth_uid, no new auth user needed');
       }
     } else {
       // ============================================================
@@ -253,20 +259,20 @@ export async function POST(request: NextRequest) {
       });
 
       // ============================================================
-      // STEP 3B: NEW USER - CREATE INTERNAL USER ROW AND LINK auth_uid
+      // STEP 3B: NEW USER - CREATE MINIMAL INTERNAL USER ROW
       // ============================================================
-      console.log('[INVITE ACCEPT] Creating internal user row linked to auth_uid');
-
-      // Get role from invite, default to 'employee' if not specified
-      const userRole = invite.role || 'employee';
+      // CRITICAL: Do NOT set users.role = 'employee'
+      // Employees are stored ONLY in the employees table
+      // This users row is for auth_uid linkage only
+      console.log('[INVITE ACCEPT] Creating minimal internal user row (NO ROLE SET)');
 
       const { data: newUser, error: userError } = await admin
         .from('users')
         .insert({
           auth_uid: authUid,
           email: invite.email,
-          role: userRole,
-          workspace_id: invite.workspace_id,
+          // role is NOT set - employees have no role in users table
+          // workspace_id is NOT set - employees have workspace in employees table
         })
         .select('id')
         .single();
@@ -279,7 +285,7 @@ export async function POST(request: NextRequest) {
           // User was created by another concurrent request
           const { data: concurrentUsers } = await admin
             .from('users')
-            .select('id, auth_uid, role, workspace_id')
+            .select('id, auth_uid')
             .eq('email', invite.email);
 
           if (concurrentUsers && concurrentUsers.length > 0) {
@@ -316,55 +322,6 @@ export async function POST(request: NextRequest) {
                 existing_auth_uid: concurrentUser.auth_uid,
               });
             }
-
-            // Update workspace if needed
-            if (invite.workspace_id && (!concurrentUser.workspace_id || concurrentUser.workspace_id !== invite.workspace_id)) {
-              const { error: workspaceError } = await admin
-                .from('users')
-                .update({ workspace_id: invite.workspace_id })
-                .eq('id', userId);
-
-              if (workspaceError) {
-                console.warn('[INVITE ACCEPT] Failed to update workspace_id:', workspaceError?.message);
-              } else {
-                console.log('[INVITE ACCEPT] Updated workspace_id for concurrent user:', {
-                  user_id: userId,
-                  workspace_id: invite.workspace_id,
-                });
-              }
-            }
-
-            // Update role if concurrent user has no role
-            if (!concurrentUser.role && invite.role) {
-              const { error: roleError } = await admin
-                .from('users')
-                .update({ role: invite.role })
-                .eq('id', userId);
-
-              if (roleError) {
-                console.warn('[INVITE ACCEPT] Failed to update role for concurrent user:', roleError?.message);
-              } else {
-                console.log('[INVITE ACCEPT] Updated role for concurrent user:', {
-                  user_id: userId,
-                  role: invite.role,
-                });
-              }
-            } else if (!concurrentUser.role && !invite.role) {
-              // Default to 'employee' if neither has a role
-              const { error: roleError } = await admin
-                .from('users')
-                .update({ role: 'employee' })
-                .eq('id', userId);
-
-              if (roleError) {
-                console.warn('[INVITE ACCEPT] Failed to set default role for concurrent user:', roleError?.message);
-              } else {
-                console.log('[INVITE ACCEPT] Set default role for concurrent user:', {
-                  user_id: userId,
-                  role: 'employee',
-                });
-              }
-            }
           } else {
             console.error('[INVITE ACCEPT] Duplicate error but user not found by email');
             return NextResponse.json(
@@ -387,14 +344,59 @@ export async function POST(request: NextRequest) {
         );
       } else {
         userId = newUser.id;
-        console.log('[INVITE ACCEPT] Successfully created and linked new user:', {
+        console.log('[INVITE ACCEPT] Successfully created new user (NO ROLE):', {
           user_id: userId,
           auth_uid: authUid,
           email: invite.email,
-          role: 'employee',
-          workspace_id: invite.workspace_id,
         });
       }
+    }
+
+    // ============================================================
+    // STEP 3C: CREATE EMPLOYEE RECORD (ONLY AUTHORITATIVE SOURCE)
+    // ============================================================
+    // CRITICAL: Employees are stored ONLY in the employees table
+    // The employees table is authoritative for role resolution during login
+    // This is where we track: auth_uid, workspace_id, invited_by_role
+    console.log('[INVITE ACCEPT] Creating employee record (authoritative role source)');
+
+    // Determine invited_by_role from the invite
+    // If workspace_id is NULL → platform employee (super_admin invited)
+    // If workspace_id is SET → client employee (client_admin invited)
+    const invitedByRole = invite.workspace_id === null ? 'super_admin' : 'client_admin';
+
+    // Create or update employee record with workspace
+    const { error: employeeError } = await admin
+      .from('employees')
+      .insert({
+        auth_uid: authUid,
+        email: invite.email,
+        workspace_id: invite.workspace_id,
+        invited_by_role: invitedByRole,
+        status: 'active',
+      });
+
+    // Enforce strict auth_uid constraint (no fallbacks)
+    if (employeeError && (employeeError.code === '23505' || employeeError.message?.includes('duplicate'))) {
+      console.log('[INVITE ACCEPT] Employee record already exists, skipping insert:', {
+        email: invite.email,
+        workspace_id: invite.workspace_id,
+        auth_uid: authUid,
+      });
+    } else if (employeeError) {
+      console.error('[INVITE ACCEPT] Failed to create employee record:', employeeError?.message);
+      return NextResponse.json(
+        { success: false, error: 'Failed to create employee record' },
+        { status: 500 }
+      );
+    } else {
+      console.log('[INVITE ACCEPT] Employee record created:', {
+        auth_uid: authUid,
+        email: invite.email,
+        workspace_id: invite.workspace_id,
+        invited_by_role: invitedByRole,
+        status: 'active',
+      });
     }
 
     // ============================================================
@@ -421,70 +423,26 @@ export async function POST(request: NextRequest) {
     console.log('[INVITE ACCEPT] Invite marked as accepted');
 
     // ============================================================
-    // STEP 5: SYNC TO MOCK DATABASE (if in mock mode)
+    // STEP 5: RETURN SUCCESS (NO REDIRECTS, NO SESSION CHANGES)
     // ============================================================
-    // When in mock mode, ensure the user is also in the mock database
-    // so that subsequent login calls can find them
-    if (process.env.NEXT_PUBLIC_USE_MOCK_SUPABASE === 'true' || process.env.MOCK_MODE === 'true') {
-      try {
-        console.log('[INVITE ACCEPT] Mock mode detected, syncing user to mock database');
-        
-        const fs = await import('fs');
-        const path = await import('path');
-        const dbPath = path.join(process.cwd(), 'tmp', 'dev-seed', 'database.json');
-        
-        // Read current mock database
-        let mockDb: any = { users: {} };
-        if (fs.existsSync(dbPath)) {
-          try {
-            mockDb = JSON.parse(fs.readFileSync(dbPath, 'utf-8'));
-          } catch (e) {
-            console.warn('[INVITE ACCEPT] Failed to parse mock database, creating new one');
-          }
-        }
-        
-        // Ensure users object exists
-        if (!mockDb.users) mockDb.users = {};
-        
-        // Add or update user in mock database
-        mockDb.users[userId] = {
-          id: userId,
-          auth_uid: authUid,
-          email: invite.email,
-          role: 'employee',
-          workspace_id: invite.workspace_id || null,
-          plan_type: 'starter',
-          payment_status: 'unpaid',
-          subscription_status: 'pending',
-          business_name: '',
-          phone: '',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        
-        // Write back to mock database
-        fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-        fs.writeFileSync(dbPath, JSON.stringify(mockDb, null, 2));
-        
-        console.log('[INVITE ACCEPT] User synced to mock database:', {
-          user_id: userId,
-          auth_uid: authUid,
-          email: invite.email,
-        });
-      } catch (syncErr: any) {
-        // Log warning but don't fail the entire request
-        console.warn('[INVITE ACCEPT] Failed to sync to mock database:', syncErr?.message);
-      }
-    }
-
-    // ============================================================
-    // STEP 6: RETURN SUCCESS WITH REDIRECT URL
-    // ============================================================
-    // v1: Do NOT auto-login. User must login via /auth/login
+    // CRITICAL: Invite acceptance ONLY creates an employee record.
+    // It does NOT:
+    // - Authenticate the user
+    // - Change existing sessions
+    // - Redirect to any dashboard
+    // - Switch roles
+    //
+    // The frontend decides UX based on whether user is authenticated:
+    // - If authenticated (admin): Show success + logout button
+    // - If not authenticated: Redirect to /login?role=employee
     return NextResponse.json(
       {
         success: true,
-        next: '/auth/login?invite=accepted',
+        employee_id: userId,
+        auth_uid: authUid,
+        email: invite.email,
+        workspace_id: invite.workspace_id,
+        invited_by_role: invitedByRole,
       },
       { status: 200 }
     );

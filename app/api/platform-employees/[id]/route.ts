@@ -14,12 +14,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     { cookies: { getAll: () => cookieStore.getAll(), setAll: (c) => c.forEach(({ name, value, options }) => cookieStore.set(name, value, options)) } }
   );
 
-  // Auth & role check
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const { data: roleData, error: roleError } = await supabase.rpc('rpc_get_user_access').single();
-  if (roleError || !roleData) return NextResponse.json({ error: 'Unable to determine user role' }, { status: 403 });
-  if ((roleData as any).role !== 'super_admin') return NextResponse.json({ error: 'Super admins only' }, { status: 403 });
+  // Auth & role check via trusted /api/auth/me endpoint
+  const authMeRes = await fetch('http://localhost:3000/api/auth/me', {
+    headers: { 'Cookie': request.headers.get('cookie') || '' }
+  });
+  if (!authMeRes.ok) return NextResponse.json({ error: 'Unauthorized' }, { status: authMeRes.status });
+  const { role: authRole } = await authMeRes.json();
+  if (authRole !== 'super_admin') return NextResponse.json({ error: 'Super admins only' }, { status: 403 });
 
   // Fetch single platform employee with admin client to bypass RLS
   const admin = createAdminSupabaseClient();
@@ -62,19 +63,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   if (phone !== undefined && typeof phone !== 'string') return NextResponse.json({ error: 'Phone must be a string' }, { status: 400 });
   if (is_active !== undefined && typeof is_active !== 'boolean') return NextResponse.json({ error: 'is_active must be a boolean' }, { status: 400 });
 
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll(), setAll: (c) => c.forEach(({ name, value, options }) => cookieStore.set(name, value, options)) } }
-  );
-
-  // Auth & role check
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const { data: roleData, error: roleError } = await supabase.rpc('rpc_get_user_access').single();
-  if (roleError || !roleData) return NextResponse.json({ error: 'Unable to determine user role' }, { status: 403 });
-  if ((roleData as any).role !== 'super_admin') return NextResponse.json({ error: 'Super admins only' }, { status: 403 });
+  // Auth & role check via trusted /api/auth/me endpoint
+  const authMeRes = await fetch('http://localhost:3000/api/auth/me', {
+    headers: { 'Cookie': request.headers.get('cookie') || '' }
+  });
+  if (!authMeRes.ok) return NextResponse.json({ error: 'Unauthorized' }, { status: authMeRes.status });
+  const { role: authRole } = await authMeRes.json();
+  if (authRole !== 'super_admin') return NextResponse.json({ error: 'Super admins only' }, { status: 403 });
 
   // Build update object with only provided fields
   const updateData: any = {};
@@ -117,19 +112,13 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   const { id: employeeId } = await params;
   if (!employeeId) return NextResponse.json({ error: 'Employee ID is required' }, { status: 400 });
 
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll(), setAll: (c) => c.forEach(({ name, value, options }) => cookieStore.set(name, value, options)) } }
-  );
-
-  // Auth & role check
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const { data: roleData, error: roleError } = await supabase.rpc('rpc_get_user_access').single();
-  if (roleError || !roleData) return NextResponse.json({ error: 'Unable to determine user role' }, { status: 403 });
-  if ((roleData as any).role !== 'super_admin') return NextResponse.json({ error: 'Super admins only' }, { status: 403 });
+  // Auth & role check via trusted /api/auth/me endpoint
+  const authMeRes = await fetch('http://localhost:3000/api/auth/me', {
+    headers: { 'Cookie': request.headers.get('cookie') || '' }
+  });
+  if (!authMeRes.ok) return NextResponse.json({ error: 'Unauthorized' }, { status: authMeRes.status });
+  const { role: authRole } = await authMeRes.json();
+  if (authRole !== 'super_admin') return NextResponse.json({ error: 'Super admins only' }, { status: 403 });
 
   // Delete platform employee with admin client to bypass RLS (workspace_id must be null)
   const admin = createAdminSupabaseClient();

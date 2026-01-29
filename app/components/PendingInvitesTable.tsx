@@ -67,7 +67,8 @@ export const PendingInvitesTable: React.FC<PendingInvitesTableProps> = ({
    */
   const handleCopyLink = useCallback(
     async (invite: EmployeeInvite) => {
-      const inviteLink = generateInviteLink(invite.token || invite.id);
+      const token = (invite as Record<string, unknown>).token as string | undefined || invite.id;
+      const inviteLink = generateInviteLink(token);
 
       try {
         // Copy to clipboard
@@ -176,7 +177,7 @@ export const PendingInvitesTable: React.FC<PendingInvitesTableProps> = ({
                         : 'bg-blue-100 text-blue-700 hover:bg-blue-200 active:bg-blue-300'
                     }`}
                     disabled={copiedInviteId === invite.id}
-                    title={generateInviteLink(invite.token || invite.id)}
+                    title={generateInviteLink(((invite as Record<string, unknown>).token as string | undefined) || invite.id)}
                   >
                     {copiedInviteId === invite.id ? (
                       <>

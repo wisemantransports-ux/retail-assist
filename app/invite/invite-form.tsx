@@ -3,12 +3,21 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import toast, { Toaster } from 'react-hot-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, CheckCircle, LogOut } from 'lucide-react';
 
 /**
  * InviteForm Component
  * 
  * Wrapped in Suspense at the page level to handle useSearchParams()
+ * 
+ * CRITICAL: Session Purity Rules
+ * - Invite acceptance ONLY creates an employee record
+ * - Does NOT authenticate or change existing sessions
+ * - If user is already authenticated (as admin):
+ *   → Show success message + logout button
+ *   → Do NOT redirect to employee dashboard
+ * - If user is NOT authenticated:
+ *   → Redirect to /login?role=employee
  */
 export default function InviteForm() {
   const router = useRouter();
@@ -20,6 +29,24 @@ export default function InviteForm() {
   const [lastName, setLastName] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [successState, setSuccessState] = useState(false);
+
+  // Check if user is already authenticated
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await fetch('/api/auth/me');
+        setIsAuthenticated(response.ok);
+        console.log('[InviteForm] Auth check:', response.ok ? 'Authenticated' : 'Not authenticated');
+      } catch (error) {
+        console.log('[InviteForm] Auth check failed, user not authenticated');
+        setIsAuthenticated(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
 
   // Validate token is present
   useEffect(() => {
@@ -30,17 +57,13 @@ export default function InviteForm() {
       }, 2000);
     } else {
       console.log('[InviteForm] Token extracted from URL:', {
-        token: token,
         token_length: token.length,
         token_preview: token.substring(0, 16),
-        contains_percent: token.includes('%'),
-        contains_plus: token.includes('+'),
-        contains_space: token.includes(' '),
       });
     }
   }, [token, router]);
 
-  if (!token) {
+  if (!token || isAuthenticated === null) {
     return null;
   }
 
@@ -74,12 +97,12 @@ export default function InviteForm() {
     try {
       console.log('[InviteForm] Submitting invite acceptance:', { 
         token: token?.substring(0, 8) + '...', 
-        email 
+        email,
+        isAuthenticated,
       });
 
-      // Token goes in the URL query string, NOT in the request body
+      // Token goes in the URL query string
       const acceptUrl = `/api/employees/accept-invite?token=${encodeURIComponent(token)}`;
-      console.log('[InviteForm] POST to:', acceptUrl);
 
       const response = await fetch(acceptUrl, {
         method: 'POST',
@@ -93,8 +116,6 @@ export default function InviteForm() {
           password,
         }),
       });
-
-      console.log('[InviteForm] Response status:', response.status);
 
       // Safely parse JSON response
       let data: any = null;
@@ -111,7 +132,6 @@ export default function InviteForm() {
 
       // ===== HANDLE ERROR RESPONSES =====
       
-      // 400/401: Invalid or expired invite token
       if (response.status === 400 || response.status === 401) {
         const errorMsg = data?.error || 'Invalid or expired invite';
         console.error('[InviteForm] Invalid invite:', errorMsg);
@@ -120,18 +140,13 @@ export default function InviteForm() {
         return;
       }
 
-      // 409: Duplicate (treat as idempotent success - user might already have accepted)
       if (response.status === 409) {
-        console.log('[InviteForm] User already accepted (409 Conflict) - treating as success');
-        toast.success('Invite already accepted! Redirecting...');
-        // Still redirect to dashboard after a brief delay
-        setTimeout(() => {
-          router.push('/employees/dashboard');
-        }, 1500);
+        console.log('[InviteForm] Employee already exists (409 Conflict)');
+        toast.error('Employee record already exists. Please log out and sign in with your employee email.');
+        setLoading(false);
         return;
       }
 
-      // 500: Server error - show generic message, no raw error text
       if (response.status === 500) {
         console.error('[InviteForm] Server error:', data?.error);
         toast.error('Something went wrong. Please try again later.');
@@ -139,9 +154,6 @@ export default function InviteForm() {
         return;
       }
 
-      // ===== HANDLE SUCCESS (200) =====
-      
-      // For idempotent behavior: success means either new or existing user
       if (!response.ok) {
         const errorMsg = data?.error || `Server error: ${response.status}`;
         console.error('[InviteForm] Request failed:', errorMsg);
@@ -150,7 +162,7 @@ export default function InviteForm() {
         return;
       }
 
-      // Verify success response has required fields
+      // Verify success response
       if (!data?.success) {
         const errorMsg = data?.error || 'Failed to accept invite';
         console.error('[InviteForm] Invite acceptance failed:', errorMsg);
@@ -159,19 +171,30 @@ export default function InviteForm() {
         return;
       }
 
-      // Success: use backend-provided redirect URL
-      if (data?.next) {
-        console.log('[InviteForm] Invite accepted, redirecting to:', data.next);
-        toast.success('Invite accepted! Redirecting to login...');
-        setTimeout(() => {
-          router.push(data.next);
-        }, 1000);
-        return;
-      }
+      console.log('[InviteForm] Invite accepted successfully:', {
+        employee_id: data.employee_id,
+        auth_uid: data.auth_uid,
+        email: data.email,
+      });
 
-      // Fallback if next not provided (shouldn't happen)
-      console.error('[InviteForm] No next URL provided by backend');
-      toast.error('Invalid server response');
+      // ===== CRITICAL: SESSION PURITY LOGIC =====
+      // RULE: Invite acceptance does NOT authenticate or redirect
+      // UX depends on whether user is already authenticated
+      
+      if (isAuthenticated) {
+        // User is logged in as admin - show success with logout option
+        console.log('[InviteForm] User is authenticated, showing success with logout option');
+        setSuccessState(true);
+        toast.success('Employee account created successfully!');
+      } else {
+        // User is not authenticated - redirect to login
+        console.log('[InviteForm] User is not authenticated, redirecting to login');
+        toast.success('Employee account created! Redirecting to login...');
+        setTimeout(() => {
+          router.push('/login?role=employee');
+        }, 1000);
+      }
+      
       setLoading(false);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
@@ -181,6 +204,64 @@ export default function InviteForm() {
     }
   };
 
+  // ===== RENDER: SUCCESS STATE FOR AUTHENTICATED USERS =====
+  if (successState && isAuthenticated) {
+    return (
+      <>
+        <Toaster position="top-right" />
+        <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-8">
+          {/* Success Header */}
+          <div className="text-center mb-8">
+            <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Success!
+            </h1>
+            <p className="text-gray-600">
+              Employee account has been created successfully.
+            </p>
+          </div>
+
+          {/* Success Message */}
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+            <p className="text-green-800 text-sm">
+              You are currently logged in as an administrator. To access the employee dashboard, please log out and sign in using your employee email address.
+            </p>
+          </div>
+
+          {/* Logout Button */}
+          <button
+            onClick={() => {
+              // Call logout endpoint
+              fetch('/api/auth/logout', { method: 'POST' })
+                .then(() => {
+                  toast.success('Logged out. Redirecting to login...');
+                  setTimeout(() => {
+                    router.push('/login?role=employee');
+                  }, 1000);
+                })
+                .catch(() => {
+                  router.push('/login?role=employee');
+                });
+            }}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+          >
+            <LogOut className="w-5 h-5" />
+            Log Out & Sign In as Employee
+          </button>
+
+          {/* Skip Button */}
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="w-full mt-3 text-gray-600 hover:text-gray-700 font-medium py-2 transition-colors"
+          >
+            Continue as Administrator
+          </button>
+        </div>
+      </>
+    );
+  }
+
+  // ===== RENDER: FORM FOR UNAUTHENTICATED USERS =====
   return (
     <>
       <Toaster position="top-right" />
@@ -279,7 +360,7 @@ export default function InviteForm() {
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all disabled:bg-gray-100 disabled:text-gray-500"
             />
             <p className="text-xs text-gray-600 mt-1">
-              Minimum 6 characters. Use a strong password with uppercase, lowercase, numbers, and symbols.
+              Minimum 6 characters
             </p>
           </div>
 
@@ -303,7 +384,7 @@ export default function InviteForm() {
         {/* Info Box */}
         <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-sm text-blue-900">
-            <strong>ℹ️ What happens next:</strong> After accepting, you'll be redirected to your workspace dashboard where you can start collaborating with your team.
+            <strong>ℹ️ What happens next:</strong> After accepting, you'll be redirected to login. Sign in with your employee email to access your workspace.
           </p>
         </div>
       </div>

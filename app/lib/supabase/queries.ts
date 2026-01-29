@@ -75,7 +75,7 @@ export async function resolveUserId(candidateId: string | null | undefined, crea
 //   * workspace_id set (if applicable)
 //
 // See: INTERNAL_USER_ID_CONTRACT.md for details and guidance.
-export async function ensureInternalUser(candidateId: string | null | undefined): Promise<{ id: string | null }> {
+export async function ensureInternalUser(candidateId: string | null | undefined): Promise<{ id: string | null, isEmployee?: boolean }> {
     if (!candidateId) return { id: null }
     
     // In mock mode, use local file-based database
@@ -177,9 +177,31 @@ export async function ensureInternalUser(candidateId: string | null | undefined)
     
     // In Supabase mode, use database queries (READ-ONLY - do NOT create/upsert)
     // v1: Login must NEVER create users, roles, or workspaces
+    // CRITICAL: Check employees FIRST before users table
+    // If auth_uid exists in employees, DO NOT create a users row
     const db = admin()
     
     console.log('[ensureInternalUser] Starting Supabase lookup for:', candidateId)
+
+    // ===== EMPLOYEE CHECK (FIRST - HARD STOP) =====
+    // If this auth_uid is an employee, THROW ERROR immediately
+    // DO NOT create a users row for employees
+    // Login endpoint must check employees BEFORE calling ensureInternalUser
+    if (typeof candidateId === 'string' && candidateId.length === 36) {
+      // candidateId looks like a UUID (auth_uid)
+      const { data: employeeCheck } = await db
+        .from('employees')
+        .select('id, auth_uid')
+        .eq('auth_uid', candidateId)
+        .maybeSingle()
+      
+      if (employeeCheck) {
+        console.log('[ensureInternalUser] ✗ HARD STOP: Employee found by auth_uid:', candidateId, '-> This should have been caught in login endpoint')
+        // Throw error - employees should never reach this point
+        // Login must check employees table BEFORE calling ensureInternalUser
+        throw new Error(`User is employee, not admin user: ${candidateId} (employee auth uid)`)
+      }
+    }
 
     // 1) If candidateId is an internal id, look it up directly
     const { data: byId } = await db.from('users').select('id, role, auth_uid').eq('id', candidateId).maybeSingle()
