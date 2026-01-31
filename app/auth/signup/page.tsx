@@ -3,7 +3,6 @@
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { supabase } from '@/lib/supabase/client';
 
 const PLANS = [
   {
@@ -96,48 +95,74 @@ function SignupForm() {
         throw new Error(data.error || 'Signup failed');
       }
 
-      // After successful signup, perform client-side sign-in with Supabase
-      try {
-        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-        if (signInError || !signInData?.user) {
-          throw new Error(signInError?.message || 'Sign in after signup failed');
-        }
+      // ===== CRITICAL: Wait for auth context to be ready =====
+      // After signup succeeds, the backend has set Supabase cookies
+      // Give the browser a moment to ensure cookies are fully set
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
-        // ===== ROLE-BASED CLIENT-SIDE REDIRECT AFTER SIGNUP =====
-        // Fetch role from RPC to determine redirect target
-        const { data: userAccess } = await supabase.rpc('rpc_get_user_access');
-        const role = userAccess?.[0]?.role;
-        const workspaceId = userAccess?.[0]?.workspace_id;
-        
-        console.log('[Signup] User role:', role);
-        console.log('[Signup] User workspace_id:', workspaceId);
+      console.log('[Signup Page] Waiting for auth context to initialize...');
 
-        // New signups will typically be client admins (admin role)
-        // But we handle all cases to be safe
-        let targetPath = '/unauthorized'; // default fallback
-        
-        if (role === 'super_admin') {
-          targetPath = '/admin';
-          console.log('[Signup] Super admin detected, redirecting to /admin');
-        } 
-        else if (role === 'platform_staff') {
-          targetPath = '/admin/support';
-          console.log('[Signup] Platform staff detected, redirecting to /admin/support');
+      // Call /api/auth/me to ensure backend validates and auth context syncs
+      // Retry up to 3 times with delays to ensure auth is ready
+      let meResponse = null;
+      let lastError: Error | null = null;
+
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          meResponse = await fetch('/api/auth/me', {
+            method: 'GET',
+            credentials: 'include',
+          });
+
+          if (meResponse.ok) {
+            console.log('[Signup Page] Auth validation succeeded on attempt', attempt);
+            break;
+          }
+
+          console.warn('[Signup Page] Auth validation failed on attempt', attempt, '- retrying...');
+
+          if (attempt < 3) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+          }
+        } catch (err) {
+          lastError = err as Error;
+          if (attempt < 3) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+          }
         }
-        else if (role === 'admin') {
-          targetPath = '/dashboard';
-          console.log('[Signup] Client admin detected, redirecting to /dashboard');
-        }
-        else if (role === 'employee') {
-          targetPath = '/employees/dashboard';
-          console.log('[Signup] Employee detected, redirecting to /employees/dashboard');
-        }
-        
-        router.push(targetPath);
-      } catch (signErr: any) {
-        // If client-side sign-in fails, surface an error but do not modify backend
-        setError(signErr?.message || 'Failed to sign in after signup');
       }
+
+      if (!meResponse?.ok) {
+        throw new Error(`Auth validation failed after signup${lastError ? ': ' + lastError.message : ''}`);
+      }
+
+      const meData = await meResponse.json();
+      const role = meData.role;
+      const workspaceId = meData.workspaceId;
+
+      console.log('[Signup Page] Role from /api/auth/me:', role);
+      console.log('[Signup Page] Workspace ID from /api/auth/me:', workspaceId);
+
+      // Determine redirect target based on role
+      let targetPath = '/unauthorized';
+
+      if (role === 'super_admin') {
+        targetPath = '/admin';
+        console.log('[Signup Page] Super admin detected, redirecting to /admin');
+      } else if (role === 'platform_staff') {
+        targetPath = '/admin/support';
+        console.log('[Signup Page] Platform staff detected, redirecting to /admin/support');
+      } else if (role === 'admin') {
+        targetPath = '/dashboard';
+        console.log('[Signup Page] Client admin detected, redirecting to /dashboard');
+      } else if (role === 'employee') {
+        targetPath = '/employees/dashboard';
+        console.log('[Signup Page] Employee detected, redirecting to /employees/dashboard');
+      }
+
+      console.log('[Signup Page] Final redirect target:', targetPath);
+      // NOW redirect - auth context is confirmed ready
+      router.push(targetPath);
     } catch (err: any) {
       setError(err.message || "Failed to sign up");
     } finally {
