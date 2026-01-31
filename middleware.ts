@@ -26,6 +26,14 @@ export async function middleware(request: NextRequest) {
   
   console.log('[Middleware] INVOKED for path:', pathname);
   
+  // ===== CRITICAL: ALLOW PUBLIC AUTH ROUTES =====
+  // Do NOT protect /auth/* routes - users must be able to access login/signup
+  // Also allow /api/auth routes that don't require authentication
+  if (pathname.startsWith('/auth/') || pathname === '/login' || pathname === '/signup') {
+    console.log('[Middleware] ✓ Public auth route allowed:', pathname);
+    return NextResponse.next();
+  }
+  
   let response = NextResponse.next({
     request: {
       headers: request.headers,
