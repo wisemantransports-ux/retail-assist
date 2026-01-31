@@ -30,18 +30,18 @@ export interface AuthState {
 /**
  * useAuth Hook
  *
- * Implements the mandatory auth flow:
- * 1. Call supabase.auth.getSession()
- * 2. If no session → isLoading becomes false, isError false, session null
- * 3. After session is confirmed, call supabase.rpc('rpc_get_user_access')
- * 4. If RPC returns no rows → treat as unauthorized
+ * Implements the mandatory auth flow (single source of truth via /api/auth/me):
+ * 1. Call supabase.auth.getSession() to check if browser has auth cookies
+ * 2. If no session → user is not authenticated, redirect to /auth/login
+ * 3. If session exists → call GET /api/auth/me to fetch authoritative role & workspace
+ * 4. If /api/auth/me returns 401/403 → user role not found, show error
+ * 5. If /api/auth/me succeeds → set role, workspaceId, and isLoading=false
  *
  * CRITICAL CONSTRAINTS:
- * - Never call RPC before auth session is ready
- * - Never hardcode roles
- * - Never infer access from email
- * - Never call RPC during SSR or build time
- * - Always handle loading and error states
+ * - Never call /api/auth/me before auth session is ready
+ * - Never hardcode roles or infer from email/cookies
+ * - Never call /api/auth/me during SSR or build time
+ * - Always handle loading and error states before rendering
  *
  * USAGE:
  * ```tsx
