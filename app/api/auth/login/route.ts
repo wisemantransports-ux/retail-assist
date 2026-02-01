@@ -21,8 +21,8 @@ export async function POST(request: NextRequest) {
     console.log('[LOGIN] Starting login flow for:', email)
 
     // Create Supabase client with proper session cookie handling
-    // This reads cookies from request and will set them in the response
-    const { supabase, response } = createAuthSupabaseClient(request)
+    // This reads cookies from request and stores cookies to be set
+    const { supabase, cookiesToSet } = createAuthSupabaseClient(request)
     
     // Authenticate with Supabase
     const { data, error } = await supabase.auth.signInWithPassword({
