@@ -1,5 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server'
-import { createServerClient } from '@/lib/supabase/server'
+import { createAuthSupabaseClient } from '@/lib/supabase/auth-server'
+import { createAdminSupabaseClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
 import { db } from '@/lib/db'
 import { env } from '@/lib/env'
@@ -19,13 +20,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Initialize response to capture cookies
-    const res = NextResponse.json({})
-    
-    // Create Supabase client with request/response for cookie handling
-    // This uses the SSR client which automatically manages session cookies
-    // @ts-ignore
-    const supabase = createServerClient(request, res as any)
+    // Create Supabase client with proper session cookie handling
+    // This reads cookies from request and sets them in response
+    const { supabase, response } = createAuthSupabaseClient(request)
     
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
