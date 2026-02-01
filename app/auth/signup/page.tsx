@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { fetchUserRoleWithRetry } from "@/lib/auth/fetchUserRole";
 
 const PLANS = [
   {
