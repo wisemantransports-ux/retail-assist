@@ -101,8 +101,28 @@ export function applyCookies(
   console.log('[Auth Server] Applying', cookiesToSet.length, 'cookies to response');
 
   cookiesToSet.forEach(({ name, value, options }) => {
-    console.log('[Auth Server] Applying cookie:', name);
-    response.cookies.set(name, value, options);
+    console.log('[Auth Server] Applying cookie:', name, 'with value length:', value.length);
+
+    // Extract only valid Next.js cookie options
+    const validOptions = {
+      path: options?.path,
+      domain: options?.domain,
+      maxAge: options?.maxAge,
+      expires: options?.expires,
+      httpOnly: options?.httpOnly,
+      secure: options?.secure,
+      sameSite: options?.sameSite,
+    };
+
+    // Remove undefined values
+    Object.keys(validOptions).forEach(key => {
+      if (validOptions[key as keyof typeof validOptions] === undefined) {
+        delete validOptions[key as keyof typeof validOptions];
+      }
+    });
+
+    console.log('[Auth Server] Cookie options:', Object.keys(validOptions).join(', '));
+    response.cookies.set(name, value, validOptions);
   });
 }
 
