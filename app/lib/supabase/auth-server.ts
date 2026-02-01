@@ -109,10 +109,25 @@ export function mergeCookies(
   console.log('[Auth Server] Merging', cookies.length, 'cookies from intermediate response');
 
   cookies.forEach((cookie) => {
-    // Extract only valid cookie options
-    const { name, value, ...cookieOptions } = cookie;
-    console.log('[Auth Server] Merging cookie:', name, 'with options:', cookieOptions);
-    toResponse.cookies.set(name, value, cookieOptions);
+    // Extract only valid cookie options - Next.js cookies API expects specific properties
+    const validOptions = {
+      path: (cookie as any).path,
+      domain: (cookie as any).domain,
+      maxAge: (cookie as any).maxAge,
+      expires: (cookie as any).expires,
+      httpOnly: (cookie as any).httpOnly,
+      secure: (cookie as any).secure,
+      sameSite: (cookie as any).sameSite,
+    };
+
+    console.log('[Auth Server] Merging cookie:', cookie.name, 'with options:', {
+      path: validOptions.path,
+      secure: validOptions.secure,
+      sameSite: validOptions.sameSite,
+      httpOnly: validOptions.httpOnly,
+    });
+
+    toResponse.cookies.set(cookie.name, cookie.value, validOptions);
   });
 }
 
