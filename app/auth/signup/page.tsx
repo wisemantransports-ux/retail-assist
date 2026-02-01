@@ -162,7 +162,8 @@ function SignupForm() {
 
       console.log('[Signup Page] Final redirect target:', targetPath);
       // NOW redirect - auth context is confirmed ready
-      router.push(targetPath);
+      // Use router.replace to prevent back button to signup page
+      router.replace(targetPath);
     } catch (err: any) {
       setError(err.message || "Failed to sign up");
     } finally {
