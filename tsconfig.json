@@ -43,6 +43,11 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "test-*.ts",
+    "debug-*.ts",
+    "check-*.ts",
+    ".next",
+    "dist"
   ]
 }

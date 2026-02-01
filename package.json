@@ -19,7 +19,6 @@
     "provision:users": "node -r ts-node/register -r tsconfig-paths/register scripts/create-admin-users.ts"
   },
   "dependencies": {
-    "@supabase/auth-helpers-nextjs": "^0.15.0",
     "@supabase/ssr": "^0.4.1",
     "@supabase/supabase-js": "^2.86.2",
     "dotenv": "^17.2.3",

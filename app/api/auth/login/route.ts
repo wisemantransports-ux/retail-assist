@@ -10,6 +10,12 @@ import { ensureWorkspaceForUser } from '@/lib/supabase/ensureWorkspaceForUser';
 
 export async function POST(request: NextRequest) {
   try {
+    // RUNTIME ASSERTION: Log Supabase URL
+    console.log(
+      '[RUNTIME SUPABASE URL]',
+      process.env.NEXT_PUBLIC_SUPABASE_URL
+    )
+
     const { email, password } = await request.json()
 
     if (!email || !password) {
