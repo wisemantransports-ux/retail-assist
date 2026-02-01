@@ -94,7 +94,8 @@ export default function LoginPage() {
 
       console.log('[Login Page] Final redirect target:', targetPath);
       // NOW redirect - auth context is confirmed ready
-      router.push(targetPath);
+      // Use router.replace to prevent back button to login page
+      router.replace(targetPath);
     } catch (err: any) {
       setError(err.message || "Failed to log in");
     } finally {
