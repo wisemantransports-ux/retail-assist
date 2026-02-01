@@ -89,41 +89,20 @@ export function createAuthSupabaseClient(request: NextRequest): {
 }
 
 /**
- * Merge cookies from intermediate response into final response.
- * 
- * When you create multiple responses during request processing,
- * use this to ensure all cookies are included in the final response.
- * 
- * @param fromResponse - Response with cookies to copy
- * @param toResponse - Response to set cookies in
+ * Apply stored cookies to a response object.
+ *
+ * @param cookiesToSet - Array of cookies from createAuthSupabaseClient
+ * @param response - Response to set cookies in
  */
-export function mergeCookies(
-  fromResponse: NextResponse,
-  toResponse: NextResponse
+export function applyCookies(
+  cookiesToSet: Array<{ name: string; value: string; options: any }>,
+  response: NextResponse
 ): void {
-  const cookies = fromResponse.cookies.getAll();
-  console.log('[Auth Server] Merging', cookies.length, 'cookies from intermediate response');
+  console.log('[Auth Server] Applying', cookiesToSet.length, 'cookies to response');
 
-  cookies.forEach((cookie) => {
-    // Extract only valid cookie options - Next.js cookies API expects specific properties
-    const validOptions = {
-      path: (cookie as any).path,
-      domain: (cookie as any).domain,
-      maxAge: (cookie as any).maxAge,
-      expires: (cookie as any).expires,
-      httpOnly: (cookie as any).httpOnly,
-      secure: (cookie as any).secure,
-      sameSite: (cookie as any).sameSite,
-    };
-
-    console.log('[Auth Server] Merging cookie:', cookie.name, 'with options:', {
-      path: validOptions.path,
-      secure: validOptions.secure,
-      sameSite: validOptions.sameSite,
-      httpOnly: validOptions.httpOnly,
-    });
-
-    toResponse.cookies.set(cookie.name, cookie.value, validOptions);
+  cookiesToSet.forEach(({ name, value, options }) => {
+    console.log('[Auth Server] Applying cookie:', name);
+    response.cookies.set(name, value, options);
   });
 }
 
