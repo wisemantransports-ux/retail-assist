@@ -26,19 +26,19 @@ import { SupabaseClient } from '@supabase/supabase-js';
 
 /**
  * Create an authenticated Supabase client for server-side API routes.
- * 
+ *
  * This client:
  * - Reads auth cookies from the incoming request
  * - Validates the session server-side
- * - Automatically sets any updated cookies in the response
+ * - Stores cookies that need to be set
  * - Properly configures cookie options (sameSite, path, secure)
- * 
+ *
  * @param request - Next.js API request
- * @returns { supabase, response } - Supabase client and response object with cookies
+ * @returns { supabase, cookiesToSet } - Supabase client and array of cookies to set in response
  */
 export function createAuthSupabaseClient(request: NextRequest): {
   supabase: SupabaseClient;
-  response: NextResponse;
+  cookiesToSet: Array<{ name: string; value: string; options: any }>;
 } {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -49,14 +49,10 @@ export function createAuthSupabaseClient(request: NextRequest): {
     );
   }
 
-  // Create a NextResponse to capture cookies
-  const response = NextResponse.json({});
+  // Store cookies that need to be set - we'll set them in the final response
+  const cookiesToSet: Array<{ name: string; value: string; options: any }> = [];
 
   // Create SSR client with proper cookie handling
-  // This client will:
-  // 1. Read cookies from the incoming request
-  // 2. Call setAll() when auth methods set cookies
-  // 3. Properly format cookies with options
   const supabase = createSSRServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       // Read cookies from incoming request
@@ -65,11 +61,11 @@ export function createAuthSupabaseClient(request: NextRequest): {
         console.log('[Auth Server] Reading cookies from request:', cookies.map(c => c.name).join(', ') || '(none)');
         return cookies;
       },
-      // Set cookies in the response
-      setAll(cookiesToSet) {
-        console.log('[Auth Server] Setting', cookiesToSet.length, 'cookies in response');
-        cookiesToSet.forEach(({ name, value, options }) => {
-          // CRITICAL: Must merge with default options
+      // Store cookies to be set later in the final response
+      setAll(incomingCookies) {
+        console.log('[Auth Server] Storing', incomingCookies.length, 'cookies to set in response');
+        incomingCookies.forEach(({ name, value, options }) => {
+          // CRITICAL: Merge options with defaults
           const cookieOptions = {
             ...options,
             path: options?.path || '/',
@@ -77,19 +73,19 @@ export function createAuthSupabaseClient(request: NextRequest): {
             secure: process.env.NODE_ENV === 'production',
             httpOnly: true,
           };
-          
-          console.log('[Auth Server] Setting cookie:', {
+
+          console.log('[Auth Server] Storing cookie:', {
             name,
             options: cookieOptions,
           });
-          
-          response.cookies.set(name, value, cookieOptions);
+
+          cookiesToSet.push({ name, value, options: cookieOptions });
         });
       },
     },
   });
 
-  return { supabase, response };
+  return { supabase, cookiesToSet };
 }
 
 /**
