@@ -18,85 +18,72 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const response = await fetch('/api/auth/login', {
+      // STEP 1: Sign in to Supabase
+      console.log('[Login Page] Step 1: POST /api/auth/login');
+      const loginResponse = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Login failed');
 
-      // ===== CRITICAL FIX: Wait for auth context to be ready =====
-      // After login succeeds, the backend has set Supabase cookies
-      // Give the browser a moment to ensure cookies are fully set
+      const loginData = await loginResponse.json();
+
+      if (!loginResponse.ok) {
+        throw new Error(loginData.error || 'Login failed');
+      }
+
+      console.log('[Login Page] ✓ Login successful');
+
+      // STEP 2: Wait for Supabase cookies to be set
+      console.log('[Login Page] Step 2: Waiting 100ms for auth cookies...');
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      console.log('[Login Page] Waiting for auth context to initialize...');
+      // STEP 3: Fetch user role from /api/auth/me with retries
+      console.log('[Login Page] Step 3: Fetching user role from /api/auth/me');
+      const roleResult = await fetchUserRoleWithRetry();
 
-      // Call /api/auth/me to ensure backend validates and auth context syncs
-      // Retry up to 3 times with delays to ensure auth is ready
-      let meResponse = null;
-      let lastError: Error | null = null;
-      
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        try {
-          meResponse = await fetch('/api/auth/me', {
-            method: 'GET',
-            credentials: 'include',
-          });
-          
-          if (meResponse.ok) {
-            console.log('[Login Page] Auth validation succeeded on attempt', attempt);
-            break;
-          }
-          
-          console.warn('[Login Page] Auth validation failed on attempt', attempt, '- retrying...');
-          
-          if (attempt < 3) {
-            await new Promise(resolve => setTimeout(resolve, 200));
-          }
-        } catch (err) {
-          lastError = err as Error;
-          if (attempt < 3) {
-            await new Promise(resolve => setTimeout(resolve, 200));
-          }
-        }
+      if (!roleResult.success) {
+        // Detailed error message to help diagnose
+        const diagnostic = [
+          'Authentication validation failed.',
+          `Error: ${roleResult.error}`,
+          'Please check:',
+          '1. User exists in Supabase Auth',
+          '2. User has role set in database users table',
+          '3. Browser allows cookies',
+        ].join('\n');
+        throw new Error(diagnostic);
       }
 
-      if (!meResponse?.ok) {
-        throw new Error(`Auth validation failed after login${lastError ? ': ' + lastError.message : ''}`);
-      }
+      const role = roleResult.role;
+      const workspaceId = roleResult.workspaceId;
 
-      const meData = await meResponse.json();
-      const role = meData.role;
-      const workspaceId = meData.workspaceId;
+      console.log('[Login Page] ✓ Role resolved:', { role, workspaceId });
 
-      console.log('[Login Page] Role from /api/auth/me:', role);
-      console.log('[Login Page] Workspace ID from /api/auth/me:', workspaceId);
-
-      // Determine redirect target based on role
+      // STEP 4: Route based on role
       let targetPath = '/unauthorized';
 
       if (role === 'super_admin') {
         targetPath = '/admin';
-        console.log('[Login Page] Super admin detected, redirecting to /admin');
+        console.log('[Login Page] → Redirecting super_admin to /admin');
       } else if (role === 'platform_staff') {
         targetPath = '/admin/support';
-        console.log('[Login Page] Platform staff detected, redirecting to /admin/support');
+        console.log('[Login Page] → Redirecting platform_staff to /admin/support');
       } else if (role === 'admin') {
         targetPath = '/dashboard';
-        console.log('[Login Page] Client admin detected, redirecting to /dashboard');
+        console.log('[Login Page] → Redirecting client_admin to /dashboard');
       } else if (role === 'employee') {
         targetPath = '/employees/dashboard';
-        console.log('[Login Page] Employee detected, redirecting to /employees/dashboard');
+        console.log('[Login Page] → Redirecting employee to /employees/dashboard');
       }
 
-      console.log('[Login Page] Final redirect target:', targetPath);
-      // NOW redirect - auth context is confirmed ready
-      // Use router.replace to prevent back button to login page
+      console.log('[Login Page] Step 4: Redirecting to', targetPath);
+      // CRITICAL: Use router.replace to prevent back button returning to login
       router.replace(targetPath);
     } catch (err: any) {
-      setError(err.message || "Failed to log in");
+      const errorMessage = err.message || 'Failed to log in';
+      console.error('[Login Page] Error:', errorMessage);
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
