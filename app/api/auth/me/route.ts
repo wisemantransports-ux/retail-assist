@@ -8,8 +8,8 @@ export async function GET(request: NextRequest) {
     console.log('[Auth Me] GET /api/auth/me');
 
     // Create Supabase client with proper cookie handling
-    // This reads auth cookies from the request
-    const { supabase, response } = createAuthSupabaseClient(request);
+    // This reads auth cookies from the request and stores cookies to be set
+    const { supabase, cookiesToSet } = createAuthSupabaseClient(request);
     
     // Get authenticated user from cookies
     const { data: userData, error: authError } = await supabase.auth.getUser();
