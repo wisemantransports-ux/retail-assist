@@ -1,21 +1,23 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { db, PLAN_LIMITS } from '@/lib/db';
-import { ensureInternalUser } from '@/lib/supabase/queries';
-import { env } from '@/lib/env';
-import { createServerClient, createAdminSupabaseClient } from '@/lib/supabase/server';
-import { PLATFORM_WORKSPACE_ID } from '@/lib/config/workspace';
+import { createAuthSupabaseClient } from '@/lib/supabase/auth-server';
+import { createAdminSupabaseClient } from '@/lib/supabase/server';
+import { PLAN_LIMITS } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   try {
-    // Create response to capture cookie updates
-    const res = NextResponse.json({});
+    console.log('[Auth Me] GET /api/auth/me');
+
+    // Create Supabase client with proper cookie handling
+    // This reads auth cookies from the request
+    const { supabase, response } = createAuthSupabaseClient(request);
     
-    // Use Supabase auth with request/response for proper cookie handling
-    // @ts-ignore
-    const supabase = createServerClient(request, res as any);
-    
+    // Get authenticated user from cookies
     const { data: userData, error: authError } = await supabase.auth.getUser();
-    console.info('[Auth Me] Supabase getUser:', userData?.user ? 'FOUND' : 'NOT_FOUND', authError ? `Error: ${authError.message}` : '');
+    
+    console.log('[Auth Me] getUser result:', {
+      found: !!userData?.user,
+      error: authError?.message || null
+    });
 
     if (authError || !userData?.user) {
       console.warn('[Auth Me] Auth check failed:', authError?.message || 'no user');
@@ -26,35 +28,44 @@ export async function GET(request: NextRequest) {
     }
 
     const authUser = userData.user;
-    console.info('[Auth Me] auth user id:', authUser.id);
+    console.log('[Auth Me] Authenticated user:', authUser.id);
     
-    // Use admin client for user lookups to avoid RLS/policy recursion
+    // Use admin client for database lookups
     const admin = createAdminSupabaseClient();
 
-    // Look up user in database using admin client
-    const { data: userDataFromDb, error: userError } = await admin.from('users').select('*').eq('auth_uid', authUser.id).single();
-    console.info('[Auth Me] user lookup (admin):', userDataFromDb ? 'FOUND' : 'NOT_FOUND', userError ? `Error: ${userError.message}` : '');
+    // Look up user in users table
+    const { data: userDataFromDb, error: userError } = await admin
+      .from('users')
+      .select('*')
+      .eq('auth_uid', authUser.id)
+      .single();
 
-    if (userError && (userError as any).code !== 'PGRST116') { // PGRST116 is "not found"
-      console.error('[Auth Me] user lookup error:', userError);
+    console.log('[Auth Me] Database lookup:', {
+      found: !!userDataFromDb,
+      error: userError?.message || null
+    });
+
+    if (userError && (userError as any).code !== 'PGRST116') { // PGRST116 = not found
+      console.error('[Auth Me] Database error:', userError);
       return NextResponse.json({ error: 'Database error' }, { status: 500 });
     }
 
     let user = userDataFromDb;
+    
+    // If user not found in users table, check employees table
     if (!user) {
-      // CRITICAL: DO NOT call ensureInternalUser - it would create a users row for employees
-      // Check employees table directly instead
+      console.log('[Auth Me] User not in users table, checking employees table');
+      
       const { data: employeeCheck } = await admin
         .from('employees')
         .select('id, workspace_id, invited_by_role, auth_uid')
         .eq('auth_uid', authUser.id)
         .maybeSingle();
       
-      // If employee found, handle as employee (no users row)
       if (employeeCheck) {
-        console.log('[Auth Me] ✓ Employee found (no users row) - role resolution via employees table');
-        // Return employee response directly
-        const finalRes = NextResponse.json({
+        console.log('[Auth Me] ✓ Employee found (no users row)');
+        
+        const finalResponse = NextResponse.json({
           session: { user: authUser },
           role: 'employee',
           workspaceId: employeeCheck.workspace_id,
@@ -73,15 +84,8 @@ export async function GET(request: NextRequest) {
           }
         }, { status: 200 });
         
-        // Copy any Supabase cookies to response to maintain session
-        const cookies = res.cookies.getAll();
-        for (const cookie of cookies) {
-          finalRes.cookies.set(cookie);
-        }
-        
-        return finalRes;
+        return finalResponse;
       } else {
-        // Not found in users or employees
         console.error('[Auth Me] User not found in users or employees tables');
         return NextResponse.json(
           { error: 'User not found' },
@@ -89,51 +93,42 @@ export async function GET(request: NextRequest) {
         );
       }
     }
-    
+
     const planLimits = PLAN_LIMITS[user.plan_type] || PLAN_LIMITS['starter'];
     
     // ===== ROLE-BASED ACCESS RESOLUTION =====
-    // Use direct table queries instead of RPC (more reliable)
-    // ===== ROLE-BASED ACCESS RESOLUTION =====
-    // STRICT Priority order (DETERMINISTIC):
+    // STRICT Priority order:
     // 1) users.role = 'super_admin'
     // 2) users.role = 'client_admin'
     // 3) employees table (employee role)
-    // CRITICAL: Must match login endpoint. Employees from employees table ONLY
+    
     let role = null;
     let workspaceIdFromRpc = null;
     let employeeScope: 'super_admin' | 'client_admin' | null = null;
     
-    console.log('[Auth Me] DEBUG: user object from DB:', { id: user.id, role: user.role, auth_uid: user.auth_uid });
+    console.log('[Auth Me] Resolving role for user:', { id: user.id, dbRole: user.role });
     
-    // 1) Check if super_admin (role already in user object from select('*'))
+    // 1) Check if super_admin
     if (user.role === 'super_admin') {
       role = 'super_admin';
       workspaceIdFromRpc = null;
-      console.log('[Auth Me] ✓ Resolved role: super_admin (priority 1) from user object');
+      console.log('[Auth Me] ✓ Resolved: super_admin');
     }
     
-    // 2) Check if client_admin (users table)
-    // CRITICAL: client_admin MUST have workspace_id set
-    if (!role) {
-      if (user.role === 'client_admin') {
-        // ===== ADMIN SCOPE ENFORCEMENT =====
-        // client_admin.workspace_id MUST NOT be NULL
-        if (!user.workspace_id) {
-          console.error('[Auth Me] ✗ Invalid client_admin state: workspace_id is NULL', {
-            user_id: user.id,
-            role: 'client_admin',
-          });
-          return NextResponse.json(
-            { error: 'Invalid admin account state - workspace not assigned' },
-            { status: 403 }
-          );
-        }
-
-        role = 'admin';  // Treat client_admin as admin role
-        workspaceIdFromRpc = user.workspace_id;
-        console.log('[Auth Me] ✓ Resolved role: admin (client_admin, priority 2), workspace:', workspaceIdFromRpc);
+    // 2) Check if client_admin
+    if (!role && user.role === 'client_admin') {
+      // client_admin MUST have workspace_id
+      if (!user.workspace_id) {
+        console.error('[Auth Me] client_admin has no workspace_id');
+        return NextResponse.json(
+          { error: 'Invalid admin account state - workspace not assigned' },
+          { status: 403 }
+        );
       }
+
+      role = 'admin';
+      workspaceIdFromRpc = user.workspace_id;
+      console.log('[Auth Me] ✓ Resolved: admin (client_admin), workspace:', workspaceIdFromRpc);
     }
     
     // 3) Check employees table (ONLY authoritative source for employee role)
@@ -148,28 +143,26 @@ export async function GET(request: NextRequest) {
         role = 'employee';
         workspaceIdFromRpc = employeeCheck.workspace_id;
         employeeScope = employeeCheck.invited_by_role || 'client_admin';
-        console.log('[Auth Me] ✓ Resolved role: employee (priority 3), invited_by:', employeeScope, ', workspace:', workspaceIdFromRpc);
+        console.log('[Auth Me] ✓ Resolved: employee, workspace:', workspaceIdFromRpc);
       }
     }
     
     // Role must be resolved
     if (!role) {
-      console.error('[Auth Me] ✗ No role resolved for user:', authUser.id);
-        console.error('[Auth Me] Troubleshooting: Verify user in users table has role field set, or migration 039 applied for employees table');
-      return NextResponse.json({ error: 'User role not found - ensure user is properly onboarded' }, { status: 403 });
+      console.error('[Auth Me] No role resolved for user:', authUser.id);
+      return NextResponse.json(
+        { error: 'User role not found - ensure user is properly onboarded' },
+        { status: 403 }
+      );
     }
+
+    console.log('[Auth Me] ✓ Role resolution complete:', { role, workspaceIdFromRpc });
     
-    console.log('[Auth Me] ✓ Role resolution complete:', { role, workspaceIdFromRpc, employeeScope });
-    
-    // Copy any Supabase cookies to response to maintain session
-    // Client will use these values to determine post-login redirect:
-    //   - super_admin (workspace_id = NULL) → /admin
-    //   - admin (workspace_id = client workspace id) → /dashboard
-    //   - employee (workspace_id = assigned workspace id) → /employees/dashboard
-    const finalRes = NextResponse.json({
-      session: { user: authUser }, // Include session for compatibility with useAuth
-      role, // Include role for easier access
-      workspaceId: workspaceIdFromRpc, // Include workspaceId
+    // Return successful auth response
+    const finalResponse = NextResponse.json({
+      session: { user: authUser },
+      role,
+      workspaceId: workspaceIdFromRpc,
       user: {
         id: authUser.id,
         email: user.email,
@@ -185,21 +178,15 @@ export async function GET(request: NextRequest) {
         workspace_id: workspaceIdFromRpc
       }
     }, { status: 200 });
-    
-    // Copy any Supabase cookies to response to maintain session
-    const cookies = res.cookies.getAll();
-    for (const cookie of cookies) {
-      finalRes.cookies.set(cookie);
-    }
-    
-    return finalRes;
+
+    console.log('[Auth Me] ✓ Auth validation successful');
+    return finalResponse;
+
   } catch (error: any) {
     console.error('[Auth Me] Unexpected error:', error?.message || error);
-    console.error('[Auth Me] Error stack:', error?.stack);
     return NextResponse.json(
       { error: 'Internal server error', details: error?.message },
       { status: 500 }
     );
   }
 }
-
