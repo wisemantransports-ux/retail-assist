@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
       
       if (employeeCheck) {
         console.log('[Auth Me] ✓ Employee found (no users row)');
-        
+
         const finalResponse = NextResponse.json({
           session: { user: authUser },
           role: 'employee',
@@ -83,7 +83,8 @@ export async function GET(request: NextRequest) {
             workspace_id: employeeCheck.workspace_id
           }
         }, { status: 200 });
-        
+
+        applyCookies(cookiesToSet, finalResponse);
         return finalResponse;
       } else {
         console.error('[Auth Me] User not found in users or employees tables');
