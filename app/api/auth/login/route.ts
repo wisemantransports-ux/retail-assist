@@ -70,20 +70,20 @@ export async function POST(request: NextRequest) {
 
       // Create final response with employee data
       const finalResponse = NextResponse.json(
-        { 
-          success: true, 
-          user: { 
-            id: data.user.id, 
-            email: data.user.email, 
+        {
+          success: true,
+          user: {
+            id: data.user.id,
+            email: data.user.email,
             role: 'employee'
-          }, 
+          },
           workspaceId: employeeCheck.workspace_id
         },
         { status: 200 }
       )
 
-      // Merge cookies from auth response (which has Supabase session cookies)
-      mergeCookies(response, finalResponse)
+      // Apply Supabase cookies (which has session cookies)
+      applyCookies(cookiesToSet, finalResponse)
 
       // Set custom session_id cookie
       finalResponse.cookies.set('session_id', sessionId, {
