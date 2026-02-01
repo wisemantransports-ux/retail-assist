@@ -1,20 +1,22 @@
 /**
  * Server-side Supabase auth client for Next.js API routes.
- * 
+ *
  * SINGLE SOURCE OF TRUTH: All server API routes (/api/auth/*) must use this utility
  * to create a Supabase client that properly handles session cookies.
- * 
+ *
  * Usage in API routes:
  * ```typescript
- * import { createAuthSupabaseClient } from '@/lib/supabase/auth-server';
- * 
+ * import { createAuthSupabaseClient, applyCookies } from '@/lib/supabase/auth-server';
+ *
  * export async function GET(request: NextRequest) {
- *   const { supabase, response } = createAuthSupabaseClient(request);
- *   
+ *   const { supabase, cookiesToSet } = createAuthSupabaseClient(request);
+ *
  *   // Use supabase for auth operations
  *   const { data } = await supabase.auth.getUser();
- *   
- *   // Return the response (cookies are automatically set)
+ *
+ *   // Create response and apply cookies
+ *   const response = NextResponse.json({ success: true });
+ *   applyCookies(cookiesToSet, response);
  *   return response;
  * }
  * ```
