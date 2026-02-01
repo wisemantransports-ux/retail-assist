@@ -61,8 +61,9 @@ export function createAuthSupabaseClient(request: NextRequest): {
     cookies: {
       // Read cookies from incoming request
       getAll() {
-        console.log('[Auth Server] Reading cookies from request');
-        return request.cookies.getAll();
+        const cookies = request.cookies.getAll();
+        console.log('[Auth Server] Reading cookies from request:', cookies.map(c => c.name).join(', ') || '(none)');
+        return cookies;
       },
       // Set cookies in the response
       setAll(cookiesToSet) {
