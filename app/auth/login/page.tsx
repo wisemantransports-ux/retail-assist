@@ -3,8 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase/client";
-import { PLATFORM_WORKSPACE_ID } from "@/lib/config/workspace";
+import { fetchUserRoleWithRetry } from "@/lib/auth/fetchUserRole";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
