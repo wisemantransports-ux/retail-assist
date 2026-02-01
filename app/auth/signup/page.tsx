@@ -96,73 +96,51 @@ function SignupForm() {
         throw new Error(data.error || 'Signup failed');
       }
 
-      // ===== CRITICAL: Wait for auth context to be ready =====
-      // After signup succeeds, the backend has set Supabase cookies
-      // Give the browser a moment to ensure cookies are fully set
+      console.log('[Signup Page] ✓ Signup successful');
+
+      // Wait for Supabase cookies to be set
+      console.log('[Signup Page] Waiting 100ms for auth cookies...');
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      console.log('[Signup Page] Waiting for auth context to initialize...');
+      // Fetch user role from /api/auth/me with retries
+      console.log('[Signup Page] Fetching user role from /api/auth/me');
+      const roleResult = await fetchUserRoleWithRetry();
 
-      // Call /api/auth/me to ensure backend validates and auth context syncs
-      // Retry up to 3 times with delays to ensure auth is ready
-      let meResponse = null;
-      let lastError: Error | null = null;
-
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        try {
-          meResponse = await fetch('/api/auth/me', {
-            method: 'GET',
-            credentials: 'include',
-          });
-
-          if (meResponse.ok) {
-            console.log('[Signup Page] Auth validation succeeded on attempt', attempt);
-            break;
-          }
-
-          console.warn('[Signup Page] Auth validation failed on attempt', attempt, '- retrying...');
-
-          if (attempt < 3) {
-            await new Promise(resolve => setTimeout(resolve, 200));
-          }
-        } catch (err) {
-          lastError = err as Error;
-          if (attempt < 3) {
-            await new Promise(resolve => setTimeout(resolve, 200));
-          }
-        }
+      if (!roleResult.success) {
+        const diagnostic = [
+          'Authentication validation failed after signup.',
+          `Error: ${roleResult.error}`,
+          'Please check:',
+          '1. User created in Supabase Auth',
+          '2. User profile created in database',
+          '3. User role assigned in users table',
+        ].join('\n');
+        throw new Error(diagnostic);
       }
 
-      if (!meResponse?.ok) {
-        throw new Error(`Auth validation failed after signup${lastError ? ': ' + lastError.message : ''}`);
-      }
+      const role = roleResult.role;
+      const workspaceId = roleResult.workspaceId;
 
-      const meData = await meResponse.json();
-      const role = meData.role;
-      const workspaceId = meData.workspaceId;
+      console.log('[Signup Page] ✓ Role resolved:', { role, workspaceId });
 
-      console.log('[Signup Page] Role from /api/auth/me:', role);
-      console.log('[Signup Page] Workspace ID from /api/auth/me:', workspaceId);
-
-      // Determine redirect target based on role
+      // Route based on role
       let targetPath = '/unauthorized';
 
       if (role === 'super_admin') {
         targetPath = '/admin';
-        console.log('[Signup Page] Super admin detected, redirecting to /admin');
+        console.log('[Signup Page] → Redirecting super_admin to /admin');
       } else if (role === 'platform_staff') {
         targetPath = '/admin/support';
-        console.log('[Signup Page] Platform staff detected, redirecting to /admin/support');
+        console.log('[Signup Page] → Redirecting platform_staff to /admin/support');
       } else if (role === 'admin') {
         targetPath = '/dashboard';
-        console.log('[Signup Page] Client admin detected, redirecting to /dashboard');
+        console.log('[Signup Page] → Redirecting client_admin to /dashboard');
       } else if (role === 'employee') {
         targetPath = '/employees/dashboard';
-        console.log('[Signup Page] Employee detected, redirecting to /employees/dashboard');
+        console.log('[Signup Page] → Redirecting employee to /employees/dashboard');
       }
 
-      console.log('[Signup Page] Final redirect target:', targetPath);
-      // NOW redirect - auth context is confirmed ready
+      console.log('[Signup Page] Redirecting to', targetPath);
       // Use router.replace to prevent back button to signup page
       router.replace(targetPath);
     } catch (err: any) {
