@@ -107,10 +107,12 @@ export function mergeCookies(
 ): void {
   const cookies = fromResponse.cookies.getAll();
   console.log('[Auth Server] Merging', cookies.length, 'cookies from intermediate response');
-  
+
   cookies.forEach((cookie) => {
-    console.log('[Auth Server] Merging cookie:', cookie.name);
-    toResponse.cookies.set(cookie.name, cookie.value, cookie);
+    // Extract only valid cookie options
+    const { name, value, ...cookieOptions } = cookie;
+    console.log('[Auth Server] Merging cookie:', name, 'with options:', cookieOptions);
+    toResponse.cookies.set(name, value, cookieOptions);
   });
 }
 
