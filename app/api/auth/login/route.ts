@@ -236,21 +236,21 @@ export async function POST(request: NextRequest) {
 
     // Create final response with user data
     const finalResponse = NextResponse.json(
-      { 
-        success: true, 
-        user: { 
-          id: internalUserId, 
-          email: data.user.email, 
-          role 
-        }, 
-        workspaceId 
+      {
+        success: true,
+        user: {
+          id: internalUserId,
+          email: data.user.email,
+          role
+        },
+        workspaceId
       },
       { status: 200 }
     )
 
-    // CRITICAL: Merge cookies from auth response
-    // This ensures Supabase session cookies are included in the final response
-    mergeCookies(response, finalResponse)
+    // CRITICAL: Apply Supabase cookies to the response
+    // This ensures session cookies are included in the final response
+    applyCookies(cookiesToSet, finalResponse)
 
     // Set custom session_id cookie for application session management
     finalResponse.cookies.set('session_id', sessionId, {
