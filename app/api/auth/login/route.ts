@@ -1,5 +1,5 @@
 import { NextResponse, NextRequest } from 'next/server'
-import { createAuthSupabaseClient, mergeCookies } from '@/lib/supabase/auth-server'
+import { createAuthSupabaseClient, applyCookies } from '@/lib/supabase/auth-server'
 import { createAdminSupabaseClient } from '@/lib/supabase/server'
 import { db } from '@/lib/db'
 import { env } from '@/lib/env'
