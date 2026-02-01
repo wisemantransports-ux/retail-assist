@@ -180,7 +180,6 @@ export async function GET(request: NextRequest) {
     }, { status: 200 });
 
     // Apply any cookie updates (e.g., refresh token rotation)
-    const { applyCookies } = await import('@/lib/supabase/auth-server');
     applyCookies(cookiesToSet, finalResponse);
 
     console.log('[Auth Me] ✓ Auth validation successful');
