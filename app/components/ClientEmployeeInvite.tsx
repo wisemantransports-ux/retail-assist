@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 import { Copy, Check, Loader2 } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
+import { createBrowserSupabaseClient } from '@/lib/supabase/client';
 
 /**
  * TypeScript interface for employee invites in client workspace
