@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { createBrowserSupabaseClient } from '@/lib/supabase/client';
 import toast from 'react-hot-toast';
 
 // TypeScript Types
