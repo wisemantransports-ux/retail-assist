@@ -37,6 +37,7 @@ export default function NewAutomationRulePage() {
     try {
       setLoading(true);
 
+      const supabase = createBrowserSupabaseClient();
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session) {
