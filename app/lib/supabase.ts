@@ -1,15 +1,10 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+/**
+ * DEPRECATED: Use createBrowserSupabaseClient from @/lib/supabase/client instead.
+ *
+ * This file is kept for backwards compatibility only.
+ * It re-exports the singleton instance from the correct location.
+ */
+import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
-const SUPABASE_URL =
-  process.env.NEXT_PUBLIC_SUPABASE_URL ||
-  (() => {
-    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL environment variable')
-  })()
-
-const SUPABASE_ANON_KEY =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  (() => {
-    throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable')
-  })()
-
-export const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+export const supabase: SupabaseClient = createBrowserSupabaseClient()
