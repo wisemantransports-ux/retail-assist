@@ -33,12 +33,10 @@ interface ClientEmployeeInviteProps {
 }
 
 /**
- * Initialize Supabase client
+ * Get the singleton Supabase client
+ * (created at module load time to ensure single instance)
  */
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-);
+const supabase = createBrowserSupabaseClient();
 
 /**
  * ClientEmployeeInvite Component
