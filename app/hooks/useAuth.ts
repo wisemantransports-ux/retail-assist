@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { createBrowserSupabaseClient } from '@/lib/supabase/client';
 import type { Session } from '@supabase/supabase-js';
 
 /**
