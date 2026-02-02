@@ -31,14 +31,14 @@ export interface AuthState {
  * useAuth Hook
  *
  * Implements the mandatory auth flow (single source of truth via /api/auth/me):
- * 1. Call supabase.auth.getSession() to check if browser has auth cookies
- * 2. If no session → user is not authenticated, redirect to /auth/login
- * 3. If session exists → call GET /api/auth/me to fetch authoritative role & workspace
- * 4. If /api/auth/me returns 401/403 → user role not found, show error
- * 5. If /api/auth/me succeeds → set role, workspaceId, and isLoading=false
+ * 1. Call GET /api/auth/me to check if user has a valid server-side session
+ * 2. If 401/403 → user is not authenticated, no session
+ * 3. If 200 → /api/auth/me returns role, workspace, and user data
+ * 4. Set role, workspaceId, and isLoading=false
  *
  * CRITICAL CONSTRAINTS:
- * - Never call /api/auth/me before auth session is ready
+ * - Server uses HttpOnly cookies for session security
+ * - Client validates session via /api/auth/me, not client-side Supabase.getSession()
  * - Never hardcode roles or infer from email/cookies
  * - Never call /api/auth/me during SSR or build time
  * - Always handle loading and error states before rendering
@@ -68,7 +68,7 @@ export function useAuth(): AuthState {
   const hasInitialized = useRef(false);
 
   /**
-   * Initialize auth: session → RPC
+   * Initialize auth via /api/auth/me (server-side session validation)
    * Only call once per component mount
    */
   const initializeAuth = useCallback(async () => {
@@ -80,29 +80,17 @@ export function useAuth(): AuthState {
     initInProgressRef.current = true;
 
     try {
-      // ===== STEP 0: Check if we have a session first =====
-      const supabase = createBrowserSupabaseClient();
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
+      // ===== STEP 1: Validate session via backend (single source of truth) =====
+      // Server validates the HttpOnly cookies and returns role + workspace
+      console.log('[useAuth] Validating session via /api/auth/me...');
+      const meResponse = await fetch('/api/auth/me', {
+        method: 'GET',
+        credentials: 'include', // Include HttpOnly cookies in request
+      });
 
-      if (sessionError) {
-        console.error('[useAuth] Session error:', sessionError.message);
-        setState((prev) => ({
-          ...prev,
-          isLoading: false,
-          isError: true,
-          errorMessage: `Session error: ${sessionError.message}`,
-        }));
-        hasInitialized.current = true;
-        initInProgressRef.current = false;
-        return;
-      }
-
-      // If no session, user is not authenticated
-      if (!session) {
-        console.log('[useAuth] No session found - user not authenticated');
+      // 401/403: No valid session, user not authenticated
+      if (meResponse.status === 401 || meResponse.status === 403) {
+        console.log('[useAuth] No valid session (', meResponse.status, ')');
         setState((prev) => ({
           ...prev,
           session: null,
@@ -112,32 +100,6 @@ export function useAuth(): AuthState {
           isLoading: false,
           isError: false,
           errorMessage: null,
-        }));
-        hasInitialized.current = true;
-        initInProgressRef.current = false;
-        return;
-      }
-
-      // ===== STEP 1: Session confirmed - fetch user access via backend API =====
-      console.log('[useAuth] Session confirmed for user:', session.user.id);
-      console.log('[useAuth] Step 1: Fetching user access via /api/auth/me...');
-      const meResponse = await fetch('/api/auth/me', {
-        method: 'GET',
-        credentials: 'include', // Include cookies in request
-      });
-
-      // Handle 401/403 as unauthenticated (no role assigned yet)
-      if (meResponse.status === 401 || meResponse.status === 403) {
-        console.log('[useAuth] /api/auth/me returned', meResponse.status, '- user role not found');
-        setState((prev) => ({
-          ...prev,
-          session,
-          access: null,
-          role: null,
-          workspaceId: null,
-          isLoading: false,
-          isError: true,
-          errorMessage: `User role not found - ensure user is properly onboarded`,
         }));
         hasInitialized.current = true;
         initInProgressRef.current = false;
@@ -160,7 +122,7 @@ export function useAuth(): AuthState {
         console.error('[useAuth] /api/auth/me server error (', meResponse.status, '):', meError);
         setState((prev) => ({
           ...prev,
-          session,
+          session: null,
           isLoading: false,
           isError: true,
           errorMessage: `Server error (${meResponse.status}): ${meError.error || 'Unknown error'}`,
@@ -170,14 +132,14 @@ export function useAuth(): AuthState {
         return;
       }
 
-      // Success - user has a role
+      // Success - user has a valid session and role
       const meData = await meResponse.json();
-      console.log('[useAuth] Backend auth successful:', meData);
-      
+      console.log('[useAuth] Session validated, role:', meData.role);
+
       // Backend validated user and role lookup succeeded
       setState((prev) => ({
         ...prev,
-        session: meData.session || {},
+        session: meData.session || { user: meData.user },
         access: meData.access || null,
         role: meData.role || null,
         workspaceId: meData.workspaceId || null,
@@ -185,7 +147,7 @@ export function useAuth(): AuthState {
         isError: false,
         errorMessage: null,
       }));
-      
+
       hasInitialized.current = true;
       initInProgressRef.current = false;
       return;
