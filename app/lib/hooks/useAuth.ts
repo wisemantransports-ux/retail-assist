@@ -29,8 +29,11 @@ export function useAuth(): UseAuthResult {
   useEffect(() => {
     async function fetchUser() {
       try {
-        const response = await fetch('/api/auth/me');
-        
+        const response = await fetch('/api/auth/me', {
+          method: 'GET',
+          credentials: 'include', // CRITICAL: Include HttpOnly cookies
+        });
+
         if (response.status === 401) {
           // Not authenticated, redirect to login
           window.location.href = '/login';
