@@ -73,19 +73,23 @@ export function useAuth(): AuthState {
   const initializeAuth = useCallback(async () => {
     // Prevent race conditions and multiple initializations
     if (initInProgressRef.current || hasInitialized.current) {
+      console.log('[useAuth] Already initialized or initialization in progress, skipping');
       return;
     }
 
     initInProgressRef.current = true;
+    console.log('[useAuth] ===== STARTING AUTH INITIALIZATION =====');
 
     try {
       // ===== STEP 1: Validate session via backend (single source of truth) =====
       // Server validates the HttpOnly cookies and returns role + workspace
-      console.log('[useAuth] Validating session via /api/auth/me...');
+      console.log('[useAuth] STEP 1: Validating session via /api/auth/me...');
       const meResponse = await fetch('/api/auth/me', {
         method: 'GET',
         credentials: 'include', // Include HttpOnly cookies in request
       });
+
+      console.log('[useAuth] /api/auth/me response status:', meResponse.status);
 
       // 401/403: No valid session, user not authenticated
       if (meResponse.status === 401 || meResponse.status === 403) {
