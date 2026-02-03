@@ -137,7 +137,7 @@ export function useAuth(): AuthState {
 
       // Success - user has a valid session and role
       const meData = await meResponse.json();
-      console.log('[useAuth] Session validated, role:', meData.role);
+      console.log('[useAuth] ✓ Session validated successfully, role:', meData.role);
 
       // Backend validated user and role lookup succeeded
       setState((prev) => ({
@@ -151,8 +151,10 @@ export function useAuth(): AuthState {
         errorMessage: null,
       }));
 
+      console.log('[useAuth] ✓ Auth state updated with role and workspace');
       hasInitialized.current = true;
       initInProgressRef.current = false;
+      console.log('[useAuth] ===== AUTH INITIALIZATION COMPLETE =====');
       return;
     } catch (err: any) {
       console.error('[useAuth] Unexpected error:', err);
