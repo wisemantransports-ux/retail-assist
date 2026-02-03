@@ -1,7 +1,9 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { env } from '@/lib/env';
 
+// CRITICAL: Module-level singleton - only ONE instance should ever exist
 let client: SupabaseClient | null = null;
+let initializationAttempts = 0;
 
 const createChainableMock = () => {
   const chain: any = {
