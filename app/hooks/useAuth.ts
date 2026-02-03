@@ -172,8 +172,17 @@ export function useAuth(): AuthState {
 
   // Initialize auth on mount
   useEffect(() => {
+    console.log('[useAuth] useEffect: Calling initializeAuth...');
     initializeAuth();
   }, [initializeAuth]);
+
+  console.log('[useAuth] Current state:', {
+    isLoading: state.isLoading,
+    hasSession: !!state.session,
+    role: state.role,
+    workspaceId: state.workspaceId,
+    isError: state.isError,
+  });
 
   return state;
 }
