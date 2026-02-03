@@ -176,14 +176,6 @@ export function useAuth(): AuthState {
     initializeAuth();
   }, [initializeAuth]);
 
-  console.log('[useAuth] Current state:', {
-    isLoading: state.isLoading,
-    hasSession: !!state.session,
-    role: state.role,
-    workspaceId: state.workspaceId,
-    isError: state.isError,
-  });
-
   return state;
 }
 
