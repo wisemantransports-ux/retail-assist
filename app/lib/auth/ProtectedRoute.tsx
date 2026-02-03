@@ -96,6 +96,15 @@ export function ProtectedRoute({
   const router = useRouter();
   const auth = useAuthContext();
 
+  // ===== HOOK: Redirect if not authenticated =====
+  // Must be called at top level, not inside conditionals
+  useEffect(() => {
+    if (!auth.isLoading && !auth.session && !auth.isError) {
+      console.warn('[ProtectedRoute] No session found, redirecting to', redirectTo);
+      router.push(redirectTo);
+    }
+  }, [auth.isLoading, auth.session, auth.isError, router, redirectTo]);
+
   // ===== CHECK 1: Loading =====
   if (auth.isLoading) {
     return loadingComponent;
@@ -109,11 +118,7 @@ export function ProtectedRoute({
 
   // ===== CHECK 3: Session exists =====
   if (!auth.session) {
-    console.warn('[ProtectedRoute] No session found, redirecting to', redirectTo);
-    // Use useEffect to redirect - don't redirect synchronously during render
-    useEffect(() => {
-      router.push(redirectTo);
-    }, [router, redirectTo]);
+    // Redirect is handled by useEffect above
     return loadingComponent;
   }
 
