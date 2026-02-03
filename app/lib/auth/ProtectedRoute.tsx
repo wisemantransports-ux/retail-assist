@@ -136,26 +136,28 @@ export function ProtectedRoute({
   if (allowedRoles) {
     const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
     if (!roles.includes(auth.role || '')) {
-      console.warn('[ProtectedRoute] User role not allowed. Role:', auth.role, 'Allowed:', roles);
+      console.warn('[ProtectedRoute] ✗ User role not allowed. Role:', auth.role, 'Allowed:', roles);
       return unauthorizedComponent;
     }
+    console.log('[ProtectedRoute] ✓ User role allowed:', auth.role);
   }
 
   // ===== CHECK 5: Workspace validation =====
   // Super admin can have null workspace_id (they don't belong to any workspace)
   // All other roles MUST have a workspace_id
   if (auth.role !== 'super_admin' && !auth.workspaceId) {
-    console.error('[ProtectedRoute] Non-super_admin user missing workspace_id. Role:', auth.role);
+    console.error('[ProtectedRoute] ✗ Non-super_admin user missing workspace_id. Role:', auth.role);
     return unauthorizedComponent;
   }
 
   // Super admin must NOT have a workspace_id (this is an invalid state)
   if (auth.role === 'super_admin' && auth.workspaceId) {
-    console.error('[ProtectedRoute] Super admin should not have workspace_id:', auth.workspaceId);
+    console.error('[ProtectedRoute] ✗ Super admin should not have workspace_id:', auth.workspaceId);
     return unauthorizedComponent;
   }
 
   // ===== ALL CHECKS PASSED =====
+  console.log('[ProtectedRoute] ✓✓✓ ALL CHECKS PASSED - rendering protected content');
   return children;
 }
 
