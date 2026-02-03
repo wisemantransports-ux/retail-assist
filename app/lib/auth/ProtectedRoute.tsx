@@ -113,6 +113,7 @@ export function ProtectedRoute({
 
   // ===== CHECK 1: Loading =====
   if (auth.isLoading) {
+    console.log('[ProtectedRoute] Still loading auth, showing spinner');
     return loadingComponent;
   }
 
@@ -125,8 +126,11 @@ export function ProtectedRoute({
   // ===== CHECK 3: Session exists =====
   if (!auth.session) {
     // Redirect is handled by useEffect above
+    console.warn('[ProtectedRoute] No session after loading complete, waiting for redirect');
     return loadingComponent;
   }
+
+  console.log('[ProtectedRoute] ✓ Session found, proceeding with role checks');
 
   // ===== CHECK 4: Role allowed =====
   if (allowedRoles) {
