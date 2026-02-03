@@ -99,8 +99,14 @@ export function ProtectedRoute({
   // ===== HOOK: Redirect if not authenticated =====
   // Must be called at top level, not inside conditionals
   useEffect(() => {
+    console.log('[ProtectedRoute] useEffect check:', {
+      isLoading: auth.isLoading,
+      hasSession: !!auth.session,
+      isError: auth.isError,
+    });
+
     if (!auth.isLoading && !auth.session && !auth.isError) {
-      console.warn('[ProtectedRoute] No session found, redirecting to', redirectTo);
+      console.warn('[ProtectedRoute] ✗ No session found, redirecting to', redirectTo);
       router.push(redirectTo);
     }
   }, [auth.isLoading, auth.session, auth.isError, router, redirectTo]);
