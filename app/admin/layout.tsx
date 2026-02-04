@@ -2,17 +2,14 @@
 
 import "@/globals.css";
 import Topbar from "@/components/Topbar";
-import { ProtectedRoute } from "@/lib/auth/ProtectedRoute";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ProtectedRoute allowedRoles="super_admin">
-      <div className="min-h-screen bg-background flex flex-col">
-        <Topbar />
-        <main className="flex-1 p-6 lg:p-8">
-          {children}
-        </main>
-      </div>
-    </ProtectedRoute>
+    <div className="min-h-screen bg-background flex flex-col">
+      <Topbar />
+      <main className="flex-1 p-6 lg:p-8">
+        {children}
+      </main>
+    </div>
   );
 }

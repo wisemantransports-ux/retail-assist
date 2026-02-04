@@ -1,0 +1,47 @@
+name: PR — Auth Sync Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: auth-sync-check
+  cancel-in-progress: true
+
+jobs:
+  test-auth-sync:
+    name: Test /api/auth/sync on PR
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start dev server
+        # Start Next dev in background and wait for port 3000 to be available
+        run: |
+          npm run dev > dev.log 2>&1 &
+          npx wait-on http://localhost:3000 --timeout 120000
+
+      - name: Run auth sync test
+        run: npm run test:auth-sync
+        env:
+          # Allow the script to discover env vars from .env.local if available
+          BASE_URL: http://localhost:3000
+
+      - name: Upload dev server logs (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dev-log
+          path: dev.log

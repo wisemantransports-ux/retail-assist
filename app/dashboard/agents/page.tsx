@@ -46,7 +46,7 @@ export default function AgentsPage() {
       setError(null);
 
       // First, get user info for plan gating
-      const userRes = await fetch('/api/auth/me');
+      const userRes = await fetch('/api/auth/me', { credentials: 'include' });
       if (userRes.ok) {
         const userData = await userRes.json();
         setUser(userData.user);

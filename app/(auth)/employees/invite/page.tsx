@@ -17,7 +17,7 @@ export default function InviteEmployee() {
     // Verify user is admin
     const checkAuth = async () => {
       try {
-        const response = await fetch('/api/auth/me');
+        const response = await fetch('/api/auth/me', { credentials: 'include' });
         if (!response.ok) {
           router.push('/login');
           return;

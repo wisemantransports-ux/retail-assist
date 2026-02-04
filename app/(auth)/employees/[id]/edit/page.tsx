@@ -32,7 +32,7 @@ export default function EditEmployee() {
     const fetchData = async () => {
       try {
         // Get user's role
-        const roleResponse = await fetch('/api/auth/me');
+        const roleResponse = await fetch('/api/auth/me', { credentials: 'include' });
         if (!roleResponse.ok) {
           router.push('/login');
           return;

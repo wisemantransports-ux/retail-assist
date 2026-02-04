@@ -1,5 +1,4 @@
 import React, { useState, useCallback } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import toast from 'react-hot-toast';
 
 // TypeScript Types
@@ -26,11 +25,6 @@ interface RPCResponse {
   error?: string;
 }
 
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-);
 
 // Default form values
 const DEFAULT_FORM_DATA: FormData = {
@@ -109,6 +103,9 @@ export const CreateEmployeeInviteForm: React.FC<CreateEmployeeInviteFormProps> =
         // Client-admins MUST use /api/employees endpoint
         // API infers workspace_id from auth context
         // Frontend sends ONLY email to prevent client-side auth bypasses
+        // If you are a platform (super) admin calling Supabase directly from the client,
+        // prefer using the helper at `app/lib/employees/createEmployee.ts` which enforces
+        // inviter rules (super_admin vs client_admin workspace handling).
 
         const response = await fetch('/api/employees', {
           method: 'POST',

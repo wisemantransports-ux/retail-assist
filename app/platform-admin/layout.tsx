@@ -1,6 +1,5 @@
 'use client';
 
-import { ProtectedRoute } from '@/lib/auth/ProtectedRoute';
 
 /**
  * Platform Admin Layout
@@ -19,8 +18,8 @@ export default function PlatformAdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ProtectedRoute allowedRoles="super_admin">
+    <>
       {children}
-    </ProtectedRoute>
+    </>
   );
 }

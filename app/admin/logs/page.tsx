@@ -26,7 +26,7 @@ export default function AdminLogsPage() {
 
   async function checkAuth() {
     try {
-      const res = await fetch('/api/auth/me');
+      const res = await fetch('/api/auth/me', { credentials: 'include' });
       const data = await res.json();
       
       if (!res.ok || data.user.role !== 'super_admin') {

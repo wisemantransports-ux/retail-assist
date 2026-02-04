@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { supabase } from 'app/lib/supabase';
+import createBrowserSupabaseClient from '@/lib/supabase/client';
 
 export default function ResetPage() {
   const [email, setEmail] = useState("");
@@ -17,6 +17,7 @@ export default function ResetPage() {
     setLoading(true);
 
     try {
+      const supabase = createBrowserSupabaseClient();
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(
         email,
         {

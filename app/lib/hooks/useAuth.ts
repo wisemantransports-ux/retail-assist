@@ -29,7 +29,7 @@ export function useAuth(): UseAuthResult {
   useEffect(() => {
     async function fetchUser() {
       try {
-        const response = await fetch('/api/auth/me');
+        const response = await fetch('/api/auth/me', { credentials: 'include' });
         
         if (response.status === 401) {
           // Not authenticated, redirect to login

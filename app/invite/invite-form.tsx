@@ -36,7 +36,7 @@ export default function InviteForm() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const response = await fetch('/api/auth/me');
+        const response = await fetch('/api/auth/me', { credentials: 'include' });
         setIsAuthenticated(response.ok);
         console.log('[InviteForm] Auth check:', response.ok ? 'Authenticated' : 'Not authenticated');
       } catch (error) {

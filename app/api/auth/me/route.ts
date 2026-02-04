@@ -1,19 +1,31 @@
 import { NextResponse, NextRequest } from 'next/server';
+import * as nextHeaders from 'next/headers';
 import { db, PLAN_LIMITS } from '@/lib/db';
+import { createServerClient } from '@/lib/supabase/server';
 import { ensureInternalUser } from '@/lib/supabase/queries';
 import { env } from '@/lib/env';
-import { createServerClient, createAdminSupabaseClient } from '@/lib/supabase/server';
+import { createAdminSupabaseClient } from '@/lib/supabase/server';
+import { createServerClient as createSSRServerClient } from '@supabase/ssr';
 import { PLATFORM_WORKSPACE_ID } from '@/lib/config/workspace';
 
 export async function GET(request: NextRequest) {
   try {
     // Create response to capture cookie updates
     const res = NextResponse.json({});
-    
-    // Use Supabase auth with request/response for proper cookie handling
-    // @ts-ignore
-    const supabase = createServerClient(request, res as any);
-    
+
+    // Use SSR client directly wired to Next.js cookies (cookies()) so auth cookies are read reliably
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+
+    if (!url || !anonKey) {
+      console.error('[Auth Me] Missing Supabase server config');
+      return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
+    }
+
+    // Use our shared server client factory which correctly wires Next.js cookies
+    // This avoids direct calls to `cookies()` and keeps cookie handling centralized
+    const supabase = createServerClient(request, res);
+
     const { data: userData, error: authError } = await supabase.auth.getUser();
     console.info('[Auth Me] Supabase getUser:', userData?.user ? 'FOUND' : 'NOT_FOUND', authError ? `Error: ${authError.message}` : '');
 
@@ -74,8 +86,8 @@ export async function GET(request: NextRequest) {
         }, { status: 200 });
         
         // Copy any Supabase cookies to response to maintain session
-        const cookies = res.cookies.getAll();
-        for (const cookie of cookies) {
+        const supabaseCookies = res.cookies.getAll();
+        for (const cookie of supabaseCookies) {
           finalRes.cookies.set(cookie);
         }
         
@@ -187,8 +199,8 @@ export async function GET(request: NextRequest) {
     }, { status: 200 });
     
     // Copy any Supabase cookies to response to maintain session
-    const cookies = res.cookies.getAll();
-    for (const cookie of cookies) {
+    const supabaseCookies = res.cookies.getAll();
+    for (const cookie of supabaseCookies) {
       finalRes.cookies.set(cookie);
     }
     

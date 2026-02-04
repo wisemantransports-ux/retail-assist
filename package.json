@@ -16,6 +16,8 @@
     "test:invite-flow:safe:watch": "nodemon --exec 'npm run test:invite-flow:safe' --watch test-employee-invite-flow.ts --watch scripts/run-safe-invite-test.ts",
     "test:invite-acceptance:v1": "npx ts-node -r tsconfig-paths/register test-invite-acceptance-flow-v1.ts",
     "test:invite-acceptance:verify": "npx ts-node -r tsconfig-paths/register test-invite-acceptance-verify.ts",
+    "test:auth-sync": "node scripts/ci/test-auth-sync.js",
+    "test:middleware-logout": "node scripts/test-middleware-logout.js",
     "provision:users": "node -r ts-node/register -r tsconfig-paths/register scripts/create-admin-users.ts"
   },
   "dependencies": {

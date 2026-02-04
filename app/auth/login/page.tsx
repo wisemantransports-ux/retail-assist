@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
+import { useAuthContext } from '@/lib/auth/AuthProvider';
+import { useAuth } from '@/hooks/useAuth';
 import { PLATFORM_WORKSPACE_ID } from "@/lib/config/workspace";
 
 export default function LoginPage() {
@@ -12,6 +14,9 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const pathname = usePathname();
+  const auth = useAuthContext();
+  const hasAutoRedirectRef = useRef(false);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -19,26 +24,59 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Login failed');
+      // Perform client-side sign in using the shared browser Supabase client
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInError || !signInData?.session) {
+        console.error('[Login Page] supabase.auth.signInWithPassword error', signInError);
+        throw new Error(signInError?.message || 'Sign in failed');
+      }
 
-      // ===== CRITICAL FIX: Wait for auth context to be ready =====
-      // After login succeeds, the backend has set Supabase cookies
-      // Give the browser a moment to ensure cookies are fully set
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Ensure the session is persisted and then ask the backend to mirror the session to cookies
+      try {
+        const access_token = signInData.session.access_token;
+        const refresh_token = signInData.session.refresh_token;
 
-      console.log('[Login Page] Waiting for auth context to initialize...');
+        if (!access_token || !refresh_token) {
+          console.error('[Login Page] Missing access or refresh token after sign-in - aborting sync');
+          throw new Error('Missing access/refresh token from auth provider');
+        }
+
+        const syncRes = await fetch('/api/auth/sync', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ access_token, refresh_token }),
+        });
+
+        if (!syncRes.ok) {
+          const body = await syncRes.json().catch(() => ({}));
+          console.error('[Login Page] /api/auth/sync failed', syncRes.status, body);
+
+          if (syncRes.status === 400 && body?.error === 'Invalid refresh token') {
+            // Invalid/rotated refresh token - prompt user to sign in again
+            throw new Error('Server rejected refresh token. Please try signing in again.');
+          }
+
+          // Fallback logging and continue to /api/auth/me validation which may still work
+          console.warn('[Login Page] session sync to server failed:', body || syncRes.status);
+        }
+      } catch (syncErr) {
+        console.warn('[Login Page] session sync to server failed:', syncErr);
+        // If the sync failed with an invalid refresh token, show a user-facing error
+        if ((syncErr as Error).message?.includes('refresh token')) {
+          setError((syncErr as Error).message);
+          setLoading(false);
+          return;
+        }
+        // Otherwise, continue and attempt /api/auth/me validation as a fallback
+      }
+
+      // Wait briefly for cookies to be written by the sync endpoint
+      await new Promise((resolve) => setTimeout(resolve, 150));
 
       // Call /api/auth/me to ensure backend validates and auth context syncs
-      // Retry up to 3 times with delays to ensure auth is ready
       let meResponse = null;
       let lastError: Error | null = null;
-      
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
           meResponse = await fetch('/api/auth/me', {
@@ -65,8 +103,8 @@ export default function LoginPage() {
       }
 
       if (!meResponse?.ok) {
-        throw new Error(`Auth validation failed after login${lastError ? ': ' + lastError.message : ''}`);
-      }
+        throw new Error(`Auth validation failed after login${lastError ? ': ' + lastError.message : ''}`);}
+
 
       const meData = await meResponse.json();
       const role = meData.role;
@@ -93,6 +131,11 @@ export default function LoginPage() {
       }
 
       console.log('[Login Page] Final redirect target:', targetPath);
+      // Set a short-lived flag to indicate a login-initiated redirect is in progress
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('auth:recent-redirect', String(Date.now()));
+      }
+
       // NOW redirect - auth context is confirmed ready
       // Use router.replace to prevent back-button issues
       router.replace(targetPath);
@@ -102,6 +145,43 @@ export default function LoginPage() {
       setLoading(false);
     }
   }
+
+  // Auto-redirect for already authenticated users who land on the login page
+  const { status, role } = useAuth();
+  useEffect(() => {
+    if (hasAutoRedirectRef.current) return;
+    if (pathname !== '/auth/login') return;
+
+    if (status === 'loading') return; // wait for /api/auth/me
+
+    if (status === 'authenticated') {
+      hasAutoRedirectRef.current = true;
+
+      // Determine redirect target based on role
+      let targetPath = '/unauthorized';
+      if (role === 'super_admin') {
+        targetPath = '/admin';
+      } else if (role === 'platform_staff') {
+        targetPath = '/admin/support';
+      } else if (role === 'admin') {
+        targetPath = '/dashboard';
+      } else if (role === 'employee') {
+        targetPath = '/employees/dashboard';
+      }
+
+      // Mark recent redirect to avoid instant bounce-back from ProtectedRoute
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('auth:recent-redirect', String(Date.now()));
+      }
+
+      console.log('[Login Page] Auto-redirecting already-authenticated user to', targetPath);
+      router.replace(targetPath);
+    }
+
+    if (status === 'unauthorized') {
+      router.replace('/unauthorized');
+    }
+  }, [status, role, pathname, router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-gray-900 to-gray-800">

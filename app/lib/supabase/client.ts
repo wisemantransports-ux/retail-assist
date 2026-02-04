@@ -70,7 +70,8 @@ export function createBrowserSupabaseClient() {
 
   if (client) return client;
   // Enable client-side session persistence and automatic token refresh
-  client = createClient(url, key, { auth: { persistSession: true, storage: undefined, autoRefreshToken: true } });
+  // IMPORTANT: Do not override `storage` so the SDK uses the platform default (localStorage in browser)
+  client = createClient(url, key, { auth: { persistSession: true, autoRefreshToken: true } });
   return client;
 }
 

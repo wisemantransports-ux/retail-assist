@@ -17,6 +17,8 @@ export interface UserAccess {
 /**
  * Auth context containing session and access info
  */
+export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated' | 'unauthorized';
+
 export interface AuthState {
   session: Session | null;
   access: UserAccess | null;
@@ -25,7 +27,13 @@ export interface AuthState {
   isLoading: boolean;
   isError: boolean;
   errorMessage: string | null;
+  status: AuthStatus;
 }
+
+// IMPORTANT:
+// Supabase Auth only proves identity.
+// Authorization is resolved exclusively via /api/auth/me.
+// Never render protected UI before /api/auth/me returns 200.
 
 /**
  * useAuth Hook
@@ -61,11 +69,16 @@ export function useAuth(): AuthState {
     isLoading: true,
     isError: false,
     errorMessage: null,
+    status: 'loading',
   });
 
-  // Use ref to prevent multiple simultaneous calls
+  const [status, setStatus] = useState<AuthStatus>('loading');
+
+  // Use refs to prevent multiple simultaneous calls and track hydration
   const initInProgressRef = useRef(false);
   const hasInitialized = useRef(false);
+  // Track whether we've observed the first auth state change callback from Supabase
+  const firstAuthEventRef = useRef(false);
 
   /**
    * Initialize auth: session → RPC
@@ -94,15 +107,190 @@ export function useAuth(): AuthState {
           isLoading: false,
           isError: true,
           errorMessage: `Session error: ${sessionError.message}`,
+          status: 'unauthenticated',
         }));
+        setStatus('unauthenticated');
         hasInitialized.current = true;
         initInProgressRef.current = false;
         return;
       }
 
-      // If no session, user is not authenticated
+      // If SDK reports no session, don't conclude unauthenticated immediately.
+      // It's possible the SDK hasn't synced yet after a redirect; check backend as a reliable source.
       if (!session) {
-        console.log('[useAuth] No session found - user not authenticated');
+        console.log('[useAuth] No session found via SDK - checking backend /api/auth/me as fallback');
+
+        // Helper: fetch with retries for transient 5xx errors
+        async function fetchWithRetries(input: RequestInfo, init?: RequestInit, retries = 2, backoffMs = 200) {
+          for (let attempt = 0; attempt <= retries; attempt++) {
+            try {
+              const res = await fetch(input, init);
+              if (res.ok) return res;
+
+              // Retry on transient 5xx errors
+              if (res.status >= 500 && attempt < retries) {
+                console.warn('[useAuth] /api/auth/me returned', res.status, '- retrying (attempt', attempt + 1, 'of', retries, ')');
+                const wait = backoffMs * Math.pow(2, attempt);
+                await new Promise((r) => setTimeout(r, wait));
+                continue;
+              }
+
+              return res;
+            } catch (err) {
+              if (attempt < retries) {
+                const wait = backoffMs * Math.pow(2, attempt);
+                await new Promise((r) => setTimeout(r, wait));
+                continue;
+              }
+              throw err;
+            }
+          }
+          throw new Error('Failed to fetch after retries');
+        }
+
+        try {
+          const meResponse = await fetchWithRetries('/api/auth/me', {
+            method: 'GET',
+            credentials: 'include',
+          });
+
+          // Backend claims authenticated
+          if (meResponse.ok) {
+            const meData = await meResponse.json();
+            console.log('[useAuth] /api/auth/me indicates authenticated:', meData);
+            setState((prev) => ({
+              ...prev,
+              session: meData.session || null,
+              access: meData.access || null,
+              role: meData.role || null,
+              workspaceId: meData.workspaceId || null,
+              isLoading: false,
+              isError: false,
+              errorMessage: null,
+              status: 'authenticated',
+            }));
+            setStatus('authenticated');
+            hasInitialized.current = true;
+            initInProgressRef.current = false;
+            return;
+          }
+
+          // Backend reports not found/unauthorized
+          if (meResponse.status === 401) {
+            console.log('[useAuth] /api/auth/me returned 401 - user not authenticated');
+            setState((prev) => ({
+              ...prev,
+              session: null,
+              access: null,
+              role: null,
+              workspaceId: null,
+              isLoading: false,
+              isError: false,
+              errorMessage: null,
+              status: 'unauthenticated',
+            }));
+            setStatus('unauthenticated');
+            hasInitialized.current = true;
+            initInProgressRef.current = false;
+            return;
+          }
+
+          if (meResponse.status === 403) {
+            console.log('[useAuth] /api/auth/me returned 403 - user unauthorized');
+            setState((prev) => ({
+              ...prev,
+              session: null,
+              access: null,
+              role: null,
+              workspaceId: null,
+              isLoading: false,
+              isError: false,
+              errorMessage: null,
+              status: 'unauthorized',
+            }));
+            setStatus('unauthorized');
+            hasInitialized.current = true;
+            initInProgressRef.current = false;
+            return;
+          }
+
+          // Other server errors (after retries)
+          let meError: any = {};
+          try {
+            meError = await meResponse.json();
+          } catch (e) {
+            meError = { error: await meResponse.text() };
+          }
+          console.error('[useAuth] /api/auth/me server error (', meResponse.status, meResponse.statusText, '):', meError);
+          setState((prev) => ({
+            ...prev,
+            session: null,
+            isLoading: false,
+            isError: true,
+            errorMessage: `Server error (${meResponse.status}): ${meError.error || 'Unknown error'}`,
+            status: 'unauthenticated',
+          }));
+          setStatus('unauthenticated');
+          hasInitialized.current = true;
+          initInProgressRef.current = false;
+          return;
+        } catch (err: any) {
+          console.error('[useAuth] Error calling /api/auth/me fallback:', err);
+          // If the backend check fails unexpectedly, fall back to unauthenticated to avoid hanging forever
+          setState((prev) => ({
+            ...prev,
+            session: null,
+            access: null,
+            role: null,
+            workspaceId: null,
+            isLoading: false,
+            isError: false,
+            errorMessage: null,
+          }));
+          hasInitialized.current = true;
+          initInProgressRef.current = false;
+          return;
+        }
+      }
+
+      // ===== STEP 1: Session confirmed - fetch user access via backend API =====
+      console.log('[useAuth] Session confirmed for user:', session.user.id);
+      console.log('[useAuth] Step 1: Fetching user access via /api/auth/me...');
+
+      // Helper: fetch with retries for transient 5xx errors
+      async function fetchWithRetries(input: RequestInfo, init?: RequestInit, retries = 2, backoffMs = 200) {
+        for (let attempt = 0; attempt <= retries; attempt++) {
+          try {
+            const res = await fetch(input, init);
+            if (res.ok) return res;
+            if (res.status >= 500 && attempt < retries) {
+              console.warn('[useAuth] /api/auth/me returned', res.status, '- retrying (attempt', attempt + 1, 'of', retries, ')');
+              const wait = backoffMs * Math.pow(2, attempt);
+              await new Promise((r) => setTimeout(r, wait));
+              continue;
+            }
+            return res;
+          } catch (err) {
+            if (attempt < retries) {
+              const wait = backoffMs * Math.pow(2, attempt);
+              await new Promise((r) => setTimeout(r, wait));
+              continue;
+            }
+            throw err;
+          }
+        }
+        throw new Error('Failed to fetch after retries');
+      }
+
+      const meResponse = await fetchWithRetries('/api/auth/me', {
+        method: 'GET',
+        credentials: 'include', // Include cookies in request
+      });
+
+      // Distinguish 401 (unauthenticated) vs 403 (authorization failure)
+      if (meResponse.status === 401) {
+        console.log('[useAuth] /api/auth/me returned 401 - treating as unauthenticated');
+        // Clear session and treat as unauthenticated so client can handle login flow
         setState((prev) => ({
           ...prev,
           session: null,
@@ -112,23 +300,16 @@ export function useAuth(): AuthState {
           isLoading: false,
           isError: false,
           errorMessage: null,
+          status: 'unauthenticated',
         }));
+        setStatus('unauthenticated');
         hasInitialized.current = true;
         initInProgressRef.current = false;
         return;
       }
 
-      // ===== STEP 1: Session confirmed - fetch user access via backend API =====
-      console.log('[useAuth] Session confirmed for user:', session.user.id);
-      console.log('[useAuth] Step 1: Fetching user access via /api/auth/me...');
-      const meResponse = await fetch('/api/auth/me', {
-        method: 'GET',
-        credentials: 'include', // Include cookies in request
-      });
-
-      // Handle 401/403 as unauthenticated (no role assigned yet)
-      if (meResponse.status === 401 || meResponse.status === 403) {
-        console.log('[useAuth] /api/auth/me returned', meResponse.status, '- user role not found');
+      if (meResponse.status === 403) {
+        console.log('[useAuth] /api/auth/me returned 403 - user is authenticated but unauthorized');
         setState((prev) => ({
           ...prev,
           session,
@@ -138,7 +319,9 @@ export function useAuth(): AuthState {
           isLoading: false,
           isError: true,
           errorMessage: `User role not found - ensure user is properly onboarded`,
+          status: 'unauthorized',
         }));
+        setStatus('unauthorized');
         hasInitialized.current = true;
         initInProgressRef.current = false;
         return;
@@ -157,7 +340,7 @@ export function useAuth(): AuthState {
             meError = { error: 'Unknown error' };
           }
         }
-        console.error('[useAuth] /api/auth/me server error (', meResponse.status, '):', meError);
+        console.error('[useAuth] /api/auth/me server error (', meResponse.status, meResponse.statusText, '):', meError);
         setState((prev) => ({
           ...prev,
           session,
@@ -184,7 +367,11 @@ export function useAuth(): AuthState {
         isLoading: false,
         isError: false,
         errorMessage: null,
+        status: 'authenticated',
       }));
+
+      // Ensure external consumers relying on `status` see the updated value
+      setStatus('authenticated');
       
       hasInitialized.current = true;
       initInProgressRef.current = false;
@@ -203,12 +390,71 @@ export function useAuth(): AuthState {
     }
   }, []);
 
-  // Initialize auth on mount
+  // Initialize auth on mount (this triggers a getSession() check)
   useEffect(() => {
     initializeAuth();
   }, [initializeAuth]);
 
-  return state;
+  // Subscribe to Supabase auth state changes (SIGNED_IN/SIGNED_OUT) to keep state in sync
+  // *Important*: The first onAuthStateChange callback (whichever it is) is considered
+  // an indicator that the SDK has hydrated. We treat that event as equivalent to
+  // the initial getSession() in terms of turning off `isLoading` if needed.
+  useEffect(() => {
+    const supabase = createBrowserSupabaseClient();
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event) => {
+      console.log('[useAuth] auth state changed:', event);
+
+      // If this is the first auth event we observed, mark it and act as a hydration signal
+      if (!firstAuthEventRef.current) {
+        firstAuthEventRef.current = true;
+        console.info('[useAuth] First auth state change observed; treating as hydration signal:', event);
+
+        if (event === 'SIGNED_IN') {
+          // Session became available — initialize to fetch backend role/access
+          await initializeAuth();
+        } else if (event === 'SIGNED_OUT') {
+          // Explicitly set unauthenticated state and clear loading
+          setState({
+            session: null,
+            access: null,
+            role: null,
+            workspaceId: null,
+            isLoading: false,
+            isError: false,
+            errorMessage: null,
+            status: 'unauthenticated',
+          });
+          setStatus('unauthenticated');
+        }
+
+        return;
+      }
+
+      // Subsequent events: keep state in sync
+      if (event === 'SIGNED_IN') {
+        await initializeAuth();
+      }
+      if (event === 'SIGNED_OUT') {
+        setState({
+          session: null,
+          access: null,
+          role: null,
+          workspaceId: null,
+          isLoading: false,
+          isError: false,
+          errorMessage: null,
+          status: 'unauthenticated',
+        });
+        setStatus('unauthenticated');
+      }
+    });
+
+    return () => subscription?.unsubscribe();
+  }, [initializeAuth]);
+
+  return { ...state, status } as AuthState;
 }
 
 /**

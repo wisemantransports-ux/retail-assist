@@ -105,7 +105,7 @@ export const ROLE_ROUTES = {
 |-----------|------|---------|
 | **useRoleBasedRedirect()** | [app/lib/auth/roleBasedRouting.ts#L46-75](app/lib/auth/roleBasedRouting.ts#L46-75) | Auto-redirect after login |
 | **useRouteGuard()** | [app/lib/auth/roleBasedRouting.ts#L118-150](app/lib/auth/roleBasedRouting.ts#L118-150) | Protect pages by role |
-| **ProtectedRoute** | [app/lib/auth/ProtectedRoute.tsx#L96-132](app/lib/auth/ProtectedRoute.tsx#L96-132) | Wrap layouts/pages |
+| **ProtectedRoute** (deprecated) | Deprecated — use `app/dashboard/layout.tsx` single gate sourced from `/api/auth/me` | No more page-level blocking guards |
 | **useCanAccess()** | [app/lib/auth/roleBasedRouting.ts#L166-175](app/lib/auth/roleBasedRouting.ts#L166-175) | Conditional UI rendering |
 
 **Example:** Login flow

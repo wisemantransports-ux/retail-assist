@@ -22,7 +22,7 @@ export default function InboxPage() {
           // If we can fetch agents, assume workspace exists
           // For now, we'll use a placeholder. In production, you'd want an endpoint to get workspace ID
           // Let's try to infer from the user session
-          const authRes = await fetch('/api/auth/me');
+          const authRes = await fetch('/api/auth/me', { credentials: 'include' });
           if (authRes.ok) {
             const authData = await authRes.json();
             // Use the user's workspace_id from auth context

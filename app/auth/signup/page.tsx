@@ -99,8 +99,40 @@ function SignupForm() {
       // After successful signup, perform client-side sign-in with Supabase
       try {
         const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-        if (signInError || !signInData?.user) {
+        if (signInError || !signInData?.session) {
           throw new Error(signInError?.message || 'Sign in after signup failed');
+        }
+
+        // After client sign-in, mirror session to server cookies so /api/auth/me works
+        try {
+          const access_token = signInData.session.access_token;
+          const refresh_token = signInData.session.refresh_token;
+
+          if (!access_token || !refresh_token) {
+            console.error('[Signup] Missing access or refresh token after sign-in - aborting sync');
+            throw new Error('Missing access/refresh token from auth provider');
+          }
+
+          const syncRes = await fetch('/api/auth/sync', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ access_token, refresh_token })
+          });
+
+          if (!syncRes.ok) {
+            const body = await syncRes.json().catch(() => ({}));
+            console.error('[Signup] /api/auth/sync failed', syncRes.status, body);
+            if (syncRes.status === 400 && body?.error === 'Invalid refresh token') {
+              throw new Error('Server rejected refresh token. Please sign in again.');
+            }
+            console.warn('[Signup] session sync failed:', body || syncRes.status);
+          }
+        } catch (syncErr) {
+          console.warn('[Signup] session sync failed:', syncErr);
+          setError((syncErr as Error).message || 'Session sync failed');
+          setLoading(false);
+          return;
         }
 
         // ===== ROLE-BASED CLIENT-SIDE REDIRECT AFTER SIGNUP =====

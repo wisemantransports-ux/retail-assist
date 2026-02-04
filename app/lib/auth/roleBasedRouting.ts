@@ -67,8 +67,8 @@ export function useRoleBasedRedirect(): void {
 
     // If error or no session, redirect to login
     if (auth.isError || !auth.session) {
-      console.log('[useRoleBasedRedirect] No session, redirecting to /login');
-      router.push('/login');
+      console.log('[useRoleBasedRedirect] No session, redirecting to /auth/login');
+      router.push('/auth/login');
       return;
     }
 
@@ -134,8 +134,8 @@ export function useRouteGuard(requiredRole: string | string[]): void {
 
     // If no session, redirect to login
     if (!auth.session) {
-      console.warn('[useRouteGuard] No session, redirecting to /login');
-      router.push('/login');
+      console.warn('[useRouteGuard] No session, redirecting to /auth/login');
+      router.push('/auth/login');
       return;
     }
 

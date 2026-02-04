@@ -105,7 +105,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 }
 ```
 
-#### 3. **ProtectedRoute Component** (`app/lib/auth/ProtectedRoute.tsx`)
+#### 3. **ProtectedRoute Component** (`app/lib/auth/ProtectedRoute.tsx`) — *DEPRECATED*
+
+> Deprecated: Page-level guards that block rendering (e.g., `ProtectedRoute`, `AdminProtectedRoute`) were removed in favor of a single authoritative gate in `app/dashboard/layout.tsx` which relies on `/api/auth/me`. Do not add new page-level blocking guards.
 
 Guards routes based on authentication and role:
 

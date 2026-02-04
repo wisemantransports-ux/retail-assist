@@ -40,7 +40,7 @@ export default function SubscriptionGuard({ children, requiredFeature }: Subscri
 
   async function checkSubscription() {
     try {
-      const res = await fetch("/api/auth/me");
+      const res = await fetch("/api/auth/me", { credentials: 'include' });
       const data = await res.json();
 
       if (!res.ok) {
@@ -203,7 +203,7 @@ export function useSubscription() {
   useEffect(() => {
     async function fetchUser() {
       try {
-        const res = await fetch("/api/auth/me");
+        const res = await fetch("/api/auth/me", { credentials: 'include' });
         const data = await res.json();
         if (res.ok) {
           setUser(data.user);

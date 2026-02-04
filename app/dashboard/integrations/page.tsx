@@ -109,7 +109,7 @@ export default function IntegrationsPage() {
   async function loadUserAndPages() {
     try {
       const [userRes, pagesRes] = await Promise.all([
-        fetch('/api/auth/me'),
+        fetch('/api/auth/me', { credentials: 'include' }),
         fetch('/api/meta/pages')
       ]);
 

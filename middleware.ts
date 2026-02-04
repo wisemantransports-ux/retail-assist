@@ -28,8 +28,17 @@ export async function middleware(request: NextRequest) {
   
   // ===== CRITICAL: ALLOW PUBLIC AUTH ROUTES =====
   // Do NOT protect /auth/* routes - users must be able to access login/signup
-  // Also allow /api/auth routes that don't require authentication
-  if (pathname.startsWith('/auth/') || pathname === '/login' || pathname === '/signup') {
+  // Also allow /api/auth/* endpoints (login/logout/me) so client-side checks can reach them
+  // ===== CRITICAL: ALLOW PUBLIC AUTH ROUTES =====
+  // Do NOT protect auth pages or auth APIs - users must be able to access login/signup
+  // This allows the client to fully control auth flow and logout navigation.
+  if (
+    pathname === '/auth' ||
+    pathname.startsWith('/auth') ||
+    pathname === '/login' ||
+    pathname === '/signup' ||
+    pathname.startsWith('/api/auth')
+  ) {
     console.log('[Middleware] ✓ Public auth route allowed:', pathname);
     return NextResponse.next();
   }
@@ -67,10 +76,13 @@ export async function middleware(request: NextRequest) {
     error: userError?.message || 'none'
   });
 
-  // If no user, redirect to login
+  // If no user, DO NOT redirect server-side to login. Treat as unauthenticated (401 equivalent)
+  // and allow the request to continue so the client can handle logout navigation. Only
+  // true authorization failures (403) should be redirected to /unauthorized.
   if (!user || userError) {
-    console.warn('[Middleware] No valid user found, redirecting to /login');
-    return NextResponse.redirect(new URL('/login', request.url));
+    console.warn('[Middleware] No valid user found - unauthenticated; allowing request to continue');
+    // Return the proxied response; client will detect missing session and navigate as needed
+    return response;
   }
 
   // ===== STEP 2: RESOLVE ROLE FROM DATABASE =====
@@ -144,9 +156,10 @@ export async function middleware(request: NextRequest) {
 
   console.log('[Middleware] ✓ Role resolution complete:', { role, workspaceId, employeeScope });
 
-  // If no role found, redirect to unauthorized
+  // If no role found for an authenticated user, this is an authorization failure (403)
+  // and we redirect to the /unauthorized landing so the user sees the right UX.
   if (!role) {
-    console.warn('[Middleware] No role found for user, redirecting to /unauthorized');
+    console.warn('[Middleware] No role found for authenticated user - redirecting to /unauthorized');
     return NextResponse.redirect(new URL('/unauthorized', request.url));
   }
 

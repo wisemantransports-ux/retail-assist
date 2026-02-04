@@ -1,6 +1,5 @@
 'use client';
 
-import { ProtectedRoute } from '@/lib/auth/ProtectedRoute';
 
 /**
  * Employee App Layout
@@ -21,8 +20,8 @@ export default function EmployeeAppLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ProtectedRoute allowedRoles="employee">
+    <>
       {children}
-    </ProtectedRoute>
+    </>
   );
 }
