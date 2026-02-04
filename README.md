@@ -197,6 +197,15 @@ NEXT_PUBLIC_USE_MOCK_SUPABASE=false npm run dev
 ```bash
 # 1. Push to GitHub
 git push origin main
+```
+
+> Vercel deployment notes: If you deploy to Vercel set the following environment variables in your project settings:
+>
+> - `NEXT_PUBLIC_SUPABASE_URL`
+> - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+> - `SUPABASE_SERVICE_ROLE_KEY`
+>
+> These are required for the server-side Supabase clients used by API routes and server components. Ensure values are set for both Preview and Production environments.
 
 # 2. Connect repo in Netlify dashboard
 # 3. Add environment variables

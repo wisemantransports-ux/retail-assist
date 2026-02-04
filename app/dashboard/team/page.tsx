@@ -74,7 +74,7 @@ export default function TeamPage() {
             >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-medium">
-                  {member.name.charAt(0).toUpperCase()}
+                  {(member.name || '').charAt(0).toUpperCase()}
                 </div>
                 <div>
                   <p className="text-white font-medium">{member.name}</p>
@@ -89,7 +89,7 @@ export default function TeamPage() {
                     ? 'bg-blue-900/50 text-blue-400'
                     : 'bg-gray-600 text-gray-300'
                 }`}>
-                  {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
+                  {(member.role || '').charAt(0).toUpperCase() + (member.role || '').slice(1)}
                 </span>
                 <span className="text-gray-500 text-sm">
                   Joined {new Date(member.joined_at).toLocaleDateString()}

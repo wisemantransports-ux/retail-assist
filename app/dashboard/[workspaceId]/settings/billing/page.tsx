@@ -55,7 +55,7 @@ export default function BillingPage() {
             <div>
               <p className="text-sm text-gray-500">Status</p>
               <p className={`font-semibold ${subscription.status === 'active' ? 'text-green-600' : 'text-orange-600'}`}>
-                {subscription.status.toUpperCase()}
+                {(subscription.status || '').toUpperCase()}
               </p>
             </div>
             <div>

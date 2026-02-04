@@ -53,8 +53,16 @@ export default function LoginPage() {
           console.error('[Login Page] /api/auth/sync failed', syncRes.status, body);
 
           if (syncRes.status === 400 && body?.error === 'Invalid refresh token') {
-            // Invalid/rotated refresh token - prompt user to sign in again
-            throw new Error('Server rejected refresh token. Please try signing in again.');
+            // Invalid/rotated refresh token - clear local session and prompt user to re-authenticate
+            try {
+              await supabase.auth.signOut();
+            } catch (signOutErr) {
+              console.warn('[Login Page] supabase.signOut() failed', signOutErr);
+            }
+            try { sessionStorage.removeItem('auth:recent-redirect'); } catch (e) {}
+            setError('Your session expired or became invalid. Please sign in again.');
+            setLoading(false);
+            return;
           }
 
           // Fallback logging and continue to /api/auth/me validation which may still work

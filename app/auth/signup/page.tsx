@@ -124,7 +124,16 @@ function SignupForm() {
             const body = await syncRes.json().catch(() => ({}));
             console.error('[Signup] /api/auth/sync failed', syncRes.status, body);
             if (syncRes.status === 400 && body?.error === 'Invalid refresh token') {
-              throw new Error('Server rejected refresh token. Please sign in again.');
+              // Invalid/rotated refresh token - clear local session and prompt user to re-authenticate
+              try {
+                await supabase.auth.signOut();
+              } catch (signOutErr) {
+                console.warn('[Signup] supabase.signOut() failed', signOutErr);
+              }
+              try { sessionStorage.removeItem('auth:recent-redirect'); } catch (e) {}
+              setError('Your session expired or became invalid. Please sign in again.');
+              setLoading(false);
+              return;
             }
             console.warn('[Signup] session sync failed:', body || syncRes.status);
           }

@@ -51,7 +51,7 @@ export default function PaymentHistory({ payments }: { payments: Payment[] }) {
                       : 'bg-yellow-100 text-yellow-800'
                   }`}
                 >
-                  {payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
+                  {(payment.status || '').charAt(0).toUpperCase() + (payment.status || '').slice(1)}
                 </span>
               </td>
             </tr>

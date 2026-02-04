@@ -303,8 +303,7 @@ export default function EmployeeDashboard() {
                             : 'bg-gray-100 text-gray-800'
                         }`}
                       >
-                        {task.priority.charAt(0).toUpperCase() +
-                          task.priority.slice(1)}
+                        {(task.priority || '').charAt(0).toUpperCase() + (task.priority || '').slice(1)}
                       </span>
 
                       {/* Status Badge */}
@@ -319,8 +318,8 @@ export default function EmployeeDashboard() {
                       >
                         {task.status === 'in_progress'
                           ? 'In Progress'
-                          : task.status.charAt(0).toUpperCase() +
-                            task.status.slice(1)}
+                          : (task.status || '').charAt(0).toUpperCase() +
+                            (task.status || '').slice(1)}
                       </span>
                     </div>
                   </div>

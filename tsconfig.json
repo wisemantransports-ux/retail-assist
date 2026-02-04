@@ -48,6 +48,10 @@
     "debug-*.ts",
     "check-*.ts",
     ".next",
-    "dist"
+    "dist",
+    "**/_tests_/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/_mocks_/**"
   ]
 }

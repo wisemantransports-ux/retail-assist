@@ -186,10 +186,10 @@ export default function ClientDashboard() {
           <h2 className="text-xl font-semibold text-white">Business Overview</h2>
           <span
             className={`px-3 py-1 rounded-full text-sm text-white ${getPlanBadgeColor(
-              user.plan_type
+              user.plan_type || 'starter'
             )}`}
           >
-            {user.plan_type.toUpperCase()} Plan
+            {(user.plan_type || 'starter').toUpperCase()} Plan
           </span>
         </div>
 
