@@ -134,8 +134,14 @@ export default function LoginPage() {
         targetPath = '/dashboard';
         console.log('[Login Page] Client admin detected, redirecting to /dashboard');
       } else if (role === 'employee') {
-        targetPath = '/employees/dashboard';
-        console.log('[Login Page] Employee detected, redirecting to /employees/dashboard');
+        // Check if employee belongs to PLATFORM_WORKSPACE_ID
+        if (workspaceId === PLATFORM_WORKSPACE_ID) {
+          targetPath = '/super-admin/employees';
+          console.log('[Login Page] Platform employee detected, redirecting to /super-admin/employees');
+        } else {
+          targetPath = '/employees/dashboard';
+          console.log('[Login Page] Client employee detected, redirecting to /employees/dashboard');
+        }
       }
 
       console.log('[Login Page] Final redirect target:', targetPath);
@@ -155,7 +161,7 @@ export default function LoginPage() {
   }
 
   // Auto-redirect for already authenticated users who land on the login page
-  const { status, role } = useAuth();
+  const { status, role, workspaceId } = useAuth();
   useEffect(() => {
     if (hasAutoRedirectRef.current) return;
     if (pathname !== '/auth/login') return;
@@ -174,7 +180,12 @@ export default function LoginPage() {
       } else if (role === 'admin') {
         targetPath = '/dashboard';
       } else if (role === 'employee') {
-        targetPath = '/employees/dashboard';
+        // Check if employee belongs to PLATFORM_WORKSPACE_ID
+        if (workspaceId === PLATFORM_WORKSPACE_ID) {
+          targetPath = '/super-admin/employees';
+        } else {
+          targetPath = '/employees/dashboard';
+        }
       }
 
       // Mark recent redirect to avoid instant bounce-back from ProtectedRoute
@@ -189,7 +200,7 @@ export default function LoginPage() {
     if (status === 'unauthorized') {
       router.replace('/unauthorized');
     }
-  }, [status, role, pathname, router]);
+  }, [status, role, pathname, router, workspaceId]);
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-gray-900 to-gray-800">

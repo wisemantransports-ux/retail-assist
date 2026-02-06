@@ -1,352 +1,177 @@
-# Retail Assist App
+# Supabase CLI
 
-**AI-powered retail automation platform for small businesses**
+[![Coverage Status](https://coveralls.io/repos/github/supabase/cli/badge.svg?branch=main)](https://coveralls.io/github/supabase/cli?branch=main) [![Bitbucket Pipelines](https://img.shields.io/bitbucket/pipelines/supabase-cli/setup-cli/master?style=flat-square&label=Bitbucket%20Canary)](https://bitbucket.org/supabase-cli/setup-cli/pipelines) [![Gitlab Pipeline Status](https://img.shields.io/gitlab/pipeline-status/sweatybridge%2Fsetup-cli?label=Gitlab%20Canary)
+](https://gitlab.com/sweatybridge/setup-cli/-/pipelines)
 
-Automate customer engagement across Facebook, Instagram, WhatsApp, and your website using AI agents. Built with Next.js, Supabase, and OpenAI.
+[Supabase](https://supabase.io) is an open source Firebase alternative. We're building the features of Firebase using enterprise-grade open source tools.
 
----
+This repository contains all the functionality for Supabase CLI.
 
-## ✨ Features
+- [x] Running Supabase locally
+- [x] Managing database migrations
+- [x] Creating and deploying Supabase Functions
+- [x] Generating types directly from your database schema
+- [x] Making authenticated HTTP requests to [Management API](https://supabase.com/docs/reference/api/introduction)
 
-- **AI Agents** - Create intelligent chatbots with custom prompts
-- **Comment Automation** - Auto-reply to social media comments
-- **Message Management** - Send DMs to customers automatically
-- **Analytics Dashboard** - Track conversations and conversion rates
-- **Team Collaboration** - Manage multiple workspaces and team members
-- **API Integration** - Integrate with external applications
-- **Billing System** - Subscription management with Stripe
-- **Multi-Platform** - Support for Facebook, Instagram, WhatsApp, and more
+## Getting started
 
----
+### Install the CLI
 
-## 🚀 Quick Start
+Available via [NPM](https://www.npmjs.com) as dev dependency. To install:
 
-### Local Development (Fastest)
 ```bash
-# Clone repository
-git clone https://github.com/wisemanreal88-spec/retail-assist-app.git
-cd retail-assist-app
-
-# Install dependencies
-npm install
-
-# Run development server (with mock data by default)
-npm run dev
-
-# Open browser
-# Visit http://localhost:5000
+npm i supabase --save-dev
 ```
 
-**That's it!** Everything works in mock mode without any database setup.
+When installing with yarn 4, you need to disable experimental fetch with the following nodejs config.
 
-### Production Setup
-
-See [SETUP.md](./SETUP.md) for:
-- Supabase database setup
-- OpenAI API configuration
-- Meta/Facebook integration
-- WhatsApp Cloud API setup
-- Stripe payment processing
-- Netlify deployment
-
----
-
-## 📚 Documentation
-
-| Document | Purpose |
-|----------|---------|
-| [QUICK_REFERENCE.md](./QUICK_REFERENCE.md) | ⚡ Quick reference guide |
-| [SETUP.md](./SETUP.md) | 📋 Setup & deployment guide |
-| [DEVELOPMENT.md](./DEVELOPMENT.md) | 🏗️ Architecture & development |
-| [API.md](./API.md) | 🔌 API endpoints & examples |
-| [ROADMAP.md](./ROADMAP.md) | 🗺️ Next priorities |
-| [PHASE1_SUMMARY.md](./PHASE1_SUMMARY.md) | 📊 Phase 1 completion summary |
-
----
-
-## 💻 Tech Stack
-
-- **Framework:** Next.js 16 (App Router)
-- **Database:** Supabase (PostgreSQL with RLS)
-- **AI:** OpenAI GPT-4o-mini
-- **Authentication:** Supabase Auth
-- **UI:** React + Tailwind CSS
-- **Styling:** Tailwind CSS 4
-- **Deployment:** Netlify
-- **Payments:** Stripe (coming soon)
-
----
-
-## 🏗️ Architecture
-
-### Database
-13 core tables with Row-Level Security (RLS):
-- Users & Workspaces
-- Agents & Comments
-- Automation Rules
-- Direct Messages
-- Integrations & Billing
-- Analytics & Audit Logs
-
-[See database schema](./supabase/migrations/001_initial_schema.sql)
-
-### API Structure
 ```
-/api
-├── /agents - Create & manage agents
-├── /agent/[id] - Chat with agents
-├── /agent/[id]/comments - Process comments
-└── /webhooks/facebook - Receive Facebook events
+NODE_OPTIONS=--no-experimental-fetch yarn add supabase
 ```
 
-[See API documentation](./API.md)
+> **Note**
+For Bun versions below v1.0.17, you must add `supabase` as a [trusted dependency](https://bun.sh/guides/install/trusted) before running `bun add -D supabase`.
 
----
+<details>
+  <summary><b>macOS</b></summary>
 
-## 🔑 Key Features
+  Available via [Homebrew](https://brew.sh). To install:
 
-### AI Agents
-Create intelligent agents with:
-- Custom system prompts
-- Greeting & fallback messages
-- Configurable OpenAI models
-- Temperature & token limits
-- Unique API keys for external integration
+  ```sh
+  brew install supabase/tap/supabase
+  ```
 
-### Comment Automation
-Automatically process comments from:
-- Facebook & Instagram
-- Website comments
-- WhatsApp business messages
-- Email submissions
+  To install the beta release channel:
+  
+  ```sh
+  brew install supabase/tap/supabase-beta
+  brew link --overwrite supabase-beta
+  ```
+  
+  To upgrade:
 
-### Analytics
-Track:
-- Total conversations
-- Message volume per agent
-- Conversion rates
-- Response times
-- API costs
+  ```sh
+  brew upgrade supabase
+  ```
+</details>
 
-### Team Management
-- Multi-workspace support
-- Role-based access (owner/admin/member/viewer)
-- User invitations
-- Audit logging
+<details>
+  <summary><b>Windows</b></summary>
 
----
+  Available via [Scoop](https://scoop.sh). To install:
 
-## 🔐 Security
+  ```powershell
+  scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
+  scoop install supabase
+  ```
 
-- **Row-Level Security (RLS)** - All data isolated by workspace
-- **API Key Authentication** - Secure external API access
-- **Session-Based Auth** - Secure dashboard access
-- **Audit Logging** - Track all actions for compliance
-- **Environment Variables** - No secrets in code
+  To upgrade:
 
----
+  ```powershell
+  scoop update supabase
+  ```
+</details>
 
-## 📊 Mock vs Real Mode
+<details>
+  <summary><b>Linux</b></summary>
 
-### Mock Mode (Development)
+  Available via [Homebrew](https://brew.sh) and Linux packages.
+
+  #### via Homebrew
+
+  To install:
+
+  ```sh
+  brew install supabase/tap/supabase
+  ```
+
+  To upgrade:
+
+  ```sh
+  brew upgrade supabase
+  ```
+
+  #### via Linux packages
+
+  Linux packages are provided in [Releases](https://github.com/supabase/cli/releases). To install, download the `.apk`/`.deb`/`.rpm`/`.pkg.tar.zst` file depending on your package manager and run the respective commands.
+
+  ```sh
+  sudo apk add --allow-untrusted <...>.apk
+  ```
+
+  ```sh
+  sudo dpkg -i <...>.deb
+  ```
+
+  ```sh
+  sudo rpm -i <...>.rpm
+  ```
+
+  ```sh
+  sudo pacman -U <...>.pkg.tar.zst
+  ```
+</details>
+
+<details>
+  <summary><b>Other Platforms</b></summary>
+
+  You can also install the CLI via [go modules](https://go.dev/ref/mod#go-install) without the help of package managers.
+
+  ```sh
+  go install github.com/supabase/cli@latest
+  ```
+
+  Add a symlink to the binary in `$PATH` for easier access:
+
+  ```sh
+  ln -s "$(go env GOPATH)/bin/cli" /usr/bin/supabase
+  ```
+
+  This works on other non-standard Linux distros.
+</details>
+
+<details>
+  <summary><b>Community Maintained Packages</b></summary>
+
+  Available via [pkgx](https://pkgx.sh/). Package script [here](https://github.com/pkgxdev/pantry/blob/main/projects/supabase.com/cli/package.yml).
+  To install in your working directory:
+
+  ```bash
+  pkgx install supabase
+  ```
+
+  Available via [Nixpkgs](https://nixos.org/). Package script [here](https://github.com/NixOS/nixpkgs/blob/master/pkgs/development/tools/supabase-cli/default.nix).
+</details>
+
+### Run the CLI
+
 ```bash
-NEXT_PUBLIC_USE_MOCK_SUPABASE=true npm run dev
+supabase bootstrap
 ```
-- Works offline
-- No API costs
-- Realistic fake data
-- Perfect for development
 
-### Real Mode (Production)
+Or using npx:
+
 ```bash
-NEXT_PUBLIC_USE_MOCK_SUPABASE=false npm run dev
-```
-- Real Supabase database
-- Real OpenAI API calls
-- Real integrations
-- Actual costs incurred
-
----
-
-## 🎯 Development Priorities
-
-### ✅ Phase 1 Complete
-- Database schema
-- Real Supabase integration
-- Real OpenAI integration
-- Agent CRUD operations
-- Comment processing
-
-### 🔄 Phase 2 (Queued)
-- Comment automation engine
-- Facebook/Instagram integration
-- WhatsApp integration
-- Analytics dashboard
-
-### 📅 Phase 3 (Planned)
-- Stripe billing system
-- Team collaboration features
-- Advanced analytics
-- Website chat widget
-
----
-
-## 🚀 Deployment
-
-### Netlify (Recommended)
-```bash
-# 1. Push to GitHub
-git push origin main
+npx supabase bootstrap
 ```
 
-> Vercel deployment notes: If you deploy to Vercel set the following environment variables in your project settings:
->
-> - `NEXT_PUBLIC_SUPABASE_URL`
-> - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-> - `SUPABASE_SERVICE_ROLE_KEY`
->
-> These are required for the server-side Supabase clients used by API routes and server components. Ensure values are set for both Preview and Production environments.
+The bootstrap command will guide you through the process of setting up a Supabase project using one of the [starter](https://github.com/supabase-community/supabase-samples/blob/main/samples.json) templates.
 
-# 2. Connect repo in Netlify dashboard
-# 3. Add environment variables
-# 4. Auto-deploys on push
+## Docs
+
+Command & config reference can be found [here](https://supabase.com/docs/reference/cli/about).
+
+## Breaking changes
+
+We follow semantic versioning for changes that directly impact CLI commands, flags, and configurations.
+
+However, due to dependencies on other service images, we cannot guarantee that schema migrations, seed.sql, and generated types will always work for the same CLI major version. If you need such guarantees, we encourage you to pin a specific version of CLI in package.json.
+
+## Developing
+
+To run from source:
+
+```sh
+# Go >= 1.22
+go run . help
 ```
-
-See [SETUP.md](./SETUP.md#-deployment-to-netlify) for detailed instructions.
-
----
-
-## 📖 API Examples
-
-### Create an Agent
-```bash
-curl -X POST https://retail-assist-app.netlify.app/api/agents \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Customer Support Bot",
-    "systemPrompt": "You are a helpful customer support agent",
-    "greeting": "Welcome! How can we help?"
-  }'
-```
-
-### Chat with Agent
-```bash
-curl -X POST https://retail-assist-app.netlify.app/api/agent/AGENT_ID \
-  -H "X-API-Key: sk_your_api_key" \
-  -d '{"message": "What are your hours?"}'
-```
-
-See [API.md](./API.md) for complete API documentation.
-
----
-
-## 🔧 Configuration
-
-### Environment Variables
-```bash
-# Database
-NEXT_PUBLIC_SUPABASE_URL=...
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-SUPABASE_SERVICE_ROLE_KEY=...
-
-# AI
-OPENAI_API_KEY=sk_...
-
-# Integrations
-META_PAGE_ACCESS_TOKEN=...
-WHATSAPP_API_TOKEN=...
-STRIPE_API_KEY=...
-```
-
-See [.env.example](./.env.example) for all variables.
-
----
-
-## 🧪 Testing
-
-### Unit Tests
-```bash
-# (Tests coming soon)
-npm run test
-```
-
-### Development Testing
-```bash
-# Run with mock data
-NEXT_PUBLIC_USE_MOCK_SUPABASE=true npm run dev
-
-# Run with real integrations
-NEXT_PUBLIC_USE_MOCK_SUPABASE=false npm run dev
-```
-
----
-
-## 📈 Performance
-
-- Agent responses: <1s average
-- Database queries: <100ms with RLS
-- Cost tracking: Real-time
-- Scalable to thousands of concurrent users
-
----
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/your-feature`
-3. Commit changes: `git commit -am 'Add new feature'`
-4. Push to branch: `git push origin feature/your-feature`
-5. Submit a pull request
-
----
-
-## 📞 Support
-
-- **Documentation:** See docs folder
-- **API Reference:** [API.md](./API.md)
-- **Setup Help:** [SETUP.md](./SETUP.md)
-- **Issues:** GitHub Issues
-- **Discussions:** GitHub Discussions
-
----
-
-## 📄 License
-
-Private repository - All rights reserved
-
----
-
-## 🎯 Status
-
-**Current Phase:** Phase 1 Complete ✅
-
-- ✅ Database schema
-- ✅ Real Supabase integration
-- ✅ Real OpenAI integration
-- ✅ Agent management
-- ✅ Comment processing
-- 🔄 Next: Comment automation & social integrations
-
----
-
-## 👨‍💻 About
-
-Built by Retail Pro team using Next.js, Supabase, and OpenAI.
-
-**Vision:** Empower small businesses to automate customer engagement with AI, without technical expertise.
-
----
-
-## 🚀 Get Started
-
-1. **Clone:** `git clone ...`
-2. **Install:** `npm install`
-3. **Run:** `npm run dev`
-4. **Visit:** http://localhost:5000
-
-For production setup, see [SETUP.md](./SETUP.md).
-
----
-
-**Last Updated:** December 7, 2025  
-**Status:** Production Ready Phase 1 ✅

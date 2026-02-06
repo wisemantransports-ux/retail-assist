@@ -160,11 +160,12 @@ export async function POST(request: NextRequest) {
     const internal_user_id = internalUser.id;
 
     // Get user's role and workspace from RPC
-    const { data: roleData, error: roleError } = await supabase
+    const result = await supabase
       .rpc('rpc_get_user_access')
       .single();
+    const roleData = result.data;
 
-    if (roleError || !roleData) {
+    if (!roleData) {
       return NextResponse.json({ error: 'Unable to determine user role' }, { status: 403 });
     }
 

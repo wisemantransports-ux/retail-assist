@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { db, PLAN_LIMITS } from '@/lib/db';
 import { createServerClient, createAdminSupabaseClient } from '@/lib/supabase/server';
+import { PLATFORM_WORKSPACE_ID } from '@/lib/config/workspace';
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,88 +26,18 @@ export async function GET(request: NextRequest) {
     const authUser = userData.user;
     console.info('[Auth Me] auth user id:', authUser.id);
 
-    // Admin client bypasses RLS safely
-    const admin = createAdminSupabaseClient();
+    // ===== AUTHORITATIVE ROLE RESOLUTION (RPC ONLY) =====
+    // Use rpc_get_user_access() as the single source of truth for role and workspace
+    const result = await supabase.rpc('rpc_get_user_access').single();
+    const accessData = result.data;
 
-    // ===== USERS TABLE LOOKUP =====
-    const { data: userDataFromDb, error: userError } = await admin
-      .from('users')
-      .select('*')
-      .eq('auth_uid', authUser.id)
-      .single();
-
-    console.info(
-      '[Auth Me] user lookup (admin):',
-      userDataFromDb ? 'FOUND' : 'NOT_FOUND',
-      userError ? `Error: ${userError.message}` : ''
-    );
-
-    // ===== EMPLOYEE FALLBACK (NO users ROW) =====
-    if (!userDataFromDb) {
-      const { data: employeeCheck } = await admin
-        .from('employees')
-        .select('workspace_id, invited_by_role')
-        .eq('auth_uid', authUser.id)
-        .maybeSingle();
-
-      if (!employeeCheck) {
-        return NextResponse.json({ error: 'User not found' }, { status: 404 });
-      }
-
-      const finalRes = NextResponse.json(
-        {
-          session: { user: authUser },
-          role: 'employee',
-          workspaceId: employeeCheck.workspace_id,
-          user: {
-            id: authUser.id,
-            email: authUser.email || '',
-            role: 'employee',
-            workspace_id: employeeCheck.workspace_id,
-          },
-        },
-        { status: 200 }
-      );
-
-      for (const cookie of res.cookies.getAll()) {
-        finalRes.cookies.set(cookie);
-      }
-
-      return finalRes;
+    if (!accessData) {
+      console.warn('[Auth Me] rpc_get_user_access failed or returned no data');
+      return NextResponse.json({ error: 'Unable to determine user role' }, { status: 403 });
     }
 
-    const user = userDataFromDb;
-    const planLimits = PLAN_LIMITS[user.plan_type] || PLAN_LIMITS.starter;
-
-    // ===== ROLE RESOLUTION (STRICT ORDER) =====
-    let role: 'super_admin' | 'admin' | 'employee';
-    let workspaceId: string | null = null;
-
-    if (user.role === 'super_admin') {
-      role = 'super_admin';
-    } else if (user.role === 'client_admin') {
-      if (!user.workspace_id) {
-        return NextResponse.json(
-          { error: 'Invalid admin account state (missing workspace)' },
-          { status: 403 }
-        );
-      }
-      role = 'admin';
-      workspaceId = user.workspace_id;
-    } else {
-      const { data: employeeCheck } = await admin
-        .from('employees')
-        .select('workspace_id')
-        .eq('auth_uid', authUser.id)
-        .maybeSingle();
-
-      if (!employeeCheck) {
-        return NextResponse.json({ error: 'User role not resolved' }, { status: 403 });
-      }
-
-      role = 'employee';
-      workspaceId = employeeCheck.workspace_id;
-    }
+    const role = (accessData as any).role as string;
+    const workspaceId = (accessData as any).workspace_id as string | null;
 
     const finalRes = NextResponse.json(
       {
@@ -115,14 +46,9 @@ export async function GET(request: NextRequest) {
         workspaceId,
         user: {
           id: authUser.id,
-          email: user.email,
-          business_name: user.business_name,
-          phone: user.phone,
+          email: authUser.email || '',
           role,
           workspace_id: workspaceId,
-          plan_type: user.plan_type,
-          plan_name: planLimits.name,
-          plan_limits: planLimits,
         },
       },
       { status: 200 }

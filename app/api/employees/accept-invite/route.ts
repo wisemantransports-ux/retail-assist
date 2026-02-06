@@ -1,4 +1,5 @@
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
+import { PLATFORM_WORKSPACE_ID } from '@/lib/config/workspace';
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
@@ -365,13 +366,27 @@ export async function POST(request: NextRequest) {
     // If workspace_id is SET → client employee (client_admin invited)
     const invitedByRole = invite.workspace_id === null ? 'super_admin' : 'client_admin';
 
+    // ✨ FIX #2: WORKSPACE RESOLUTION (AUTHORITATIVE)
+    // - Super admin invites → workspace_id = PLATFORM_WORKSPACE_ID
+    // - Client admin invites → workspace_id = their workspace_id
+    // Employees MUST have a valid workspace_id (NOT NULL)
+    const resolvedWorkspaceId = 
+      invitedByRole === 'super_admin' 
+        ? PLATFORM_WORKSPACE_ID 
+        : invite.workspace_id;
+
+    console.log('[INVITE ACCEPT] Workspace resolved for employee:', {
+      invited_by_role: invitedByRole,
+      resolved_workspace_id: resolvedWorkspaceId,
+    });
+
     // Create or update employee record with workspace
     const { error: employeeError } = await admin
       .from('employees')
       .insert({
         auth_uid: authUid,
         email: invite.email,
-        workspace_id: invite.workspace_id,
+        workspace_id: resolvedWorkspaceId,
         invited_by_role: invitedByRole,
         status: 'active',
       });
@@ -380,7 +395,7 @@ export async function POST(request: NextRequest) {
     if (employeeError && (employeeError.code === '23505' || employeeError.message?.includes('duplicate'))) {
       console.log('[INVITE ACCEPT] Employee record already exists, skipping insert:', {
         email: invite.email,
-        workspace_id: invite.workspace_id,
+        workspace_id: resolvedWorkspaceId,
         auth_uid: authUid,
       });
     } else if (employeeError) {
@@ -393,7 +408,7 @@ export async function POST(request: NextRequest) {
       console.log('[INVITE ACCEPT] Employee record created:', {
         auth_uid: authUid,
         email: invite.email,
-        workspace_id: invite.workspace_id,
+        workspace_id: resolvedWorkspaceId,
         invited_by_role: invitedByRole,
         status: 'active',
       });
@@ -441,7 +456,7 @@ export async function POST(request: NextRequest) {
         employee_id: userId,
         auth_uid: authUid,
         email: invite.email,
-        workspace_id: invite.workspace_id,
+        workspace_id: resolvedWorkspaceId,
         invited_by_role: invitedByRole,
       },
       { status: 200 }

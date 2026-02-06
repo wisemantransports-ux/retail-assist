@@ -6,7 +6,7 @@ import { env } from '@/lib/env'
 import { resolveUserId, ensureInternalUser } from '@/lib/supabase/queries'
 import { sessionManager } from '@/lib/session'
 import { PLATFORM_WORKSPACE_ID } from '@/lib/config/workspace'
-import { ensureWorkspaceForUser } from '@/lib/supabase/ensureWorkspaceForUser';
+import { ensureWorkspaceForUser } from '@/lib/supabase/ensureWorkspaceForUser'
 
 export async function POST(request: NextRequest) {
   try {
@@ -157,62 +157,28 @@ export async function POST(request: NextRequest) {
       }, { status: 403 })
     }
 
-    // ===== ROLE-BASED ACCESS RESOLUTION =====
-    // STRICT Priority order (DETERMINISTIC):
-    // 1) users.role = 'super_admin'
-    // 2) users.role = 'client_admin'
-    // 3) employees table (employee role)
-    // CRITICAL: employees NEVER misidentified as client_admin
-    // Use admin client to bypass RLS policies (reusing import from line 49)
-    const adminClient = createAdminSupabaseClient()
+    // ===== AUTHORITATIVE ROLE RESOLUTION (RPC ONLY) =====
+    // Use rpc_get_user_access() as the single source of truth for role and workspace
+    // This ensures consistency with middleware and /api/auth/me
     
-    let role: string | null = null
-    let workspaceId: string | null = null
-    let employeeScope: 'super_admin' | 'client_admin' | null = null
-    
-    // 1) Check if user has super_admin role in users table
-    const { data: superAdminCheck } = await adminClient
-      .from('users')
-      .select('id, role')
-      .eq('id', internalUserId)
-      .eq('role', 'super_admin')
-      .maybeSingle()
-    
-    if (superAdminCheck) {
-      role = 'super_admin'
-      workspaceId = null
-      console.log('[LOGIN] ✓ Resolved role: super_admin (priority 1), auth_uid:', data.user.id)
-    } else {
-      // 2) Check if user has client_admin role in users table
-      const { data: clientAdminCheck } = await adminClient
-        .from('users')
-        .select('id, role')
-        .eq('id', internalUserId)
-        .eq('role', 'client_admin')
-        .maybeSingle()
-      
-      if (clientAdminCheck) {
-        role = 'admin'  // Treat client_admin as admin role
-        
-        // Find workspace_id from workspace_members
-        const { data: membershipCheck } = await adminClient
-          .from('workspace_members')
-          .select('workspace_id')
-          .eq('user_id', internalUserId)
-          .maybeSingle()
-        
-        if (membershipCheck?.workspace_id) {
-          workspaceId = membershipCheck.workspace_id
-          console.log('[LOGIN] ✓ Resolved role: admin (client_admin, priority 2), workspace:', workspaceId, ', auth_uid:', data.user.id)
-        } else {
-          console.log('[LOGIN] ✓ Resolved role: admin (client_admin, priority 2) but no workspace yet, auth_uid:', data.user.id)
-        }
-      } else {
-        // 3) This should not reach here since employees were checked above
-        // But if somehow we get here, all roles should be resolved in users table
-        console.error('[LOGIN] ✗ No admin role found for internal user (employee check should have caught this)')
-      }
+    const result = await supabase
+      .rpc('rpc_get_user_access')
+      .single()
+    const accessData = result.data
+
+    if (!accessData) {
+      console.error('[LOGIN] Role resolution failed:', 'no access data')
+      return NextResponse.json(
+        { error: 'Unable to determine user role' },
+        { status: 403 }
+      )
     }
+
+    const role = (accessData as any).role as string
+    let workspaceId = (accessData as any).workspace_id as string | null
+    const employeeScope = role === 'employee' ? (accessData as any).invited_by_role : null
+
+    console.log('[LOGIN] ✓ Role resolved via RPC:', { role, workspaceId, employeeScope, auth_uid: data.user.id })
 
     // Role must be resolved
     if (!role) {
