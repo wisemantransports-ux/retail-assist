@@ -43,11 +43,13 @@ as $$
 declare
     v_token text;
     v_inviter_id uuid;
+    v_inviter_role text;
+    v_inviter_workspace_id uuid;
     v_is_admin boolean;
     v_is_super_admin boolean;
 begin
     -- 1️⃣ Resolve inviter (from Supabase auth)
-    select id into v_inviter_id
+    select id, role, workspace_id into v_inviter_id, v_inviter_role, v_inviter_workspace_id
     from public.users
     where auth_uid = auth.uid();
     
@@ -56,16 +58,11 @@ begin
     end if;
 
     -- 2️⃣ Check if inviter is super_admin
-    select role = 'super_admin' into v_is_super_admin
-    from public.users
-    where id = v_inviter_id;
+    v_is_super_admin := (v_inviter_role = 'super_admin');
 
-    -- 3️⃣ Check if inviter is admin of this workspace
-    select exists (
-        select 1 from public.admin_access aa
-        where aa.user_id = v_inviter_id
-          and aa.workspace_id = p_workspace_id
-    ) into v_is_admin;
+    -- 3️⃣ Check if inviter is client_admin with matching workspace
+    -- Client admins have role='admin' and their workspace_id must match p_workspace_id
+    v_is_admin := (v_inviter_role = 'admin' AND v_inviter_workspace_id = p_workspace_id);
 
     -- 4️⃣ CRITICAL: Authorization checks
     if p_role = 'platform_staff' then
