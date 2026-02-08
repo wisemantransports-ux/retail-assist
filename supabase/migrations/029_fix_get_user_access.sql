@@ -1,91 +1,30 @@
 -- =============================================
 -- 029_fix_get_user_access.sql
--- Schema-safe, authoritative role resolution
--- Includes: super_admin, admin, employee, platform_staff
+-- Schema-safe access resolution (NO users.role)
 -- =============================================
 
-create or replace function public.rpc_get_user_access()
-returns table (
-  user_id uuid,
-  workspace_id uuid,
-  role text
+BEGIN;
+
+DROP FUNCTION IF EXISTS public.rpc_get_user_access();
+
+CREATE OR REPLACE FUNCTION public.rpc_get_user_access()
+RETURNS TABLE (
+  user_id UUID,
+  workspace_id UUID,
+  role TEXT
 )
-language sql
-security definer
-as $$
-  select
-    r.user_id,
-    r.workspace_id,
-    r.role
-  from (
-    -- 1️⃣ Super Admin (platform-level, users table ONLY, workspace_id = NULL)
-    select
-      u.id as user_id,
-      null::uuid as workspace_id,
-      'super_admin'::text as role,
-      1 as priority
-    from public.users u
-    where u.auth_uid = auth.uid()
-      and u.role = 'super_admin'
-
-    union all
-
-    -- 2️⃣ Platform Staff (workspace_id = 00000000-0000-0000-0000-000000000001)
-    select
-      aa.user_id,
-      '00000000-0000-0000-0000-000000000001'::uuid as workspace_id,
-      'platform_staff'::text as role,
-      2 as priority
-    from public.admin_access aa
-    join public.users u on u.id = aa.user_id
-    where u.auth_uid = auth.uid()
-      and aa.workspace_id = '00000000-0000-0000-0000-000000000001'
-
-    union all
-
-    -- 3️⃣ Client Admin (workspace-level, admin_access with non-null workspace_id)
-    select
-      aa.user_id,
-      aa.workspace_id,
-      'admin'::text as role,
-      3 as priority
-    from public.admin_access aa
-    join public.users u on u.id = aa.user_id
-    where u.auth_uid = auth.uid()
-      and aa.workspace_id is not null
-      and aa.workspace_id != '00000000-0000-0000-0000-000000000001'
-
-    union all
-
-    -- 4️⃣ Employee (scoped to ONE workspace, only if not admin or super_admin)
-    select
-      e.user_id,
-      e.workspace_id as workspace_id,
-      'employee'::text as role,
-      4 as priority
-    from public.employees e
-    join public.users u on u.id = e.user_id
-    where u.auth_uid = auth.uid()
-      and not exists (
-        select 1
-        from public.admin_access aa2
-        where aa2.user_id = e.user_id
-      )
-      and not exists (
-        select 1
-        from public.users u3
-        where u3.auth_uid = auth.uid()
-          and u3.role = 'super_admin'
-      )
-  ) r
-  order by r.priority
-  limit 1;
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT
+    wm.user_id,
+    wm.workspace_id,
+    wm.role
+  FROM public.workspace_members wm
+  WHERE wm.user_id = auth.uid();
 $$;
 
--- Lock down permissions
-revoke all on function public.rpc_get_user_access from public;
-grant execute on function public.rpc_get_user_access to authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_get_user_access() TO authenticated;
 
--- =============================================
--- END OF 029
--- =============================================
+COMMIT;
