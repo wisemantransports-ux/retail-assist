@@ -72,13 +72,13 @@ export async function GET(
     }
 
     const supabase = await createServerClient();
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const effectiveUserId = (await resolveUserId(session.user.id, false)) || session.user.id
+    const effectiveUserId = (await resolveUserId(user.id, false)) || user.id
     const { rule, error } = await getRuleWithWorkspaceCheck(supabase, id, effectiveUserId);
 
     if (error) {
@@ -123,9 +123,9 @@ export async function PATCH(
     }
 
     const supabase = await createServerClient();
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -137,7 +137,7 @@ export async function PATCH(
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
 
-    const effectiveUserId2 = (await resolveUserId(session.user.id, false)) || session.user.id
+    const effectiveUserId2 = (await resolveUserId(user.id, false)) || user.id
     const { rule, workspace, error } = await getRuleWithWorkspaceCheck(
       supabase,
       id,
@@ -213,13 +213,13 @@ export async function DELETE(
     }
 
     const supabase = await createServerClient();
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const effectiveUserId3 = (await resolveUserId(session.user.id, false)) || session.user.id
+    const effectiveUserId3 = (await resolveUserId(user.id, false)) || user.id
     const { rule, error } = await getRuleWithWorkspaceCheck(supabase, id, effectiveUserId3);
 
     if (error) {

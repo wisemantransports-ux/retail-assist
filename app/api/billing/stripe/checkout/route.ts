@@ -15,8 +15,8 @@ export async function POST(req: Request) {
 
     // Get current user & workspace info
     const supabase = await createServerClient();
-    const { data: { session } } = await supabase.auth.getSession();
-    const userId = session?.user?.id;
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const userId = user?.id;
     const effectiveUserId = (await resolveUserId(userId, false)) || userId
 
     if (!userId) {

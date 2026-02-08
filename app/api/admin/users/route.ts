@@ -1,21 +1,29 @@
 import { NextResponse } from 'next/server';
 import { db, PLAN_LIMITS } from '@/lib/db';
-import { sessionManager } from '@/lib/session';
 import { cookies } from 'next/headers';
+import createServerClient from '@/lib/supabase/server';
 
 async function verifyAdmin(request: Request) {
-  const cookieStore = await cookies();
-  const sessionId = cookieStore.get('session_id')?.value;
-  if (!sessionId) return null;
+  // Use Supabase auth (server client) and RPC for authoritative role resolution
+  const res = NextResponse.json({});
+  // @ts-ignore
+  const supabase = createServerClient(request as any, res as any);
 
-  const session = await sessionManager.validate(sessionId);
-  if (!session) return null;
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) return null;
 
-  const user = await db.users.findById(session.user_id);
-  if (!user || user.role !== 'super_admin') return null;
+  const rpc = await supabase.rpc('rpc_get_user_access').single();
+  const access = rpc.data;
+  if (!access) return null;
 
-  return user;
-}
+  const role = (access as any).role as string | null;
+  const workspaceId = (access as any).workspace_id as string | null;
+
+  // Only allow platform super_admin for these admin APIs
+  if (role !== 'super_admin') return null;
+
+  return { id: user.id, email: user.email, role, workspaceId } as any;
+} 
 
 export async function GET(request: Request) {
   try {

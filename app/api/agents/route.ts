@@ -27,14 +27,14 @@ export async function GET(request: Request) {
     }
 
     const supabase = await createServerClient();
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
-    if (!session) {
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Resolve session user to internal id (read-only)
-    const effectiveUserId = (await resolveUserId(session.user.id, false)) || session.user.id
+    // Resolve user to internal id (read-only)
+    const effectiveUserId = (await resolveUserId(user.id, false)) || user.id
     // Get user's default workspace
     const { data: workspace, error: workspaceError } = await supabase
       .from('workspaces')
@@ -90,9 +90,9 @@ export async function POST(request: Request) {
     }
 
     const supabase = await createServerClient();
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

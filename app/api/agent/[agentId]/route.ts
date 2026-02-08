@@ -52,8 +52,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ age
       isApiKeyAuth = true;
     } else {
       // Require authenticated session
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
 
