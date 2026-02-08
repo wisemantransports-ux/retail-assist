@@ -111,24 +111,18 @@ export async function middleware(request: NextRequest) {
   // ===== AUTHORIZATION LOGIC BY ROLE (RPC-DRIVEN) =====
   const url = request.nextUrl.clone();
 
-  // ===== 1️⃣ SUPER ADMIN ROLE (workspace_id = NULL) =====
+  // ===== 1️⃣ SUPER ADMIN ROLE =====
   if (role === 'super_admin') {
     console.log('[Middleware] Processing super_admin authorization');
-
-    // Super admin MUST NOT have a workspace_id
-    if (workspaceId) {
-      console.error('[Middleware] ✗ Super admin has workspace_id set - unauthorized state');
-      return NextResponse.redirect(new URL('/unauthorized', request.url));
-    }
 
     // Allow no-workspace routes
     if (isAllowedWithoutWorkspace(pathname)) return response;
 
-    // Allow /super-admin routes
-    if (pathname === '/super-admin' || pathname.startsWith('/super-admin/')) return response;
+    // Allow /admin routes
+    if (pathname === '/admin' || pathname.startsWith('/admin/')) return response;
 
-    // Redirect super_admin to /super-admin
-    url.pathname = '/super-admin';
+    // Redirect super_admin to /admin
+    url.pathname = '/admin';
     return NextResponse.redirect(url);
   }
 
@@ -145,11 +139,11 @@ export async function middleware(request: NextRequest) {
     // Allow no-workspace routes
     if (isAllowedWithoutWorkspace(pathname)) return response;
 
-    // Allow /admin routes only
-    if (pathname === '/admin' || pathname.startsWith('/admin/')) return response;
+    // Allow /dashboard routes only
+    if (pathname === '/dashboard' || pathname.startsWith('/dashboard/')) return response;
 
-    // Redirect client admin to /admin
-    url.pathname = '/admin';
+    // Redirect client admin to /dashboard
+    url.pathname = '/dashboard';
     return NextResponse.redirect(url);
   }
 
