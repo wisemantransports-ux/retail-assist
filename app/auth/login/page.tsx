@@ -197,9 +197,10 @@ export default function LoginPage() {
       router.replace(targetPath);
     }
 
-    if (status === 'unauthorized') {
-      router.replace('/unauthorized');
-    }
+    // Note: Do NOT auto-redirect to /unauthorized on this page.
+    // If status === 'unauthorized' (authenticated but no role), the user should be able to
+    // submit the login form to try again. Only the form submission will determine if they
+    // should be redirected to /unauthorized.
   }, [status, role, pathname, router, workspaceId]);
 
   return (

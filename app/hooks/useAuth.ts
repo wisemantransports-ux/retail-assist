@@ -115,142 +115,27 @@ export function useAuth(): AuthState {
         return;
       }
 
-      // If SDK reports no session, don't conclude unauthenticated immediately.
-      // It's possible the SDK hasn't synced yet after a redirect; check backend as a reliable source.
+      // If SDK reports no session, user is unauthenticated.
+      // Do NOT call /api/auth/me for unauthenticated users; it will call rpc_get_user_access
+      // which is only meant for authenticated users and may return 403 for non-auth requests.
+      // Only call /api/auth/me AFTER a session exists (see below).
       if (!session) {
-        console.log('[useAuth] No session found via SDK - checking backend /api/auth/me as fallback');
-
-        // Helper: fetch with retries for transient 5xx errors
-        async function fetchWithRetries(input: RequestInfo, init?: RequestInit, retries = 2, backoffMs = 200) {
-          for (let attempt = 0; attempt <= retries; attempt++) {
-            try {
-              const res = await fetch(input, init);
-              if (res.ok) return res;
-
-              // Retry on transient 5xx errors
-              if (res.status >= 500 && attempt < retries) {
-                console.warn('[useAuth] /api/auth/me returned', res.status, '- retrying (attempt', attempt + 1, 'of', retries, ')');
-                const wait = backoffMs * Math.pow(2, attempt);
-                await new Promise((r) => setTimeout(r, wait));
-                continue;
-              }
-
-              return res;
-            } catch (err) {
-              if (attempt < retries) {
-                const wait = backoffMs * Math.pow(2, attempt);
-                await new Promise((r) => setTimeout(r, wait));
-                continue;
-              }
-              throw err;
-            }
-          }
-          throw new Error('Failed to fetch after retries');
-        }
-
-        try {
-          const meResponse = await fetchWithRetries('/api/auth/me', {
-            method: 'GET',
-            credentials: 'include',
-          });
-
-          // Backend claims authenticated
-          if (meResponse.ok) {
-            const meData = await meResponse.json();
-            console.log('[useAuth] /api/auth/me indicates authenticated:', meData);
-            setState((prev) => ({
-              ...prev,
-              session: meData.session || null,
-              access: meData.access || null,
-              role: meData.role || null,
-              workspaceId: meData.workspaceId || null,
-              isLoading: false,
-              isError: false,
-              errorMessage: null,
-              status: 'authenticated',
-            }));
-            setStatus('authenticated');
-            hasInitialized.current = true;
-            initInProgressRef.current = false;
-            return;
-          }
-
-          // Backend reports not found/unauthorized
-          if (meResponse.status === 401) {
-            console.log('[useAuth] /api/auth/me returned 401 - user not authenticated');
-            setState((prev) => ({
-              ...prev,
-              session: null,
-              access: null,
-              role: null,
-              workspaceId: null,
-              isLoading: false,
-              isError: false,
-              errorMessage: null,
-              status: 'unauthenticated',
-            }));
-            setStatus('unauthenticated');
-            hasInitialized.current = true;
-            initInProgressRef.current = false;
-            return;
-          }
-
-          if (meResponse.status === 403) {
-            console.log('[useAuth] /api/auth/me returned 403 - user unauthorized');
-            setState((prev) => ({
-              ...prev,
-              session: null,
-              access: null,
-              role: null,
-              workspaceId: null,
-              isLoading: false,
-              isError: false,
-              errorMessage: null,
-              status: 'unauthorized',
-            }));
-            setStatus('unauthorized');
-            hasInitialized.current = true;
-            initInProgressRef.current = false;
-            return;
-          }
-
-          // Other server errors (after retries)
-          let meError: any = {};
-          try {
-            meError = await meResponse.json();
-          } catch (e) {
-            meError = { error: await meResponse.text() };
-          }
-          console.error('[useAuth] /api/auth/me server error (', meResponse.status, meResponse.statusText, '):', meError);
-          setState((prev) => ({
-            ...prev,
-            session: null,
-            isLoading: false,
-            isError: true,
-            errorMessage: `Server error (${meResponse.status}): ${meError.error || 'Unknown error'}`,
-            status: 'unauthenticated',
-          }));
-          setStatus('unauthenticated');
-          hasInitialized.current = true;
-          initInProgressRef.current = false;
-          return;
-        } catch (err: any) {
-          console.error('[useAuth] Error calling /api/auth/me fallback:', err);
-          // If the backend check fails unexpectedly, fall back to unauthenticated to avoid hanging forever
-          setState((prev) => ({
-            ...prev,
-            session: null,
-            access: null,
-            role: null,
-            workspaceId: null,
-            isLoading: false,
-            isError: false,
-            errorMessage: null,
-          }));
-          hasInitialized.current = true;
-          initInProgressRef.current = false;
-          return;
-        }
+        console.log('[useAuth] No session found - user is unauthenticated');
+        setState((prev) => ({
+          ...prev,
+          session: null,
+          access: null,
+          role: null,
+          workspaceId: null,
+          isLoading: false,
+          isError: false,
+          errorMessage: null,
+          status: 'unauthenticated',
+        }));
+        setStatus('unauthenticated');
+        hasInitialized.current = true;
+        initInProgressRef.current = false;
+        return;
       }
 
       // ===== STEP 1: Session confirmed - fetch user access via backend API =====
