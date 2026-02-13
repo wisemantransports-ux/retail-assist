@@ -321,7 +321,7 @@ export default function EmployeeMessagesPage() {
               : errorMsg === 'Access denied. Expected role: employee, got: super_admin'
                 ? 'Platform admins access support escalations via /admin'
                 : errorMsg === 'Access denied. Expected role: employee, got: platform_staff'
-                  ? 'Platform staff access escalated messages via /admin/support'
+                  ? 'Platform staff access escalated messages via /support'
                   : errorMsg}
           </p>
         </div>

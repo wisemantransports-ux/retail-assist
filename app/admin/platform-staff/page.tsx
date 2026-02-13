@@ -82,7 +82,7 @@ function PlatformStaffContent() {
         console.log('[PlatformStaffPage] Workspace ID:', workspace_id);
 
         // Only super_admin may access
-        const canManageEmployees = role === "super_admin" || role === "client_admin";
+        const canManageEmployees = role === "super_admin" || role === "admin";
         if (!canManageEmployees) {
           console.warn('[PlatformStaffPage] Access denied for role:', role);
           router.push('/unauthorized');

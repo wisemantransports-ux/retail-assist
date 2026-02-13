@@ -16,9 +16,10 @@ import { useEffect } from 'react';
  */
 
 export const ROLE_ROUTES = {
-  super_admin: '/platform-admin',
-  admin: '/admin/dashboard',
-  employee: '/app',
+  super_admin: '/admin',
+  admin: '/dashboard',
+  platform_staff: '/support',
+  employee: '/employees/dashboard',
 } as const;
 
 export type ValidRole = keyof typeof ROLE_ROUTES;

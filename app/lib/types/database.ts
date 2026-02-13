@@ -579,7 +579,7 @@ export interface ManualPayment {
 // EMPLOYEES DASHBOARD TYPES
 // ============================================================================
 
-export type EmployeeRole = 'super_admin' | 'admin' | 'employee';
+export type EmployeeRole = 'super_admin' | 'admin' | 'employee' | 'platform_staff';
 
 export interface Employee {
   id: string;

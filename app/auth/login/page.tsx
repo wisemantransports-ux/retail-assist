@@ -128,8 +128,8 @@ export default function LoginPage() {
         targetPath = '/admin';
         console.log('[Login Page] Super admin detected, redirecting to /admin');
       } else if (role === 'platform_staff') {
-        targetPath = '/admin/support';
-        console.log('[Login Page] Platform staff detected, redirecting to /admin/support');
+        targetPath = '/support';
+        console.log('[Login Page] Platform staff detected, redirecting to /support');
       } else if (role === 'admin') {
         targetPath = '/dashboard';
         console.log('[Login Page] Client admin detected, redirecting to /dashboard');
@@ -169,6 +169,14 @@ export default function LoginPage() {
     if (status === 'loading') return; // wait for /api/auth/me
 
     if (status === 'authenticated') {
+      // If the session exists but the user's role hasn't been resolved yet,
+      // do not auto-redirect to `/unauthorized`. Allow the login UI to render
+      // so the user can re-authenticate or complete any recovery steps.
+      if (!role) {
+        console.log('[Login Page] Authenticated but role unresolved — allowing login UI');
+        return;
+      }
+
       hasAutoRedirectRef.current = true;
 
       // Determine redirect target based on role
@@ -176,11 +184,10 @@ export default function LoginPage() {
       if (role === 'super_admin') {
         targetPath = '/admin';
       } else if (role === 'platform_staff') {
-        targetPath = '/admin/support';
+        targetPath = '/support';
       } else if (role === 'admin') {
         targetPath = '/dashboard';
       } else if (role === 'employee') {
-        // Check if employee belongs to PLATFORM_WORKSPACE_ID
         if (workspaceId === PLATFORM_WORKSPACE_ID) {
           targetPath = '/super-admin/employees';
         } else {

@@ -189,7 +189,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ===== CLIENT ADMIN ONBOARDING COMPLETION =====
-    // For client_admin role: Create workspace if missing, return workspaceId
+    // For admin role: Create workspace if missing, return workspaceId
     if (role === 'admin' && !workspaceId) {
       console.log('[LOGIN] Client admin without workspace detected - initiating onboarding completion');
       
@@ -204,7 +204,7 @@ export async function POST(request: NextRequest) {
         }
         
         workspaceId = result.workspaceId;
-        console.log('[LOGIN] ✓ Workspace created/assigned for client_admin:', workspaceId);
+        console.log('[LOGIN] ✓ Workspace created/assigned for admin:', workspaceId);
       } catch (err: any) {
         console.error('[LOGIN] Workspace provisioning error:', err.message);
         return NextResponse.json({ 
@@ -239,7 +239,7 @@ export async function POST(request: NextRequest) {
     // ===== RETURN ROLE AND WORKSPACE_ID FOR CLIENT-SIDE ROUTING =====
     // Client will use role to determine post-login redirect:
     //   - super_admin → /admin
-    //   - platform_staff → /admin/support
+    //   - platform_staff → /support
     //   - admin → /dashboard
     //   - employee → /employees/dashboard
     

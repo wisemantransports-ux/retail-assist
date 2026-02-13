@@ -11,7 +11,7 @@ import type { Session } from '@supabase/supabase-js';
 export interface UserAccess {
   user_id: string;
   workspace_id: string | null;
-  role: 'super_admin' | 'admin' | 'employee' | string;
+  role: 'super_admin' | 'admin' | 'employee' | 'platform_staff' | string;
 }
 
 /**

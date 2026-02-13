@@ -293,7 +293,7 @@ export default function AdminMessagesPage() {
             {errorMsg === 'Access denied. Expected role: admin, got: employee'
               ? 'Employee accounts access messages via /employees/messages instead'
               : errorMsg === 'Access denied. Expected role: admin, got: platform_staff'
-                ? 'Support staff access escalated messages via /admin/support'
+                ? 'Support staff access escalated messages via /support'
                 : errorMsg}
           </p>
         </div>

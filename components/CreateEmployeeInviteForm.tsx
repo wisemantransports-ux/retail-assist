@@ -100,12 +100,12 @@ export const CreateEmployeeInviteForm: React.FC<CreateEmployeeInviteFormProps> =
 
       try {
         // AUTHORIZATION STRATEGY:
-        // Client-admins MUST use /api/employees endpoint
+        // Admins MUST use /api/employees endpoint
         // API infers workspace_id from auth context
         // Frontend sends ONLY email to prevent client-side auth bypasses
         // If you are a platform (super) admin calling Supabase directly from the client,
         // prefer using the helper at `app/lib/employees/createEmployee.ts` which enforces
-        // inviter rules (super_admin vs client_admin workspace handling).
+        // inviter rules (super_admin vs admin workspace handling).
 
         const response = await fetch('/api/employees', {
           method: 'POST',

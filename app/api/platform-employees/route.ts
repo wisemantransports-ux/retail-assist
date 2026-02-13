@@ -181,18 +181,18 @@ export async function POST(request: NextRequest) {
 
     // ===== CRITICAL: EMAIL VALIDATION FOR EMPLOYEE INVITES =====
     // Employees cannot use emails already registered as:
-    // - super_admin or client_admin (in users table)
+    // - super_admin or admin (in users table)
     // - existing employee (in employees table)
     console.log('[INVITE CREATE] Checking if email is already in use:', email);
     
     const admin = createAdminSupabaseClient();
     
-    // Check 1: Email must not exist as super_admin or client_admin
+    // Check 1: Email must not exist as super_admin or admin
     const { data: existingUserCheck, error: checkError } = await admin
       .from('users')
       .select('id, email, role')
       .eq('email', email)
-      .in('role', ['super_admin', 'client_admin']);
+      .in('role', ['super_admin', 'admin']);
 
     if (existingUserCheck && existingUserCheck.length > 0) {
       const existingUser = existingUserCheck[0];

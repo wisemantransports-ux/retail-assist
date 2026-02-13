@@ -2,7 +2,7 @@
 
 import { createBrowserSupabaseClient } from '@/lib/supabase/client';
 
-export type InviterRole = 'super_admin' | 'client_admin';
+export type InviterRole = 'super_admin' | 'admin';
 
 export async function createEmployee({
   email,
@@ -19,7 +19,7 @@ export async function createEmployee({
   if (invitedByRole === 'super_admin') {
     // Super admin invites → workspace_id must be null
     workspaceId = null;
-  } else if (invitedByRole === 'client_admin') {
+  } else if (invitedByRole === 'admin') {
     // Client admin invites → workspace_id required
     if (!workspaceId) throw new Error('Client admin must assign a workspace');
   } else {

@@ -114,14 +114,14 @@ export async function POST(request: NextRequest) {
     // super_admins and platform employees may not have a workspace assigned at invite time
 
     // ===== CRITICAL: ROLE CONFLICT CHECK =====
-    // Employees cannot use emails already registered as super_admin or client_admin
+    // Employees cannot use emails already registered as super_admin or admin
     console.log('[INVITE ACCEPT] Checking for role conflicts with reserved admin roles:', invite.email);
     
     const { data: reservedRoleCheck, error: reservedCheckError } = await admin
       .from('users')
       .select('id, email, role')
       .eq('email', invite.email)
-      .in('role', ['super_admin', 'client_admin']);
+      .in('role', ['super_admin', 'admin']);
 
     if (reservedRoleCheck && reservedRoleCheck.length > 0) {
       const reservedUser = reservedRoleCheck[0];
@@ -171,8 +171,8 @@ export async function POST(request: NextRequest) {
 
       const existingUser = existingUsers[0];
       
-      // CRITICAL: Reject if user is super_admin or client_admin - they cannot be employees
-      if (existingUser.role === 'super_admin' || existingUser.role === 'client_admin') {
+      // CRITICAL: Reject if user is super_admin or admin - they cannot be employees
+      if (existingUser.role === 'super_admin' || existingUser.role === 'admin') {
         console.log('[INVITE ACCEPT] User is admin - cannot accept employee invite', {
           email: invite.email,
           existing_role: existingUser.role,
@@ -363,8 +363,8 @@ export async function POST(request: NextRequest) {
 
     // Determine invited_by_role from the invite
     // If workspace_id is NULL → platform employee (super_admin invited)
-    // If workspace_id is SET → client employee (client_admin invited)
-    const invitedByRole = invite.workspace_id === null ? 'super_admin' : 'client_admin';
+    // If workspace_id is SET → client employee (admin invited)
+    const invitedByRole = invite.workspace_id === null ? 'super_admin' : 'admin';
 
     // ✨ FIX #2: WORKSPACE RESOLUTION (AUTHORITATIVE)
     // - Super admin invites → workspace_id = PLATFORM_WORKSPACE_ID

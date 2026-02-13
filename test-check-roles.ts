@@ -20,15 +20,15 @@ if (error) {
   });
 }
 
-// Also check for client_admin role
-console.log('\n\nChecking for client_admin users...\n');
+// Also check for admin role
+console.log('\n\nChecking for admin users...\n');
 const { data: clientAdmins } = await admin
   .from('users')
   .select('id, email, role, workspace_id')
-  .eq('role', 'client_admin')
+  .eq('role', 'admin')
   .limit(5);
 
-console.log(`Found ${clientAdmins?.length || 0} client_admin users:`);
+console.log(`Found ${clientAdmins?.length || 0} admin users:`);
 clientAdmins?.forEach(u => {
   console.log(`  - ${u.email} | workspace: ${u.workspace_id}`);
 });

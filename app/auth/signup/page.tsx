@@ -160,10 +160,10 @@ function SignupForm() {
         if (role === 'super_admin') {
           targetPath = '/admin';
           console.log('[Signup] Super admin detected, redirecting to /admin');
-        } 
+        }
         else if (role === 'platform_staff') {
-          targetPath = '/admin/support';
-          console.log('[Signup] Platform staff detected, redirecting to /admin/support');
+          targetPath = '/support';
+          console.log('[Signup] Platform staff detected, redirecting to /support');
         }
         else if (role === 'admin') {
           targetPath = '/dashboard';

@@ -118,17 +118,32 @@ export async function middleware(request: NextRequest) {
     // Allow no-workspace routes
     if (isAllowedWithoutWorkspace(pathname)) return response;
 
-    // Allow /admin routes
+    // Allow admin routes (super_admin is effectively platform admin)
     if (pathname === '/admin' || pathname.startsWith('/admin/')) return response;
 
-    // Redirect super_admin to /admin
+    // Redirect super_admin to the admin UI
     url.pathname = '/admin';
+    return NextResponse.redirect(url);
+  }
+
+  // ===== 1.5️⃣ PLATFORM STAFF (support) =====
+  if (role === 'platform_staff') {
+    console.log('[Middleware] Processing platform_staff authorization');
+
+    // Allow no-workspace routes
+    if (isAllowedWithoutWorkspace(pathname)) return response;
+
+    // Allow only /support routes for platform_staff
+    if (pathname === '/support' || pathname.startsWith('/support/')) return response;
+
+    // Redirect platform_staff to support UI
+    url.pathname = '/support';
     return NextResponse.redirect(url);
   }
 
   // ===== 2️⃣ CLIENT ADMIN ROLE (workspace_id REQUIRED) =====
   if (role === 'admin') {
-    console.log('[Middleware] Processing client_admin authorization');
+    console.log('[Middleware] Processing admin authorization');
 
     // Client admin MUST have a workspace_id
     if (!workspaceId) {
@@ -176,6 +191,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+
   // ===== UNKNOWN ROLE =====
   console.error('[Middleware] Unknown role:', role);
   return NextResponse.redirect(new URL('/unauthorized', request.url));
@@ -191,7 +207,9 @@ export const config = {
     '/dashboard',
     '/dashboard/:path*',
     '/employees',
-    '/employees/:path*'
+    '/employees/:path*',
+    '/support',
+    '/support/:path*'
   ],
 };
 

@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
           console.warn('[SIGNUP] Workspace provisioning failed (non-fatal):', workspaceResult.error);
         } else {
           workspaceId = workspaceResult.workspaceId;
-          console.info('[SIGNUP] ✓ Workspace provisioned for client_admin:', workspaceId, 'created:', workspaceResult.created);
+          console.info('[SIGNUP] ✓ Workspace provisioned for admin:', workspaceId, 'created:', workspaceResult.created);
         }
       } catch (err: any) {
         console.warn('[SIGNUP] Workspace provisioning error (non-fatal):', err.message);

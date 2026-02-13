@@ -4,10 +4,10 @@ import { NextRequest, NextResponse } from 'next/server';
 
 /**
  * GET /api/employees/invites
- * Returns list of pending invites for the client_admin's workspace
+ * Returns list of pending invites for the admin's workspace
  *
  * SECURITY:
- * - Only client_admin can list invites in their workspace
+ * - Only admin can list invites in their workspace
  * - Results are scoped to the admin's workspace_id
  * - Employees cannot access this endpoint
  */
